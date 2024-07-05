@@ -45,7 +45,7 @@
 //!     }
 //!
 //!     // Called when the emulator plays a sound.
-//!     fn sound_play(&mut self, _stream: Box<dyn Stream>) {
+//!     fn sound_play(&mut self, _stream: rgy::SoundStream) {
 //!         // TODO: Play the wave pattern provided `Stream`.
 //!     }
 //!
@@ -76,11 +76,6 @@
 //!         true
 //!     }
 //!
-//!     // Called when the emulator stores the save data to the battery-backed RAM.
-//!     fn load_ram(&mut self, size: usize) -> Vec<u8> {
-//!         // TODO: Return save data.
-//!         vec![0; size]
-//!     }
 //!
 //!     // Called when the emulator loads the save data from the battery-backed RAM.
 //!     fn save_ram(&mut self, _ram: &[u8]) {
