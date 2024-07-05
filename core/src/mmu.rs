@@ -1,5 +1,5 @@
 use alloc::{vec, vec::Vec};
-use hashbrown::HashMap;
+use arrayvec::ArrayVec;
 
 /// The variants to control memory read access from the CPU.
 pub enum MemRead {
@@ -29,7 +29,7 @@ pub trait MemHandler {
 }
 
 /// The handle of a memory handler.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Handle(u64);
 
 /// The memory management unit (MMU)
@@ -39,9 +39,8 @@ pub struct Handle(u64);
 /// and to modify the memory access behaviour.
 pub struct Mmu<'a> {
     ram: Vec<u8>,
-    handles: HashMap<Handle, (u16, u16)>,
     #[allow(clippy::type_complexity)]
-    handlers: HashMap<u16, Vec<(Handle, &'a dyn MemHandler)>>,
+    handlers: ArrayVec<((u16, u16), Handle, &'a dyn MemHandler), 18>,
     hdgen: u64,
 }
 
@@ -56,8 +55,7 @@ impl<'a> Mmu<'a> {
     pub fn new() -> Mmu<'a> {
         Mmu {
             ram: vec![0u8; 0x10000],
-            handles: HashMap::new(),
-            handlers: HashMap::new(),
+            handlers: ArrayVec::new(),
             hdgen: 0,
         }
     }
@@ -74,50 +72,32 @@ impl<'a> Mmu<'a> {
     pub fn add_handler(&mut self, range: (u16, u16), handler: &'a dyn MemHandler) -> Handle {
         let handle = self.next_handle();
 
-        self.handles.insert(handle.clone(), range);
-
-        for i in range.0..=range.1 {
-            if self.handlers.contains_key(&i) {
-                if let Some(v) = self.handlers.get_mut(&i) {
-                    v.push((handle.clone(), handler))
-                }
-            } else {
-                self.handlers.insert(i, vec![(handle.clone(), handler)]);
-            }
-        }
+        self.handlers.push((range, handle, handler));
 
         handle
     }
 
-    /// Remove a memory handler.
-    #[allow(unused)]
-    pub fn remove_handler<T>(&mut self, handle: &Handle)
-    where
-        T: MemHandler + 'static,
-    {
-        let range = match self.handles.remove(handle) {
-            Some(range) => range,
-            None => return,
-        };
-
-        for i in range.0..range.1 {
-            if let Some(v) = self.handlers.get_mut(&i) {
-                v.retain(|(hd, _)| hd != handle)
+    fn get_handlers_from_address<'b>(
+        handlers: &'b [((u16, u16), Handle, &dyn MemHandler)],
+        addr: u16,
+    ) -> impl Iterator<Item = &'b dyn MemHandler> + 'b {
+        handlers.iter().filter_map(move |(range, _, handler)| {
+            if (range.0..=range.1).contains(&addr) {
+                Some(*handler)
+            } else {
+                None
             }
-        }
+        })
     }
 
     /// Reads one byte from the given address in the memory.
     pub fn get8(&self, addr: u16) -> u8 {
-        if let Some(handlers) = self.handlers.get(&addr) {
-            for (_, handler) in handlers {
-                match handler.on_read(self, addr) {
-                    MemRead::Replace(alt) => return alt,
-                    MemRead::PassThrough => {}
-                }
+        for handler in Self::get_handlers_from_address(&self.handlers, addr) {
+            match handler.on_read(self, addr) {
+                MemRead::Replace(alt) => return alt,
+                MemRead::PassThrough => {}
             }
         }
-
         if (0xe000..=0xfdff).contains(&addr) {
             // echo ram
             self.ram[addr as usize - 0x2000]
@@ -128,16 +108,14 @@ impl<'a> Mmu<'a> {
 
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
-        if let Some(handlers) = self.handlers.get(&addr) {
-            for (_, handler) in handlers {
-                match handler.on_write(self, addr, v) {
-                    MemWrite::Replace(alt) => {
-                        self.ram[addr as usize] = alt;
-                        return;
-                    }
-                    MemWrite::PassThrough => {}
-                    MemWrite::Block => return,
+        for handler in Self::get_handlers_from_address(&self.handlers, addr) {
+            match handler.on_write(self, addr, v) {
+                MemWrite::Replace(alt) => {
+                    self.ram[addr as usize] = alt;
+                    return;
                 }
+                MemWrite::PassThrough => {}
+                MemWrite::Block => return,
             }
         }
 

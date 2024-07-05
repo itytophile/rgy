@@ -17,6 +17,7 @@ log = "0.4"
 hashbrown = "0.14"
 spin = "0.9"
 static_cell = "2.1.0"
+arrayvec = { version = "0.7", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.11"
