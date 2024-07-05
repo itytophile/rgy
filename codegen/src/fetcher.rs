@@ -1,5 +1,7 @@
+use lazy_static::lazy_static;
+use log::{debug, info};
 use pest::Parser;
-#[derive(Parser)]
+#[derive(pest_derive::Parser)]
 #[grammar = "inst.pest"]
 struct InstParser;
 
@@ -12,7 +14,7 @@ use crate::format::{Instruction, Time};
 use std::fs::File;
 use std::io::prelude::*;
 
-use crate::{Error, Fetch, Result};
+use crate::Fetch;
 
 lazy_static! {
     static ref ALT: HashMap<&'static str, &'static str> = {
@@ -61,8 +63,8 @@ lazy_static! {
 }
 
 fn parse_time(s: &str) -> Time {
-    if s.contains("/") {
-        let mut nums = s.split("/");
+    if s.contains('/') {
+        let mut nums = s.split('/');
         Time::Two(
             nums.next()
                 .expect("Incomplete time")
@@ -152,19 +154,17 @@ fn parse_table(table: ElementRef, op_prefix: u16) -> Vec<Instruction> {
     vec
 }
 
-pub fn run(opt: &Fetch) -> Result<()> {
+pub fn run(opt: &Fetch) -> anyhow::Result<()> {
     let doc = reqwest::blocking::get(
         opt.url
             .as_ref()
             .unwrap_or(&"http://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html".into()),
-    )
-    .map_err(|e| e.to_string())?
-    .text()
-    .map_err(|e| e.to_string())?;
+    )?
+    .text()?;
 
     let doc = Html::parse_document(&doc);
 
-    let sel = Selector::parse("table").map_err(|_| Error("Select failed".into()))?;
+    let sel = Selector::parse("table").map_err(|_| anyhow::anyhow!("Select failed"))?;
     let mut it = doc.select(&sel);
 
     let mut insts = Vec::new();

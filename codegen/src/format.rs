@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Time {

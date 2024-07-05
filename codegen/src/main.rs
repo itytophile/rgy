@@ -1,21 +1,3 @@
-extern crate pest;
-extern crate scraper;
-#[macro_use]
-extern crate pest_derive;
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-extern crate regex;
-#[macro_use]
-extern crate lazy_static;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_yaml;
-extern crate structopt;
-#[macro_use]
-extern crate tera;
-
 mod fetcher;
 mod format;
 mod generator;
@@ -49,36 +31,7 @@ pub enum Opt {
     Generate(Generate),
 }
 
-#[derive(Debug)]
-pub struct Error(String);
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-impl From<String> for Error {
-    fn from(s: String) -> Error {
-        Error(s)
-    }
-}
-
-impl From<std::num::ParseIntError> for Error {
-    fn from(s: std::num::ParseIntError) -> Error {
-        Error(s.to_string())
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(s: std::io::Error) -> Error {
-        Error(s.to_string())
-    }
-}
-
-impl std::convert::From<tera::Error> for Error {
-    fn from(s: tera::Error) -> Error {
-        Error(s.to_string())
-    }
-}
-
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
 
     env_logger::init();
