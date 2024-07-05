@@ -6,7 +6,7 @@ use log::*;
 
 pub struct Serial<'a> {
     hw: HardwareHandle<'a>,
-    irq: Irq,
+    irq: Irq<'a>,
     data: u8,
     recv: u8,
     ctrl: u8,
@@ -14,7 +14,7 @@ pub struct Serial<'a> {
 }
 
 impl<'a> Serial<'a> {
-    pub fn new(hw: HardwareHandle<'a>, irq: Irq) -> Self {
+    pub fn new(hw: HardwareHandle<'a>, irq: Irq<'a>) -> Self {
         Self {
             hw,
             irq,

@@ -1,16 +1,15 @@
 use crate::device::IoHandler;
 use crate::mmu::{MemRead, MemWrite, Mmu};
-use alloc::rc::Rc;
 use core::cell::RefCell;
 use log::*;
 
 #[derive(Clone)]
-pub struct Irq {
-    request: Rc<RefCell<Ints>>,
+pub struct Irq<'a> {
+    request: &'a RefCell<Ints>,
 }
 
-impl Irq {
-    fn new(request: Rc<RefCell<Ints>>) -> Irq {
+impl<'a> Irq<'a> {
+    fn new(request: &'a RefCell<Ints>) -> Self {
         Irq { request }
     }
 
@@ -64,27 +63,35 @@ impl Ints {
     }
 }
 
-pub struct Ic {
-    enable: Rc<RefCell<Ints>>,
-    request: Rc<RefCell<Ints>>,
+pub struct Ic<'a> {
+    enable: &'a RefCell<Ints>,
+    request: &'a RefCell<Ints>,
 }
 
-impl Default for Ic {
+pub struct IcCells {
+    enable: RefCell<Ints>,
+    request: RefCell<Ints>,
+}
+
+impl Default for IcCells {
     fn default() -> Self {
-        Self::new()
+        Self {
+            enable: RefCell::new(Ints::default()),
+            request: RefCell::new(Ints::default()),
+        }
     }
 }
 
-impl Ic {
-    pub fn new() -> Ic {
+impl<'a> Ic<'a> {
+    pub fn new(cells: &'a IcCells) -> Ic<'a> {
         Ic {
-            enable: Rc::new(RefCell::new(Ints::default())),
-            request: Rc::new(RefCell::new(Ints::default())),
+            enable: &cells.enable,
+            request: &cells.request,
         }
     }
 
-    pub fn irq(&self) -> Irq {
-        Irq::new(self.request.clone())
+    pub fn irq(&self) -> Irq<'a> {
+        Irq::new(self.request)
     }
 
     pub fn peek(&self) -> Option<u8> {
@@ -120,7 +127,7 @@ impl Ic {
     }
 }
 
-impl IoHandler for Ic {
+impl<'a> IoHandler for Ic<'a> {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         if addr == 0xffff {
             let v = self.enable.borrow().get();

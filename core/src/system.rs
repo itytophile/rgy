@@ -8,7 +8,7 @@ use crate::dma::Dma;
 use crate::fc::FreqControl;
 use crate::gpu::Gpu;
 use crate::hardware::{Hardware, HardwareHandle};
-use crate::ic::Ic;
+use crate::ic::{Ic, IcCells};
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::mmu::Mmu;
@@ -83,20 +83,20 @@ pub struct System<'a, 'b, D> {
     cpu: Cpu,
     mmu: Option<Mmu<'a>>,
     dbg: Device<'a, D>,
-    ic: Device<'a, Ic>,
+    ic: Device<'a, Ic<'b>>,
     gpu: Device<'a, Gpu<'b>>,
     joypad: Device<'a, Joypad<'b>>,
-    timer: Device<'a, Timer>,
+    timer: Device<'a, Timer<'b>>,
     serial: Device<'a, Serial<'b>>,
     dma: Device<'a, Dma>,
 }
 
 struct RawDevices<'a> {
     sound: RefCell<Sound>,
-    ic: RefCell<Ic>,
+    ic: RefCell<Ic<'a>>,
     gpu: RefCell<Gpu<'a>>,
     joypad: RefCell<Joypad<'a>>,
-    timer: RefCell<Timer>,
+    timer: RefCell<Timer<'a>>,
     serial: RefCell<Serial<'a>>,
     mbc: RefCell<Mbc<'a>>,
     cgb: RefCell<Cgb>,
@@ -104,8 +104,14 @@ struct RawDevices<'a> {
 }
 
 impl<'a> RawDevices<'a> {
-    pub fn new(rom: &[u8], hw: HardwareHandle<'a>, wave: Wave, mixer: Mixer) -> Self {
-        let ic = Ic::new();
+    pub fn new(
+        rom: &[u8],
+        hw: HardwareHandle<'a>,
+        wave: Wave,
+        mixer: Mixer,
+        ic_cells: &'a IcCells,
+    ) -> Self {
+        let ic = Ic::new(ic_cells);
         let irq = ic.irq();
         Self {
             sound: RefCell::new(Sound::new(hw.clone(), wave, mixer)),
@@ -124,10 +130,10 @@ impl<'a> RawDevices<'a> {
 #[derive(Clone)]
 pub struct Devices<'a, 'b> {
     sound: Device<'a, Sound>,
-    ic: Device<'a, Ic>,
+    ic: Device<'a, Ic<'b>>,
     gpu: Device<'a, Gpu<'b>>,
     joypad: Device<'a, Joypad<'b>>,
-    timer: Device<'a, Timer>,
+    timer: Device<'a, Timer<'b>>,
     serial: Device<'a, Serial<'b>>,
     mbc: Device<'a, Mbc<'b>>,
     cgb: Device<'a, Cgb>,
@@ -161,10 +167,10 @@ impl<'a, 'b> Devices<'a, 'b> {
 
 pub struct Handlers<'a, 'b> {
     sound: IoMemHandler<'a, Sound>,
-    ic: IoMemHandler<'a, Ic>,
+    ic: IoMemHandler<'a, Ic<'b>>,
     gpu: IoMemHandler<'a, Gpu<'b>>,
     joypad: IoMemHandler<'a, Joypad<'b>>,
-    timer: IoMemHandler<'a, Timer>,
+    timer: IoMemHandler<'a, Timer<'b>>,
     serial: IoMemHandler<'a, Serial<'b>>,
     mbc: IoMemHandler<'a, Mbc<'b>>,
     cgb: IoMemHandler<'a, Cgb>,
@@ -322,6 +328,7 @@ fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u
     let dbg = Device::mediate(dbg_cell);
     let hw_cell = RefCell::new(hw);
     let hw_handle = HardwareHandle::new(&hw_cell);
+    let ic_cells = IcCells::default();
     let raw_devices = RawDevices::new(
         rom,
         hw_handle.clone(),
@@ -332,6 +339,7 @@ fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u
             Unit::new(WAVE_UNIT.init(UnitRaw::default())),
             Unit::new(NOISE_UNIT.init(UnitRaw::default())),
         )),
+        &ic_cells,
     );
     let devices: Devices = Devices::new(&raw_devices);
     let dbg_handle = dbg.handler();

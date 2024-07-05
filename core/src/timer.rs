@@ -3,8 +3,8 @@ use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
 use log::*;
 
-pub struct Timer {
-    irq: Irq,
+pub struct Timer<'a> {
+    irq: Irq<'a>,
     div: u8,
     div_clocks: usize,
     tim: u8,
@@ -13,8 +13,8 @@ pub struct Timer {
     ctrl: u8,
 }
 
-impl Timer {
-    pub fn new(irq: Irq) -> Self {
+impl<'a> Timer<'a> {
+    pub fn new(irq: Irq<'a>) -> Self {
         Self {
             irq,
             div: 0,
@@ -77,7 +77,7 @@ impl Timer {
     }
 }
 
-impl IoHandler for Timer {
+impl<'a> IoHandler for Timer<'a> {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         info!("Timer read: {:04x}", addr);
         match addr {

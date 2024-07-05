@@ -6,13 +6,13 @@ use log::*;
 
 pub struct Joypad<'a> {
     hw: HardwareHandle<'a>,
-    irq: Irq,
+    irq: Irq<'a>,
     select: u8,
     pressed: u8,
 }
 
 impl<'a> Joypad<'a> {
-    pub fn new(hw: HardwareHandle<'a>, irq: Irq) -> Self {
+    pub fn new(hw: HardwareHandle<'a>, irq: Irq<'a>) -> Self {
         Self {
             hw,
             irq,

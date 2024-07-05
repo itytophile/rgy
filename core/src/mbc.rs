@@ -601,7 +601,7 @@ impl<'a> MbcType<'a> {
             MbcType::Mbc5(_) => "Mbc5",
             MbcType::HuC1(_) => "HuC1",
         }
-    } 
+    }
 }
 
 fn parse_str(b: &[u8]) -> String {

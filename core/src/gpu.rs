@@ -39,7 +39,7 @@ impl From<u8> for Mode {
 }
 
 pub struct Gpu<'a> {
-    irq: Irq,
+    irq: Irq<'a>,
 
     clocks: usize,
 
@@ -336,7 +336,7 @@ impl Hdma {
 }
 
 impl<'a> Gpu<'a> {
-    pub fn new(hw: HardwareHandle<'a>, irq: Irq) -> Self {
+    pub fn new(hw: HardwareHandle<'a>, irq: Irq<'a>) -> Self {
         Self {
             irq,
             clocks: 0,
