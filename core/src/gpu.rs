@@ -2,7 +2,6 @@ use crate::device::IoHandler;
 use crate::hardware::{HardwareHandle, VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
-use alloc::{vec, vec::Vec};
 use log::*;
 
 #[derive(Debug, Clone)]
@@ -68,19 +67,19 @@ pub struct Gpu {
     bgenable: bool,
     hw: HardwareHandle,
 
-    bg_palette: Vec<Color>,
-    obj_palette0: Vec<Color>,
-    obj_palette1: Vec<Color>,
+    bg_palette: [Color; 4],
+    obj_palette0: [Color; 4],
+    obj_palette1: [Color; 4],
     bg_color_palette: ColorPalette,
     obj_color_palette: ColorPalette,
-    vram: Vec<Vec<u8>>,
+    vram: [[u8; 0x2000]; 2],
     vram_select: usize,
 
     hdma: Hdma,
 }
 
-fn to_palette(p: u8) -> Vec<Color> {
-    vec![
+fn to_palette(p: u8) -> [Color; 4] {
+    [
         (p & 0x3).into(),
         ((p >> 2) & 0x3).into(),
         ((p >> 4) & 0x3).into(),
@@ -88,7 +87,7 @@ fn to_palette(p: u8) -> Vec<Color> {
     ]
 }
 
-fn from_palette(p: Vec<Color>) -> u8 {
+fn from_palette(p: &[Color; 4]) -> u8 {
     assert_eq!(p.len(), 4);
 
     u8::from(p[0]) | u8::from(p[1]) << 2 | u8::from(p[2]) << 4 | u8::from(p[3]) << 6
@@ -111,7 +110,7 @@ struct MapAttribute<'a> {
 }
 
 struct ColorPalette {
-    cols: Vec<Vec<Color>>,
+    cols: [[Color; 4]; 8],
     index: usize,
     auto_inc: bool,
 }
@@ -119,7 +118,7 @@ struct ColorPalette {
 impl ColorPalette {
     fn new() -> Self {
         Self {
-            cols: vec![vec![Color::rgb(); 4]; 8],
+            cols: [[Color::rgb(); 4]; 8],
             index: 0,
             auto_inc: false,
         }
@@ -361,19 +360,19 @@ impl Gpu {
             spenable: false,
             bgenable: false,
             hw,
-            bg_palette: vec![
+            bg_palette: [
                 Color::White,
                 Color::LightGray,
                 Color::DarkGray,
                 Color::Black,
             ],
-            obj_palette0: vec![
+            obj_palette0: [
                 Color::White,
                 Color::LightGray,
                 Color::DarkGray,
                 Color::Black,
             ],
-            obj_palette1: vec![
+            obj_palette1: [
                 Color::White,
                 Color::LightGray,
                 Color::DarkGray,
@@ -381,7 +380,7 @@ impl Gpu {
             ],
             bg_color_palette: ColorPalette::new(),
             obj_color_palette: ColorPalette::new(),
-            vram: vec![vec![0; 0x2000]; 2],
+            vram: [[0; 0x2000]; 2],
             vram_select: 0,
             hdma: Hdma::new(),
         }
@@ -475,15 +474,12 @@ impl Gpu {
     }
 
     fn draw(&mut self, mmu: &Mmu) {
-        let height = VRAM_HEIGHT;
-        let width = VRAM_WIDTH;
-
-        if self.ly >= height as u8 {
+        if self.ly >= VRAM_HEIGHT as u8 {
             return;
         }
 
-        let mut buf = vec![0; width];
-        let mut bgbuf = vec![0; width];
+        let mut buf = [0; VRAM_WIDTH];
+        let mut bgbuf = [0; VRAM_WIDTH];
 
         if self.bgenable {
             let mapbase = self.bgmap;
@@ -492,7 +488,7 @@ impl Gpu {
             let ty = yy / 8;
             let tyoff = yy % 8;
 
-            for x in 0..width as u16 {
+            for x in 0..VRAM_WIDTH as u16 {
                 let xx = (x + self.scx as u16) % 256;
                 let tx = xx / 8;
                 let txoff = xx % 8;
@@ -524,7 +520,7 @@ impl Gpu {
                 let ty = yy / 8;
                 let tyoff = yy % 8;
 
-                for x in 0..width as u16 {
+                for x in 0..VRAM_WIDTH as u16 {
                     if x + 7 < self.wx as u16 {
                         continue;
                     }
@@ -579,7 +575,7 @@ impl Gpu {
 
                 let tiles = 0x8000;
 
-                for x in 0..width as u16 {
+                for x in 0..VRAM_WIDTH as u16 {
                     if x + 8 < xpos {
                         continue;
                     }
@@ -794,13 +790,13 @@ impl IoHandler for Gpu {
             unreachable!("DMA request")
         } else if addr == 0xff47 {
             debug!("Read Bg palette");
-            MemRead::Replace(from_palette(self.bg_palette.clone()))
+            MemRead::Replace(from_palette(&self.bg_palette))
         } else if addr == 0xff48 {
             debug!("Read Object palette 0");
-            MemRead::Replace(from_palette(self.obj_palette0.clone()))
+            MemRead::Replace(from_palette(&self.obj_palette0))
         } else if addr == 0xff49 {
             debug!("Read Object palette 1");
-            MemRead::Replace(from_palette(self.obj_palette1.clone()))
+            MemRead::Replace(from_palette(&self.obj_palette1))
         } else if addr == 0xff4a {
             MemRead::Replace(self.wy)
         } else if addr == 0xff4b {
