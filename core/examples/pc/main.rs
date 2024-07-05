@@ -52,7 +52,9 @@ fn set_affinity() {
         Some(())
     };
 
-    if set().is_none() { warn!("Couldn't set CPU affinity") }
+    if set().is_none() {
+        warn!("Couldn't set CPU affinity")
+    }
 }
 
 fn main() {

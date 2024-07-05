@@ -1,41 +1,40 @@
-use alloc::rc::Rc;
 use core::cell::{Ref, RefCell, RefMut};
 
 use crate::mmu::{MemHandler, MemRead, MemWrite, Mmu};
 
 /// The wrapper type for I/O handlers to register to MMU.
-pub struct Device<T>(Rc<RefCell<T>>, bool);
+pub struct Device<'a, T>(&'a RefCell<T>, bool);
 
-impl<T> Device<T> {
+impl<'a, T> Device<'a, T> {
     /// Create a new device.
-    pub fn new(inner: T) -> Self {
+    pub fn new(inner: &'a RefCell<T>) -> Self {
         Self::inner(inner, false)
     }
 
     /// Create a new mediater device.
-    pub fn mediate(inner: T) -> Self {
+    pub fn mediate(inner: &'a RefCell<T>) -> Self {
         Self::inner(inner, true)
     }
 
-    fn inner(inner: T, debug: bool) -> Self {
-        Self(Rc::new(RefCell::new(inner)), debug)
+    fn inner(inner: &'a RefCell<T>, debug: bool) -> Self {
+        Self(inner, debug)
     }
 
     /// Immutably borrow the underlying I/O handler.
-    pub fn borrow(&self) -> Ref<'_, T> {
+    pub fn borrow(&self) -> Ref<'a, T> {
         self.0.borrow()
     }
 
     /// Mutabully borrow the underlying I/O handler.
-    pub fn borrow_mut(&self) -> RefMut<'_, T> {
+    pub fn borrow_mut(&self) -> RefMut<'a, T> {
         self.0.borrow_mut()
     }
 }
 
-impl<T: IoHandler> Device<T> {
+impl<'a, T: IoHandler> Device<'a, T> {
     /// Return the memory-mapped I/O handler of the device.
     pub fn handler(&self) -> IoMemHandler<T> {
-        IoMemHandler(self.0.clone(), self.1)
+        IoMemHandler(self.0, self.1)
     }
 }
 
@@ -49,9 +48,12 @@ pub trait IoHandler {
 }
 
 /// The handler to intercept memory-mapped I/O.
-pub struct IoMemHandler<T>(Rc<RefCell<T>>, bool);
+pub struct IoMemHandler<'a, T>(&'a RefCell<T>, bool);
 
-impl<T: IoHandler> MemHandler for IoMemHandler<T> {
+impl<'a, T: IoHandler> MemHandler for IoMemHandler<'a, T>
+where
+    T: IoHandler,
+{
     fn on_read(&self, mmu: &Mmu, addr: u16) -> MemRead {
         // Don't hook if it's already hooked
         match self.0.try_borrow_mut() {

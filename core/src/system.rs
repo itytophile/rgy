@@ -1,3 +1,5 @@
+use core::cell::RefCell;
+
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
 use crate::debug::{Debugger, NullDebugger};
@@ -29,10 +31,9 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-    Self::new()
+        Self::new()
     }
-    }
-    
+}
 
 impl Config {
     /// Create the default configuration.
@@ -72,27 +73,57 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<D> {
+pub struct System<'a, D> {
     cfg: Config,
     hw: HardwareHandle,
     fc: FreqControl,
     cpu: Cpu,
     mmu: Option<Mmu>,
-    dbg: Device<D>,
-    ic: Device<Ic>,
-    gpu: Device<Gpu>,
-    joypad: Device<Joypad>,
-    timer: Device<Timer>,
-    serial: Device<Serial>,
-    dma: Device<Dma>,
+    dbg: Device<'a, D>,
+    ic: Device<'a, Ic>,
+    gpu: Device<'a, Gpu>,
+    joypad: Device<'a, Joypad>,
+    timer: Device<'a, Timer>,
+    serial: Device<'a, Serial>,
+    dma: Device<'a, Dma>,
 }
 
-impl<D> System<D>
+struct Devices {
+    sound: RefCell<Sound>,
+    ic: RefCell<Ic>,
+    gpu: RefCell<Gpu>,
+    joypad: RefCell<Joypad>,
+    timer: RefCell<Timer>,
+    serial: RefCell<Serial>,
+    mbc: RefCell<Mbc>,
+    cgb: RefCell<Cgb>,
+    dma: RefCell<Dma>,
+}
+
+impl Devices {
+    pub fn new(rom: &[u8], hw: HardwareHandle) -> Self {
+        let ic = Ic::new();
+        let irq = ic.irq();
+        Self {
+            sound: RefCell::new(Sound::new(hw.clone())),
+            ic: RefCell::new(ic),
+            gpu: RefCell::new(Gpu::new(hw.clone(), irq.clone())),
+            joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
+            timer: RefCell::new(Timer::new(irq.clone())),
+            serial: RefCell::new(Serial::new(hw.clone(), irq.clone())),
+            mbc: RefCell::new(Mbc::new(hw.clone(), rom.to_vec())),
+            cgb: RefCell::new(Cgb::new()),
+            dma: RefCell::new(Dma::new()),
+        }
+    }
+}
+
+impl<'a, D> System<'a, D>
 where
     D: Debugger + 'static,
 {
     /// Create a new emulator context.
-    pub fn new<T>(cfg: Config, rom: &[u8], hw: T, dbg: D) -> Self
+    pub fn new<T>(cfg: Config, rom: &[u8], hw: T, dbg: &'a RefCell<D>, devices: &'a Devices) -> Self
     where
         T: Hardware + 'static,
     {
@@ -105,16 +136,16 @@ where
         let dbg = Device::mediate(dbg);
         let cpu = Cpu::new();
         let mut mmu = Mmu::new();
-        let sound = Device::new(Sound::new(hw.clone()));
-        let ic = Device::new(Ic::new());
+        let sound = Device::new(&devices.sound);
+        let ic = Device::new(&devices.ic);
         let irq = ic.borrow().irq().clone();
-        let gpu = Device::new(Gpu::new(hw.clone(), irq.clone()));
-        let joypad = Device::new(Joypad::new(hw.clone(), irq.clone()));
-        let timer = Device::new(Timer::new(irq.clone()));
-        let serial = Device::new(Serial::new(hw.clone(), irq.clone()));
-        let mbc = Device::new(Mbc::new(hw.clone(), rom.to_vec()));
-        let cgb = Device::new(Cgb::new());
-        let dma = Device::new(Dma::new());
+        let gpu = Device::new(&devices.gpu);
+        let joypad = Device::new(&devices.joypad);
+        let timer = Device::new(&devices.timer);
+        let serial = Device::new(&devices.serial);
+        let mbc = Device::new(&devices.mbc);
+        let cgb = Device::new(&devices.cgb);
+        let dma = Device::new(&devices.dma);
 
         mmu.add_handler((0x0000, 0xffff), dbg.handler());
 

@@ -71,9 +71,9 @@ pub struct Ic {
 
 impl Default for Ic {
     fn default() -> Self {
-    Self::new()
+        Self::new()
     }
-    }
+}
 
 impl Ic {
     pub fn new() -> Ic {

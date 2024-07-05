@@ -48,11 +48,10 @@ pub struct Mmu {
 
 impl Default for Mmu {
     fn default() -> Self {
-    Self::new()
+        Self::new()
     }
-    }
+}
 
-    
 impl Mmu {
     /// Create a new MMU instance.
     pub fn new() -> Mmu {
@@ -84,7 +83,9 @@ impl Mmu {
 
         for i in range.0..=range.1 {
             if self.handlers.contains_key(&i) {
-                if let Some(v) = self.handlers.get_mut(&i) { v.push((handle.clone(), handler.clone())) }
+                if let Some(v) = self.handlers.get_mut(&i) {
+                    v.push((handle.clone(), handler.clone()))
+                }
             } else {
                 self.handlers
                     .insert(i, vec![(handle.clone(), handler.clone())]);
@@ -106,7 +107,9 @@ impl Mmu {
         };
 
         for i in range.0..range.1 {
-            if let Some(v) = self.handlers.get_mut(&i) { v.retain(|(hd, _)| hd != handle) }
+            if let Some(v) = self.handlers.get_mut(&i) {
+                v.retain(|(hd, _)| hd != handle)
+            }
         }
     }
 
