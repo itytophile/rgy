@@ -95,7 +95,7 @@ impl Mmu {
     where
         T: MemHandler + 'static,
     {
-        let range = match self.handles.remove(&handle) {
+        let range = match self.handles.remove(handle) {
             Some(range) => range,
             None => return,
         };

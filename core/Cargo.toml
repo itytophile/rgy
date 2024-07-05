@@ -14,12 +14,12 @@ readme = "../README.md"
 [dependencies]
 lazy_static = { version = "1.2", features = ["spin_no_std"] }
 log = "0.4"
-hashbrown = "0.6"
-spin = "0.5"
+hashbrown = "0.14"
+spin = "0.9"
 
 [dev-dependencies]
-env_logger = "0.6"
-rustyline = "4.1"
+env_logger = "0.11"
+rustyline = "4"
 minifb = "0.12"
 structopt = "0.2"
 cpal = "0.9"
