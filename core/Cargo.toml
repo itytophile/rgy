@@ -20,9 +20,9 @@ spin = "0.5"
 [dev-dependencies]
 env_logger = "0.6"
 rustyline = "4.1"
-minifb = "0.11"
+minifb = "0.12"
 structopt = "0.2"
-cpal = "0.8"
+cpal = "0.9"
 signal-hook = "0.1"
 core_affinity = "0.5"
 utils = { path = "../utils" }

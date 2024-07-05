@@ -1,11 +1,10 @@
 use crate::{Error, Generate, Result};
 
-use serde_yaml;
-use tera::{to_value, Context, Value};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::collections::HashMap;
 use std::process::{Command, Stdio};
+use tera::{to_value, Context, Value};
 
 use crate::format::Instruction;
 
