@@ -13,9 +13,12 @@ use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::mmu::Mmu;
 use crate::serial::Serial;
-use crate::sound::Sound;
+use crate::sound::{
+    Mixer, MixerStream, NoiseStream, Sound, ToneStream, Unit, UnitRaw, Wave, WaveRaw, WaveStream,
+};
 use crate::timer::Timer;
 use log::*;
+use static_cell::StaticCell;
 
 /// Configuration of the emulator.
 pub struct Config {
@@ -101,11 +104,11 @@ struct RawDevices {
 }
 
 impl RawDevices {
-    pub fn new(rom: &[u8], hw: HardwareHandle) -> Self {
+    pub fn new(rom: &[u8], hw: HardwareHandle, wave: Wave, mixer: Mixer) -> Self {
         let ic = Ic::new();
         let irq = ic.irq();
         Self {
-            sound: RefCell::new(Sound::new(hw.clone())),
+            sound: RefCell::new(Sound::new(hw.clone(), wave, mixer)),
             ic: RefCell::new(ic),
             gpu: RefCell::new(Gpu::new(hw.clone(), irq.clone())),
             joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
@@ -308,11 +311,27 @@ pub fn run_debug<T: Hardware + 'static, D: Debugger + 'static>(
     run_inner(cfg, rom, hw, dbg)
 }
 
+static TONE_UNIT1: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
+static TONE_UNIT2: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
+static WAVE_UNIT: StaticCell<UnitRaw<WaveStream>> = StaticCell::new();
+static NOISE_UNIT: StaticCell<UnitRaw<NoiseStream>> = StaticCell::new();
+static WAVE: StaticCell<WaveRaw> = StaticCell::new();
+
 fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u8], hw: T, dbg: D) {
     let dbg_cell = &RefCell::new(dbg);
     let dbg = Device::mediate(dbg_cell);
     let hw_handle = HardwareHandle::new(hw);
-    let raw_devices = RawDevices::new(rom, hw_handle.clone());
+    let raw_devices = RawDevices::new(
+        rom,
+        hw_handle.clone(),
+        Wave::new(WAVE.init(WaveRaw::new())),
+        Mixer::new(MixerStream::new(
+            Unit::new(TONE_UNIT1.init(UnitRaw::default())),
+            Unit::new(TONE_UNIT2.init(UnitRaw::default())),
+            Unit::new(WAVE_UNIT.init(UnitRaw::default())),
+            Unit::new(NOISE_UNIT.init(UnitRaw::default())),
+        )),
+    );
     let devices = Devices::new(&raw_devices);
     let dbg_handle = dbg.handler();
     let handlers = Handlers::new(devices.clone());

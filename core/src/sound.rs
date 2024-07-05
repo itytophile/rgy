@@ -1,4 +1,3 @@
-use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use log::*;
 use spin::Mutex;
@@ -381,23 +380,37 @@ impl Stream for ToneStream {
 }
 
 #[derive(Debug, Clone)]
-struct Wave {
+pub struct Wave {
     enable: bool,
     sound_len: usize,
-    amp_shift: Arc<AtomicUsize>,
+    amp_shift: &'static AtomicUsize,
     counter: bool,
-    freq: Arc<AtomicUsize>,
+    freq: &'static AtomicUsize,
     wavebuf: [u8; 16],
 }
 
+pub struct WaveRaw {
+    amp_shift: AtomicUsize,
+    freq: AtomicUsize,
+}
+
+impl WaveRaw {
+    pub fn new() -> Self {
+        Self {
+            amp_shift: AtomicUsize::new(0),
+            freq: AtomicUsize::new(0),
+        }
+    }
+}
+
 impl Wave {
-    fn new() -> Self {
+    pub fn new(raw: &'static WaveRaw) -> Self {
         Self {
             enable: false,
             sound_len: 0,
-            amp_shift: Arc::new(AtomicUsize::new(0)),
+            amp_shift: &raw.amp_shift,
             counter: false,
-            freq: Arc::new(AtomicUsize::new(0)),
+            freq: &raw.freq,
             wavebuf: [0; 16],
         }
     }
@@ -612,7 +625,7 @@ impl Stream for NoiseStream {
     }
 }
 
-struct Mixer {
+pub struct Mixer {
     so1_volume: usize,
     so2_volume: usize,
     so_mask: usize,
@@ -621,13 +634,13 @@ struct Mixer {
 }
 
 impl Mixer {
-    fn new() -> Self {
+    pub fn new(stream: MixerStream) -> Self {
         Self {
             so1_volume: 0,
             so2_volume: 0,
             so_mask: 0,
             enable: false,
-            stream: MixerStream::new(),
+            stream,
         }
     }
 
@@ -711,25 +724,40 @@ impl Mixer {
     }
 }
 
-struct Unit<T> {
-    stream: Arc<Mutex<Option<T>>>,
-    volume: Arc<AtomicUsize>,
+pub struct Unit<T: 'static> {
+    stream: &'static Mutex<Option<T>>,
+    volume: &'static AtomicUsize,
 }
 
 impl<T> Clone for Unit<T> {
     fn clone(&self) -> Self {
         Self {
-            stream: self.stream.clone(),
-            volume: self.volume.clone(),
+            stream: self.stream,
+            volume: self.volume,
+        }
+    }
+}
+
+pub struct UnitRaw<T> {
+    stream: Mutex<Option<T>>,
+    volume: AtomicUsize,
+}
+
+impl<T> Default for UnitRaw<T> {
+    fn default() -> Self {
+        Self {
+            stream: Mutex::new(None),
+            volume: AtomicUsize::new(0),
         }
     }
 }
 
 impl<T> Unit<T> {
-    fn new() -> Self {
+    // None, 0
+    pub fn new(raw: &'static UnitRaw<T>) -> Self {
         Self {
-            stream: Arc::new(Mutex::new(None)),
-            volume: Arc::new(AtomicUsize::new(0)),
+            stream: &raw.stream,
+            volume: &raw.volume,
         }
     }
 }
@@ -764,12 +792,17 @@ pub struct MixerStream {
 }
 
 impl MixerStream {
-    fn new() -> Self {
+    pub fn new(
+        tone1: Unit<ToneStream>,
+        tone2: Unit<ToneStream>,
+        wave: Unit<WaveStream>,
+        noise: Unit<NoiseStream>,
+    ) -> Self {
         Self {
-            tone1: Unit::new(),
-            tone2: Unit::new(),
-            wave: Unit::new(),
-            noise: Unit::new(),
+            tone1,
+            tone2,
+            wave,
+            noise,
         }
     }
 
@@ -814,15 +847,13 @@ pub struct Sound {
 }
 
 impl Sound {
-    pub fn new(hw: HardwareHandle) -> Self {
-        let mixer = Mixer::new();
-
+    pub fn new(hw: HardwareHandle, wave: Wave, mixer: Mixer) -> Self {
         mixer.setup_stream(&hw);
 
         Self {
             tone1: Tone::new(),
             tone2: Tone::new(),
-            wave: Wave::new(),
+            wave,
             noise: Noise::new(),
             mixer,
         }
