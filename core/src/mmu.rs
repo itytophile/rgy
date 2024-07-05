@@ -1,4 +1,3 @@
-use alloc::{vec, vec::Vec};
 use arrayvec::ArrayVec;
 
 /// The variants to control memory read access from the CPU.
@@ -38,7 +37,7 @@ pub struct Handle(u64);
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
 pub struct Mmu<'a> {
-    ram: Vec<u8>,
+    ram: [u8; 0x10000],
     #[allow(clippy::type_complexity)]
     handlers: ArrayVec<((u16, u16), Handle, &'a dyn MemHandler), 18>,
     hdgen: u64,
@@ -54,7 +53,7 @@ impl<'a> Mmu<'a> {
     /// Create a new MMU instance.
     pub fn new() -> Mmu<'a> {
         Mmu {
-            ram: vec![0u8; 0x10000],
+            ram: [0u8; 0x10000],
             handlers: ArrayVec::new(),
             hdgen: 0,
         }
