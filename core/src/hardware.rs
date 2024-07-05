@@ -31,7 +31,7 @@ pub enum Key {
 }
 
 /// Sound wave stream which generates the wave to be played by the sound device.
-pub trait Stream: Send + 'static {
+pub trait Stream: Send {
     /// The maximum value of the amplitude returned by this stream.
     fn max(&self) -> u16;
 
