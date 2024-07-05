@@ -105,7 +105,7 @@ struct RawDevices<'a> {
 
 impl<'a> RawDevices<'a> {
     pub fn new(
-        rom: &[u8],
+        rom: &'a [u8],
         hw: HardwareHandle<'a>,
         wave: Wave,
         mixer: Mixer,
@@ -120,7 +120,7 @@ impl<'a> RawDevices<'a> {
             joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
             timer: RefCell::new(Timer::new(irq.clone())),
             serial: RefCell::new(Serial::new(hw.clone(), irq.clone())),
-            mbc: RefCell::new(Mbc::new(hw.clone(), rom.to_vec())),
+            mbc: RefCell::new(Mbc::new(hw.clone(), rom)),
             cgb: RefCell::new(Cgb::new()),
             dma: RefCell::new(Dma::new()),
         }
