@@ -27,10 +27,6 @@ pub trait MemHandler {
     fn on_write(&self, mmu: &Mmu, addr: u16, value: u8) -> MemWrite;
 }
 
-/// The handle of a memory handler.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Handle(u64);
-
 /// The memory management unit (MMU)
 ///
 /// This unit holds a memory byte array which represents address space of the memory.
@@ -40,7 +36,6 @@ pub struct Mmu<'a> {
     ram: [u8; 0x10000],
     #[allow(clippy::type_complexity)]
     handlers: ArrayVec<((u16, u16), &'a dyn MemHandler), 18>,
-    hdgen: u64,
 }
 
 impl Default for Mmu<'_> {
@@ -55,25 +50,12 @@ impl<'a> Mmu<'a> {
         Mmu {
             ram: [0u8; 0x10000],
             handlers: ArrayVec::new(),
-            hdgen: 0,
         }
     }
 
-    fn next_handle(&mut self) -> Handle {
-        let handle = self.hdgen;
-
-        self.hdgen += 1;
-
-        Handle(handle)
-    }
-
     /// Add a new memory handler.
-    pub fn add_handler(&mut self, range: (u16, u16), handler: &'a dyn MemHandler) -> Handle {
-        let handle = self.next_handle();
-
+    pub fn add_handler(&mut self, range: (u16, u16), handler: &'a dyn MemHandler) {
         self.handlers.push((range, handler));
-
-        handle
     }
 
     fn get_handlers_from_address<'b>(
