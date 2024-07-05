@@ -2,14 +2,13 @@ use crate::{
     device::IoHandler,
     mmu::{MemRead, MemWrite, Mmu},
 };
-use alloc::{vec, vec::Vec};
 use log::*;
 
 pub struct Cgb {
     double_speed: bool,
     speed_switch: bool,
     wram_select: usize,
-    wram_bank: Vec<Vec<u8>>,
+    wram_bank: [[u8; 0x1000]; 8],
 }
 
 #[allow(unused)]
@@ -19,7 +18,7 @@ impl Cgb {
             double_speed: false,
             speed_switch: false,
             wram_select: 1,
-            wram_bank: (0..8).map(|_| vec![0; 0x1000]).collect(),
+            wram_bank: [[0; 0x1000]; 8],
         }
     }
 
