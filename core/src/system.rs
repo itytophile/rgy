@@ -78,33 +78,33 @@ impl Config {
 /// Represents the entire emulator context.
 pub struct System<'a, D> {
     cfg: Config,
-    hw: HardwareHandle,
-    fc: FreqControl,
+    hw: HardwareHandle<'a>,
+    fc: FreqControl<'a>,
     cpu: Cpu,
     mmu: Option<Mmu<'a>>,
     dbg: Device<'a, D>,
     ic: Device<'a, Ic>,
-    gpu: Device<'a, Gpu>,
-    joypad: Device<'a, Joypad>,
+    gpu: Device<'a, Gpu<'a>>,
+    joypad: Device<'a, Joypad<'a>>,
     timer: Device<'a, Timer>,
-    serial: Device<'a, Serial>,
+    serial: Device<'a, Serial<'a>>,
     dma: Device<'a, Dma>,
 }
 
-struct RawDevices {
+struct RawDevices<'a> {
     sound: RefCell<Sound>,
     ic: RefCell<Ic>,
-    gpu: RefCell<Gpu>,
-    joypad: RefCell<Joypad>,
+    gpu: RefCell<Gpu<'a>>,
+    joypad: RefCell<Joypad<'a>>,
     timer: RefCell<Timer>,
-    serial: RefCell<Serial>,
-    mbc: RefCell<Mbc>,
+    serial: RefCell<Serial<'a>>,
+    mbc: RefCell<Mbc<'a>>,
     cgb: RefCell<Cgb>,
     dma: RefCell<Dma>,
 }
 
-impl RawDevices {
-    pub fn new(rom: &[u8], hw: HardwareHandle, wave: Wave, mixer: Mixer) -> Self {
+impl<'a> RawDevices<'a> {
+    pub fn new(rom: &[u8], hw: HardwareHandle<'a>, wave: Wave, mixer: Mixer) -> Self {
         let ic = Ic::new();
         let irq = ic.irq();
         Self {
@@ -125,17 +125,20 @@ impl RawDevices {
 pub struct Devices<'a> {
     sound: Device<'a, Sound>,
     ic: Device<'a, Ic>,
-    gpu: Device<'a, Gpu>,
-    joypad: Device<'a, Joypad>,
+    gpu: Device<'a, Gpu<'a>>,
+    joypad: Device<'a, Joypad<'a>>,
     timer: Device<'a, Timer>,
-    serial: Device<'a, Serial>,
-    mbc: Device<'a, Mbc>,
+    serial: Device<'a, Serial<'a>>,
+    mbc: Device<'a, Mbc<'a>>,
     cgb: Device<'a, Cgb>,
     dma: Device<'a, Dma>,
 }
 
 impl<'a> Devices<'a> {
-    fn new(devices: &'a RawDevices) -> Self {
+    fn new<'b>(devices: &'a RawDevices<'b>) -> Self
+    where
+        'a: 'b,
+    {
         let sound = Device::new(&devices.sound);
         let ic = Device::new(&devices.ic);
         let gpu = Device::new(&devices.gpu);
@@ -162,11 +165,11 @@ impl<'a> Devices<'a> {
 pub struct Handlers<'a> {
     sound: IoMemHandler<'a, Sound>,
     ic: IoMemHandler<'a, Ic>,
-    gpu: IoMemHandler<'a, Gpu>,
-    joypad: IoMemHandler<'a, Joypad>,
+    gpu: IoMemHandler<'a, Gpu<'a>>,
+    joypad: IoMemHandler<'a, Joypad<'a>>,
     timer: IoMemHandler<'a, Timer>,
-    serial: IoMemHandler<'a, Serial>,
-    mbc: IoMemHandler<'a, Mbc>,
+    serial: IoMemHandler<'a, Serial<'a>>,
+    mbc: IoMemHandler<'a, Mbc<'a>>,
     cgb: IoMemHandler<'a, Cgb>,
     dma: IoMemHandler<'a, Dma>,
 }
@@ -194,7 +197,7 @@ where
     /// Create a new emulator context.
     pub fn new(
         cfg: Config,
-        hw_handle: HardwareHandle,
+        hw_handle: HardwareHandle<'a>,
         dbg: &'a RefCell<D>,
         dbg_handler: &'a IoMemHandler<'a, D>,
         devices: Devices<'a>,
@@ -320,7 +323,8 @@ static WAVE: StaticCell<WaveRaw> = StaticCell::new();
 fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u8], hw: T, dbg: D) {
     let dbg_cell = &RefCell::new(dbg);
     let dbg = Device::mediate(dbg_cell);
-    let hw_handle = HardwareHandle::new(hw);
+    let hw_cell = RefCell::new(hw);
+    let hw_handle = HardwareHandle::new(&hw_cell);
     let raw_devices = RawDevices::new(
         rom,
         hw_handle.clone(),
@@ -332,7 +336,7 @@ fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u
             Unit::new(NOISE_UNIT.init(UnitRaw::default())),
         )),
     );
-    let devices = Devices::new(&raw_devices);
+    let devices: Devices = Devices::new(&raw_devices);
     let dbg_handle = dbg.handler();
     let handlers = Handlers::new(devices.clone());
     let mut sys = System::new(cfg, hw_handle, dbg_cell, &dbg_handle, devices, &handlers);

@@ -38,7 +38,7 @@ impl From<u8> for Mode {
     }
 }
 
-pub struct Gpu {
+pub struct Gpu<'a> {
     irq: Irq,
 
     clocks: usize,
@@ -65,7 +65,7 @@ pub struct Gpu {
     spsize: u16,
     spenable: bool,
     bgenable: bool,
-    hw: HardwareHandle,
+    hw: HardwareHandle<'a>,
 
     bg_palette: [Color; 4],
     obj_palette0: [Color; 4],
@@ -335,8 +335,8 @@ impl Hdma {
     }
 }
 
-impl Gpu {
-    pub fn new(hw: HardwareHandle, irq: Irq) -> Self {
+impl<'a> Gpu<'a> {
+    pub fn new(hw: HardwareHandle<'a>, irq: Irq) -> Self {
         Self {
             irq,
             clocks: 0,
@@ -770,7 +770,7 @@ impl Gpu {
     }
 }
 
-impl IoHandler for Gpu {
+impl<'a> IoHandler for Gpu<'a> {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         if (0x8000..=0x9fff).contains(&addr) {
             MemRead::Replace(self.read_vram(addr, self.vram_select))

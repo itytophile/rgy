@@ -4,15 +4,15 @@ use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
 use log::*;
 
-pub struct Joypad {
-    hw: HardwareHandle,
+pub struct Joypad<'a> {
+    hw: HardwareHandle<'a>,
     irq: Irq,
     select: u8,
     pressed: u8,
 }
 
-impl Joypad {
-    pub fn new(hw: HardwareHandle, irq: Irq) -> Self {
+impl<'a> Joypad<'a> {
+    pub fn new(hw: HardwareHandle<'a>, irq: Irq) -> Self {
         Self {
             hw,
             irq,
@@ -58,7 +58,7 @@ impl Joypad {
     }
 }
 
-impl IoHandler for Joypad {
+impl<'a> IoHandler for Joypad<'a> {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         if addr == 0xff00 {
             debug!("Joypad read: dir: {:02x}", self.select);

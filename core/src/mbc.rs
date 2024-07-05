@@ -46,8 +46,8 @@ impl MbcNone {
     }
 }
 
-struct Mbc1 {
-    hw: HardwareHandle,
+struct Mbc1<'a> {
+    hw: HardwareHandle<'a>,
     rom: Vec<u8>,
     ram: Vec<u8>,
     rom_bank: usize,
@@ -56,8 +56,8 @@ struct Mbc1 {
     ram_select: bool,
 }
 
-impl Mbc1 {
-    fn new(hw: HardwareHandle, rom: Vec<u8>) -> Self {
+impl<'a> Mbc1<'a> {
+    fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
         let ram = hw.get().borrow_mut().load_ram(0x8000);
 
         Self {
@@ -151,16 +151,16 @@ impl Mbc1 {
     }
 }
 
-struct Mbc2 {
-    hw: HardwareHandle,
+struct Mbc2<'a> {
+    hw: HardwareHandle<'a>,
     rom: Vec<u8>,
     ram: Vec<u8>,
     rom_bank: usize,
     ram_enable: bool,
 }
 
-impl Mbc2 {
-    fn new(hw: HardwareHandle, rom: Vec<u8>) -> Self {
+impl<'a> Mbc2<'a> {
+    fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
         let ram = hw.get().borrow_mut().load_ram(0x200);
 
         Self {
@@ -233,8 +233,8 @@ impl Mbc2 {
     }
 }
 
-struct Mbc3 {
-    hw: HardwareHandle,
+struct Mbc3<'a> {
+    hw: HardwareHandle<'a>,
     rom: Vec<u8>,
     ram: Vec<u8>,
     rom_bank: usize,
@@ -249,14 +249,14 @@ struct Mbc3 {
     prelatch: bool,
 }
 
-impl Drop for Mbc3 {
+impl<'a> Drop for Mbc3<'a> {
     fn drop(&mut self) {
         self.save();
     }
 }
 
-impl Mbc3 {
-    fn new(hw: HardwareHandle, rom: Vec<u8>) -> Self {
+impl<'a> Mbc3<'a> {
+    fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
         let ram = hw.get().borrow_mut().load_ram(0x8000);
 
         let mut s = Self {
@@ -441,8 +441,8 @@ impl Mbc3 {
     }
 }
 
-struct Mbc5 {
-    hw: HardwareHandle,
+struct Mbc5<'a> {
+    hw: HardwareHandle<'a>,
     rom: Vec<u8>,
     ram: Vec<u8>,
     rom_bank: usize,
@@ -450,8 +450,8 @@ struct Mbc5 {
     ram_enable: bool,
 }
 
-impl Mbc5 {
-    fn new(hw: HardwareHandle, rom: Vec<u8>) -> Self {
+impl<'a> Mbc5<'a> {
+    fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
         let ram = hw.get().borrow_mut().load_ram(0x20000);
 
         Self {
@@ -542,17 +542,17 @@ impl HuC1 {
     }
 }
 
-enum MbcType {
+enum MbcType<'a> {
     None(MbcNone),
-    Mbc1(Mbc1),
-    Mbc2(Mbc2),
-    Mbc3(Mbc3),
-    Mbc5(Mbc5),
+    Mbc1(Mbc1<'a>),
+    Mbc2(Mbc2<'a>),
+    Mbc3(Mbc3<'a>),
+    Mbc5(Mbc5<'a>),
     HuC1(HuC1),
 }
 
-impl MbcType {
-    fn new(hw: HardwareHandle, code: u8, rom: Vec<u8>) -> Self {
+impl<'a> MbcType<'a> {
+    fn new(hw: HardwareHandle<'a>, code: u8, rom: Vec<u8>) -> Self {
         match code {
             0x00 => MbcType::None(MbcNone::new(rom)),
             0x01..=0x03 => MbcType::Mbc1(Mbc1::new(hw, rom)),
@@ -591,21 +591,17 @@ impl MbcType {
             MbcType::HuC1(c) => c.on_write(mmu, addr, value),
         }
     }
-}
 
-impl alloc::fmt::Display for MbcType {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        let name = match self {
+    fn to_str(&self) -> &'static str {
+        match self {
             MbcType::None(_) => "None",
             MbcType::Mbc1(_) => "Mbc1",
             MbcType::Mbc2(_) => "Mbc2",
             MbcType::Mbc3(_) => "Mbc3",
             MbcType::Mbc5(_) => "Mbc5",
             MbcType::HuC1(_) => "HuC1",
-        };
-
-        write!(f, "{}", name)
-    }
+        }
+    } 
 }
 
 fn parse_str(b: &[u8]) -> String {
@@ -617,14 +613,14 @@ fn parse_str(b: &[u8]) -> String {
     String::from_utf8_lossy(&b).to_string()
 }
 
-struct Cartridge {
+struct Cartridge<'a> {
     title: String,
     cgb: bool,
     cgb_only: bool,
     license_new: String,
     license_old: u8,
     sgb: bool,
-    mbc: MbcType,
+    mbc: MbcType<'a>,
     rom_size: u8,
     ram_size: u8,
     dstcode: u8,
@@ -651,8 +647,8 @@ fn verify(rom: &[u8], checksum: u16) {
     }
 }
 
-impl Cartridge {
-    fn new(hw: HardwareHandle, rom: Vec<u8>) -> Self {
+impl<'a> Cartridge<'a> {
+    fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
         let checksum = (rom[0x14e] as u16) << 8 | (rom[0x14f] as u16);
 
         verify(&rom, checksum);
@@ -685,7 +681,7 @@ impl Cartridge {
         };
         info!("Destination: {}", dstcode);
 
-        info!("Mbc: {}", self.mbc);
+        info!("Mbc: {}", self.mbc.to_str());
         info!(
             "Color: {} (Compat: {}), Super: {}",
             self.cgb, !self.cgb_only, self.sgb,
@@ -725,13 +721,13 @@ impl Cartridge {
     }
 }
 
-pub struct Mbc {
-    cartridge: Cartridge,
+pub struct Mbc<'a> {
+    cartridge: Cartridge<'a>,
     use_boot_rom: bool,
 }
 
-impl Mbc {
-    pub fn new(hw: HardwareHandle, rom: Vec<u8>) -> Self {
+impl<'a> Mbc<'a> {
+    pub fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
         let cartridge = Cartridge::new(hw, rom);
 
         cartridge.show_info();
@@ -755,7 +751,7 @@ impl Mbc {
     }
 }
 
-impl IoHandler for Mbc {
+impl<'a> IoHandler for Mbc<'a> {
     fn on_read(&mut self, mmu: &Mmu, addr: u16) -> MemRead {
         if self.use_boot_rom && self.in_boot_rom(addr) {
             MemRead::Replace(BOOT_ROM[addr as usize])

@@ -1,4 +1,3 @@
-use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
@@ -74,15 +73,15 @@ pub trait Stream {
 }
 
 #[derive(Clone)]
-pub struct HardwareHandle(Rc<RefCell<dyn Hardware>>);
+pub struct HardwareHandle<'a>(&'a RefCell<dyn Hardware>);
 
-impl HardwareHandle {
-    pub fn new<T: Hardware + 'static>(inner: T) -> Self {
-        Self(Rc::new(RefCell::new(inner)))
+impl<'a> HardwareHandle<'a> {
+    pub fn new(inner: &'a RefCell<dyn Hardware>) -> Self {
+        Self(inner)
     }
 
-    pub fn get(&self) -> &Rc<RefCell<dyn Hardware>> {
-        &self.0
+    pub fn get(&self) -> &'a RefCell<dyn Hardware> {
+        self.0
     }
 }
 

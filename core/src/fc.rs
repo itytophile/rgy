@@ -2,8 +2,8 @@ use crate::hardware::HardwareHandle;
 use crate::system::Config;
 use log::*;
 
-pub struct FreqControl {
-    hw: HardwareHandle,
+pub struct FreqControl<'a> {
+    hw: HardwareHandle<'a>,
     last: u64,
     cycles: u64,
     sample: u64,
@@ -12,8 +12,8 @@ pub struct FreqControl {
     target_freq: u64,
 }
 
-impl FreqControl {
-    pub fn new(hw: HardwareHandle, cfg: &Config) -> Self {
+impl<'a> FreqControl<'a> {
+    pub fn new(hw: HardwareHandle<'a>, cfg: &Config) -> Self {
         Self {
             hw,
             last: 0,

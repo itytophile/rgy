@@ -4,8 +4,8 @@ use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
 use log::*;
 
-pub struct Serial {
-    hw: HardwareHandle,
+pub struct Serial<'a> {
+    hw: HardwareHandle<'a>,
     irq: Irq,
     data: u8,
     recv: u8,
@@ -13,8 +13,8 @@ pub struct Serial {
     clock: usize,
 }
 
-impl Serial {
-    pub fn new(hw: HardwareHandle, irq: Irq) -> Self {
+impl<'a> Serial<'a> {
+    pub fn new(hw: HardwareHandle<'a>, irq: Irq) -> Self {
         Self {
             hw,
             irq,
@@ -53,7 +53,7 @@ impl Serial {
     }
 }
 
-impl IoHandler for Serial {
+impl<'a> IoHandler for Serial<'a> {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         if addr == 0xff01 {
             MemRead::Replace(self.data)
