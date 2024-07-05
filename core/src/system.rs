@@ -76,7 +76,7 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<'a, D> {
+pub struct System<'a, 'b, D> {
     cfg: Config,
     hw: HardwareHandle<'a>,
     fc: FreqControl<'a>,
@@ -84,10 +84,10 @@ pub struct System<'a, D> {
     mmu: Option<Mmu<'a>>,
     dbg: Device<'a, D>,
     ic: Device<'a, Ic>,
-    gpu: Device<'a, Gpu<'a>>,
-    joypad: Device<'a, Joypad<'a>>,
+    gpu: Device<'a, Gpu<'b>>,
+    joypad: Device<'a, Joypad<'b>>,
     timer: Device<'a, Timer>,
-    serial: Device<'a, Serial<'a>>,
+    serial: Device<'a, Serial<'b>>,
     dma: Device<'a, Dma>,
 }
 
@@ -122,23 +122,20 @@ impl<'a> RawDevices<'a> {
 }
 
 #[derive(Clone)]
-pub struct Devices<'a> {
+pub struct Devices<'a, 'b> {
     sound: Device<'a, Sound>,
     ic: Device<'a, Ic>,
-    gpu: Device<'a, Gpu<'a>>,
-    joypad: Device<'a, Joypad<'a>>,
+    gpu: Device<'a, Gpu<'b>>,
+    joypad: Device<'a, Joypad<'b>>,
     timer: Device<'a, Timer>,
-    serial: Device<'a, Serial<'a>>,
-    mbc: Device<'a, Mbc<'a>>,
+    serial: Device<'a, Serial<'b>>,
+    mbc: Device<'a, Mbc<'b>>,
     cgb: Device<'a, Cgb>,
     dma: Device<'a, Dma>,
 }
 
-impl<'a> Devices<'a> {
-    fn new<'b>(devices: &'a RawDevices<'b>) -> Self
-    where
-        'a: 'b,
-    {
+impl<'a, 'b> Devices<'a, 'b> {
+    fn new(devices: &'a RawDevices<'b>) -> Self {
         let sound = Device::new(&devices.sound);
         let ic = Device::new(&devices.ic);
         let gpu = Device::new(&devices.gpu);
@@ -148,7 +145,7 @@ impl<'a> Devices<'a> {
         let mbc = Device::new(&devices.mbc);
         let cgb = Device::new(&devices.cgb);
         let dma = Device::new(&devices.dma);
-        Devices {
+        Self {
             sound,
             ic,
             gpu,
@@ -162,20 +159,20 @@ impl<'a> Devices<'a> {
     }
 }
 
-pub struct Handlers<'a> {
+pub struct Handlers<'a, 'b> {
     sound: IoMemHandler<'a, Sound>,
     ic: IoMemHandler<'a, Ic>,
-    gpu: IoMemHandler<'a, Gpu<'a>>,
-    joypad: IoMemHandler<'a, Joypad<'a>>,
+    gpu: IoMemHandler<'a, Gpu<'b>>,
+    joypad: IoMemHandler<'a, Joypad<'b>>,
     timer: IoMemHandler<'a, Timer>,
-    serial: IoMemHandler<'a, Serial<'a>>,
-    mbc: IoMemHandler<'a, Mbc<'a>>,
+    serial: IoMemHandler<'a, Serial<'b>>,
+    mbc: IoMemHandler<'a, Mbc<'b>>,
     cgb: IoMemHandler<'a, Cgb>,
     dma: IoMemHandler<'a, Dma>,
 }
 
-impl<'a> Handlers<'a> {
-    fn new(devices: Devices<'a>) -> Self {
+impl<'a, 'b> Handlers<'a, 'b> {
+    fn new(devices: Devices<'a, 'b>) -> Self {
         Self {
             sound: devices.sound.handler(),
             ic: devices.ic.handler(),
@@ -190,7 +187,7 @@ impl<'a> Handlers<'a> {
     }
 }
 
-impl<'a, D> System<'a, D>
+impl<'a, 'b, D> System<'a, 'b, D>
 where
     D: Debugger + 'static,
 {
@@ -200,7 +197,7 @@ where
         hw_handle: HardwareHandle<'a>,
         dbg: &'a RefCell<D>,
         dbg_handler: &'a IoMemHandler<'a, D>,
-        devices: Devices<'a>,
+        devices: Devices<'a, 'b>,
         handlers: &'a Handlers,
     ) -> Self {
         info!("Initializing...");
