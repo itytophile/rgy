@@ -1,7 +1,8 @@
-use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
+
+use crate::sound::{MixerStream, NoiseStream, ToneStream, WaveStream};
 
 /// The width of the VRAM.
 pub const VRAM_WIDTH: usize = 160;
@@ -28,6 +29,38 @@ pub enum Key {
     Select,
     /// Start key.
     Start,
+}
+
+/// Enum that represents how sound can be played
+pub enum SoundStream {
+    /// Wave stream
+    Wave(WaveStream),
+    /// Tone stream
+    Tone(ToneStream),
+    /// Noise stream
+    Noise(NoiseStream),
+    /// Mixer stream
+    Mixer(MixerStream),
+}
+
+impl Stream for SoundStream {
+    fn max(&self) -> u16 {
+        match self {
+            SoundStream::Wave(s) => s.max(),
+            SoundStream::Tone(s) => s.max(),
+            SoundStream::Noise(s) => s.max(),
+            SoundStream::Mixer(s) => s.max(),
+        }
+    }
+
+    fn next(&mut self, rate: u32) -> u16 {
+        match self {
+            SoundStream::Wave(s) => s.next(rate),
+            SoundStream::Tone(s) => s.next(rate),
+            SoundStream::Noise(s) => s.next(rate),
+            SoundStream::Mixer(s) => s.next(rate),
+        }
+    }
 }
 
 /// Sound wave stream which generates the wave to be played by the sound device.
@@ -66,7 +99,7 @@ pub trait Hardware {
 
     /// Called when the emulator plays a sound.
     /// The stream in the argument is the stream which keeps returning wave patterns.
-    fn sound_play(&mut self, stream: &dyn Stream);
+    fn sound_play(&mut self, stream: SoundStream);
 
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.

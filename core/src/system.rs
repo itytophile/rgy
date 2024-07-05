@@ -1,4 +1,4 @@
-use core::cell::{Cell, RefCell};
+use core::cell::RefCell;
 
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
@@ -88,8 +88,8 @@ pub struct System<'a, D> {
     dma: Device<'a, Dma>,
 }
 
-struct RawDevices<'a> {
-    sound: RefCell<Sound<'a>>,
+struct RawDevices {
+    sound: RefCell<Sound>,
     ic: RefCell<Ic>,
     gpu: RefCell<Gpu>,
     joypad: RefCell<Joypad>,
@@ -100,12 +100,12 @@ struct RawDevices<'a> {
     dma: RefCell<Dma>,
 }
 
-impl<'a> RawDevices<'a> {
-    pub fn new(rom: &[u8], hw: HardwareHandle, enable: &'a Cell<bool>) -> Self {
+impl RawDevices {
+    pub fn new(rom: &[u8], hw: HardwareHandle) -> Self {
         let ic = Ic::new();
         let irq = ic.irq();
         Self {
-            sound: RefCell::new(Sound::new(hw.clone(), enable)),
+            sound: RefCell::new(Sound::new(hw.clone())),
             ic: RefCell::new(ic),
             gpu: RefCell::new(Gpu::new(hw.clone(), irq.clone())),
             joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
@@ -120,7 +120,7 @@ impl<'a> RawDevices<'a> {
 
 #[derive(Clone)]
 pub struct Devices<'a> {
-    sound: Device<'a, Sound<'a>>,
+    sound: Device<'a, Sound>,
     ic: Device<'a, Ic>,
     gpu: Device<'a, Gpu>,
     joypad: Device<'a, Joypad>,
@@ -132,7 +132,7 @@ pub struct Devices<'a> {
 }
 
 impl<'a> Devices<'a> {
-    fn new(devices: &'a RawDevices<'a>) -> Self {
+    fn new(devices: &'a RawDevices) -> Self {
         let sound = Device::new(&devices.sound);
         let ic = Device::new(&devices.ic);
         let gpu = Device::new(&devices.gpu);
@@ -157,7 +157,7 @@ impl<'a> Devices<'a> {
 }
 
 pub struct Handlers<'a> {
-    sound: IoMemHandler<'a, Sound<'a>>,
+    sound: IoMemHandler<'a, Sound>,
     ic: IoMemHandler<'a, Ic>,
     gpu: IoMemHandler<'a, Gpu>,
     joypad: IoMemHandler<'a, Joypad>,
@@ -312,8 +312,7 @@ fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u
     let dbg_cell = &RefCell::new(dbg);
     let dbg = Device::mediate(dbg_cell);
     let hw_handle = HardwareHandle::new(hw);
-    let enable = &Cell::new(false);
-    let raw_devices = RawDevices::new(rom, hw_handle.clone(), enable);
+    let raw_devices = RawDevices::new(rom, hw_handle.clone());
     let devices = Devices::new(&raw_devices);
     let dbg_handle = dbg.handler();
     let handlers = Handlers::new(devices.clone());

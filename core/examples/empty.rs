@@ -1,4 +1,4 @@
-use rgy::{Config, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
     display: Vec<Vec<u32>>,
@@ -29,7 +29,7 @@ impl rgy::Hardware for Hardware {
         false
     }
 
-    fn sound_play(&mut self, _stream: &dyn Stream) {
+    fn sound_play(&mut self, _stream: SoundStream) {
         // Play the wave provided `Stream`.
     }
 

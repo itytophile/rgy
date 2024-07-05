@@ -10,7 +10,7 @@ use std::sync::{
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rgy::{Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{Key, SoundStream, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 
 #[derive(Clone)]
 pub struct Hardware {
@@ -170,7 +170,7 @@ impl rgy::Hardware for Hardware {
             .expect("Logic error in keystate map")
     }
 
-    fn sound_play(&mut self, stream: & dyn Stream) {
+    fn sound_play(&mut self, stream: SoundStream) {
         self.pcm.play(stream)
     }
 
@@ -299,18 +299,18 @@ impl Pcm {
 }
 
 #[allow(unused)]
-enum SpeakerCmd<'a> {
-    Play(&'a dyn Stream),
+enum SpeakerCmd {
+    Play(SoundStream),
     Stop,
 }
 
 #[derive(Clone)]
-pub struct SpeakerHandle<'a> {
-    tx: Sender<SpeakerCmd<'a>>,
+pub struct SpeakerHandle {
+    tx: Sender<SpeakerCmd>,
 }
 
-impl<'a> SpeakerHandle<'a> {
-    fn play(&self, stream: &dyn Stream) {
+impl SpeakerHandle {
+    fn play(&self, stream: SoundStream) {
         let _ = self.tx.send(SpeakerCmd::Play(stream));
     }
 
