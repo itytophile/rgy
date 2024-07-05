@@ -3,7 +3,7 @@ use core::cell::RefCell;
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
 use crate::debug::{Debugger, NullDebugger};
-use crate::device::Device;
+use crate::device::{Device, IoMemHandler};
 use crate::dma::Dma;
 use crate::fc::FreqControl;
 use crate::gpu::Gpu;
@@ -78,7 +78,7 @@ pub struct System<'a, D> {
     hw: HardwareHandle,
     fc: FreqControl,
     cpu: Cpu,
-    mmu: Option<Mmu>,
+    mmu: Option<Mmu<'a>>,
     dbg: Device<'a, D>,
     ic: Device<'a, Ic>,
     gpu: Device<'a, Gpu>,
@@ -88,7 +88,7 @@ pub struct System<'a, D> {
     dma: Device<'a, Dma>,
 }
 
-struct Devices {
+struct RawDevices {
     sound: RefCell<Sound>,
     ic: RefCell<Ic>,
     gpu: RefCell<Gpu>,
@@ -100,7 +100,7 @@ struct Devices {
     dma: RefCell<Dma>,
 }
 
-impl Devices {
+impl RawDevices {
     pub fn new(rom: &[u8], hw: HardwareHandle) -> Self {
         let ic = Ic::new();
         let irq = ic.irq();
@@ -118,27 +118,23 @@ impl Devices {
     }
 }
 
-impl<'a, D> System<'a, D>
-where
-    D: Debugger + 'static,
-{
-    /// Create a new emulator context.
-    pub fn new<T>(cfg: Config, rom: &[u8], hw: T, dbg: &'a RefCell<D>, devices: &'a Devices) -> Self
-    where
-        T: Hardware + 'static,
-    {
-        info!("Initializing...");
+#[derive(Clone)]
+pub struct Devices<'a> {
+    sound: Device<'a, Sound>,
+    ic: Device<'a, Ic>,
+    gpu: Device<'a, Gpu>,
+    joypad: Device<'a, Joypad>,
+    timer: Device<'a, Timer>,
+    serial: Device<'a, Serial>,
+    mbc: Device<'a, Mbc>,
+    cgb: Device<'a, Cgb>,
+    dma: Device<'a, Dma>,
+}
 
-        let hw = HardwareHandle::new(hw);
-
-        let mut fc = FreqControl::new(hw.clone(), &cfg);
-
-        let dbg = Device::mediate(dbg);
-        let cpu = Cpu::new();
-        let mut mmu = Mmu::new();
+impl<'a> Devices<'a> {
+    fn new(devices: &'a RawDevices) -> Self {
         let sound = Device::new(&devices.sound);
         let ic = Device::new(&devices.ic);
-        let irq = ic.borrow().irq().clone();
         let gpu = Device::new(&devices.gpu);
         let joypad = Device::new(&devices.joypad);
         let timer = Device::new(&devices.timer);
@@ -146,30 +142,92 @@ where
         let mbc = Device::new(&devices.mbc);
         let cgb = Device::new(&devices.cgb);
         let dma = Device::new(&devices.dma);
+        Devices {
+            sound,
+            ic,
+            gpu,
+            joypad,
+            timer,
+            serial,
+            mbc,
+            cgb,
+            dma,
+        }
+    }
+}
 
-        mmu.add_handler((0x0000, 0xffff), dbg.handler());
+pub struct Handlers<'a> {
+    sound: IoMemHandler<'a, Sound>,
+    ic: IoMemHandler<'a, Ic>,
+    gpu: IoMemHandler<'a, Gpu>,
+    joypad: IoMemHandler<'a, Joypad>,
+    timer: IoMemHandler<'a, Timer>,
+    serial: IoMemHandler<'a, Serial>,
+    mbc: IoMemHandler<'a, Mbc>,
+    cgb: IoMemHandler<'a, Cgb>,
+    dma: IoMemHandler<'a, Dma>,
+}
 
-        mmu.add_handler((0xc000, 0xdfff), cgb.handler());
-        mmu.add_handler((0xff4d, 0xff4d), cgb.handler());
-        mmu.add_handler((0xff56, 0xff56), cgb.handler());
-        mmu.add_handler((0xff70, 0xff70), cgb.handler());
+impl<'a> Handlers<'a> {
+    fn new(devices: Devices<'a>) -> Self {
+        Self {
+            sound: devices.sound.handler(),
+            ic: devices.ic.handler(),
+            gpu: devices.gpu.handler(),
+            joypad: devices.joypad.handler(),
+            timer: devices.timer.handler(),
+            serial: devices.serial.handler(),
+            mbc: devices.mbc.handler(),
+            cgb: devices.cgb.handler(),
+            dma: devices.dma.handler(),
+        }
+    }
+}
 
-        mmu.add_handler((0x0000, 0x7fff), mbc.handler());
-        mmu.add_handler((0xff50, 0xff50), mbc.handler());
-        mmu.add_handler((0xa000, 0xbfff), mbc.handler());
-        mmu.add_handler((0xff10, 0xff3f), sound.handler());
+impl<'a, D> System<'a, D>
+where
+    D: Debugger + 'static,
+{
+    /// Create a new emulator context.
+    pub fn new(
+        cfg: Config,
+        hw_handle: HardwareHandle,
+        dbg: &'a RefCell<D>,
+        dbg_handler: &'a IoMemHandler<'a, D>,
+        devices: Devices<'a>,
+        handlers: &'a Handlers,
+    ) -> Self {
+        info!("Initializing...");
 
-        mmu.add_handler((0xff46, 0xff46), dma.handler());
+        let mut fc = FreqControl::new(hw_handle.clone(), &cfg);
 
-        mmu.add_handler((0x8000, 0x9fff), gpu.handler());
-        mmu.add_handler((0xff40, 0xff55), gpu.handler());
-        mmu.add_handler((0xff68, 0xff6b), gpu.handler());
+        let dbg = Device::mediate(dbg);
+        let cpu = Cpu::new();
+        let mut mmu = Mmu::new();
 
-        mmu.add_handler((0xff0f, 0xff0f), ic.handler());
-        mmu.add_handler((0xffff, 0xffff), ic.handler());
-        mmu.add_handler((0xff00, 0xff00), joypad.handler());
-        mmu.add_handler((0xff04, 0xff07), timer.handler());
-        mmu.add_handler((0xff01, 0xff02), serial.handler());
+        mmu.add_handler((0x0000, 0xffff), dbg_handler);
+
+        mmu.add_handler((0xc000, 0xdfff), &handlers.cgb);
+        mmu.add_handler((0xff4d, 0xff4d), &handlers.cgb);
+        mmu.add_handler((0xff56, 0xff56), &handlers.cgb);
+        mmu.add_handler((0xff70, 0xff70), &handlers.cgb);
+
+        mmu.add_handler((0x0000, 0x7fff), &handlers.mbc);
+        mmu.add_handler((0xff50, 0xff50), &handlers.mbc);
+        mmu.add_handler((0xa000, 0xbfff), &handlers.mbc);
+        mmu.add_handler((0xff10, 0xff3f), &handlers.sound);
+
+        mmu.add_handler((0xff46, 0xff46), &handlers.dma);
+
+        mmu.add_handler((0x8000, 0x9fff), &handlers.gpu);
+        mmu.add_handler((0xff40, 0xff55), &handlers.gpu);
+        mmu.add_handler((0xff68, 0xff6b), &handlers.gpu);
+
+        mmu.add_handler((0xff0f, 0xff0f), &handlers.ic);
+        mmu.add_handler((0xffff, 0xffff), &handlers.ic);
+        mmu.add_handler((0xff00, 0xff00), &handlers.joypad);
+        mmu.add_handler((0xff04, 0xff07), &handlers.timer);
+        mmu.add_handler((0xff01, 0xff02), &handlers.serial);
 
         dbg.borrow_mut().init(&mmu);
 
@@ -181,21 +239,21 @@ where
 
         Self {
             cfg,
-            hw,
+            hw: hw_handle,
             fc,
             cpu,
             mmu,
             dbg,
-            ic,
-            gpu,
-            joypad,
-            timer,
-            serial,
-            dma,
+            ic: devices.ic,
+            gpu: devices.gpu,
+            joypad: devices.joypad,
+            timer: devices.timer,
+            serial: devices.serial,
+            dma: devices.dma,
         }
     }
 
-    fn step(&mut self, mut mmu: Mmu) -> Mmu {
+    fn step(&mut self, mut mmu: Mmu<'a>) -> Mmu<'a> {
         {
             let mut dbg = self.dbg.borrow_mut();
             dbg.check_signal();
@@ -251,6 +309,13 @@ pub fn run_debug<T: Hardware + 'static, D: Debugger + 'static>(
 }
 
 fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u8], hw: T, dbg: D) {
-    let mut sys = System::new(cfg, rom, hw, dbg);
+    let dbg_cell = &RefCell::new(dbg);
+    let dbg = Device::mediate(dbg_cell);
+    let hw_handle = HardwareHandle::new(hw);
+    let raw_devices = RawDevices::new(rom, hw_handle.clone());
+    let devices = Devices::new(&raw_devices);
+    let dbg_handle = dbg.handler();
+    let handlers = Handlers::new(devices.clone());
+    let mut sys = System::new(cfg, hw_handle, dbg_cell, &dbg_handle, devices, &handlers);
     while sys.poll() {}
 }

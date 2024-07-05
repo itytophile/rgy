@@ -5,6 +5,12 @@ use crate::mmu::{MemHandler, MemRead, MemWrite, Mmu};
 /// The wrapper type for I/O handlers to register to MMU.
 pub struct Device<'a, T>(&'a RefCell<T>, bool);
 
+impl<'a, T> Clone for Device<'a, T> {
+    fn clone(&self) -> Self {
+        Self(self.0, self.1)
+    }
+}
+
 impl<'a, T> Device<'a, T> {
     /// Create a new device.
     pub fn new(inner: &'a RefCell<T>) -> Self {
@@ -33,7 +39,7 @@ impl<'a, T> Device<'a, T> {
 
 impl<'a, T: IoHandler> Device<'a, T> {
     /// Return the memory-mapped I/O handler of the device.
-    pub fn handler(&self) -> IoMemHandler<T> {
+    pub fn handler(&self) -> IoMemHandler<'a, T> {
         IoMemHandler(self.0, self.1)
     }
 }

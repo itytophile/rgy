@@ -1,4 +1,3 @@
-use alloc::rc::Rc;
 use alloc::{vec, vec::Vec};
 use hashbrown::HashMap;
 
@@ -38,23 +37,23 @@ pub struct Handle(u64);
 /// This unit holds a memory byte array which represents address space of the memory.
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
-pub struct Mmu {
+pub struct Mmu<'a> {
     ram: Vec<u8>,
     handles: HashMap<Handle, (u16, u16)>,
     #[allow(clippy::type_complexity)]
-    handlers: HashMap<u16, Vec<(Handle, Rc<dyn MemHandler>)>>,
+    handlers: HashMap<u16, Vec<(Handle, &'a dyn MemHandler)>>,
     hdgen: u64,
 }
 
-impl Default for Mmu {
+impl Default for Mmu<'_> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Mmu {
+impl<'a> Mmu<'a> {
     /// Create a new MMU instance.
-    pub fn new() -> Mmu {
+    pub fn new() -> Mmu<'a> {
         Mmu {
             ram: vec![0u8; 0x10000],
             handles: HashMap::new(),
@@ -72,23 +71,18 @@ impl Mmu {
     }
 
     /// Add a new memory handler.
-    pub fn add_handler<T>(&mut self, range: (u16, u16), handler: T) -> Handle
-    where
-        T: MemHandler + 'static,
-    {
+    pub fn add_handler(&mut self, range: (u16, u16), handler: &'a dyn MemHandler) -> Handle {
         let handle = self.next_handle();
-        let handler = Rc::new(handler);
 
         self.handles.insert(handle.clone(), range);
 
         for i in range.0..=range.1 {
             if self.handlers.contains_key(&i) {
                 if let Some(v) = self.handlers.get_mut(&i) {
-                    v.push((handle.clone(), handler.clone()))
+                    v.push((handle.clone(), handler))
                 }
             } else {
-                self.handlers
-                    .insert(i, vec![(handle.clone(), handler.clone())]);
+                self.handlers.insert(i, vec![(handle.clone(), handler)]);
             }
         }
 
