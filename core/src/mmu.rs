@@ -39,7 +39,7 @@ pub struct Handle(u64);
 pub struct Mmu<'a> {
     ram: [u8; 0x10000],
     #[allow(clippy::type_complexity)]
-    handlers: ArrayVec<((u16, u16), Handle, &'a dyn MemHandler), 18>,
+    handlers: ArrayVec<((u16, u16), &'a dyn MemHandler), 18>,
     hdgen: u64,
 }
 
@@ -71,16 +71,16 @@ impl<'a> Mmu<'a> {
     pub fn add_handler(&mut self, range: (u16, u16), handler: &'a dyn MemHandler) -> Handle {
         let handle = self.next_handle();
 
-        self.handlers.push((range, handle, handler));
+        self.handlers.push((range, handler));
 
         handle
     }
 
     fn get_handlers_from_address<'b>(
-        handlers: &'b [((u16, u16), Handle, &dyn MemHandler)],
+        handlers: &'b [((u16, u16), &dyn MemHandler)],
         addr: u16,
     ) -> impl Iterator<Item = &'b dyn MemHandler> + 'b {
-        handlers.iter().filter_map(move |(range, _, handler)| {
+        handlers.iter().filter_map(move |(range, handler)| {
             if (range.0..=range.1).contains(&addr) {
                 Some(*handler)
             } else {

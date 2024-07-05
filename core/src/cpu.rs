@@ -358,11 +358,10 @@ impl Cpu {
 mod test {
     use super::*;
     use crate::inst::decode;
-    use alloc::{vec, vec::Vec};
 
-    fn write(mmu: &mut Mmu, m: Vec<u8>) {
-        for (i, m) in m.into_iter().enumerate() {
-            mmu.set8(i as u16, m);
+    fn write(mmu: &mut Mmu, m: &[u8]) {
+        for (i, m) in m.iter().enumerate() {
+            mmu.set8(i as u16, *m);
         }
     }
 
@@ -382,7 +381,7 @@ mod test {
 
         cpu.set_a(0x32);
 
-        write(&mut mmu, vec![0xaf]);
+        write(&mut mmu, &[0xaf]);
         exec(&mut cpu, &mut mmu);
 
         assert_eq!(cpu.get_a(), 0x00);
@@ -395,10 +394,7 @@ mod test {
         let mut cpu = Cpu::new();
 
         cpu.set_bc(0x1301);
-        write(
-            &mut mmu,
-            vec![0xc5, 0xf1, 0xf5, 0xd1, 0x79, 0xe6, 0xf0, 0xbb],
-        );
+        write(&mut mmu, &[0xc5, 0xf1, 0xf5, 0xd1, 0x79, 0xe6, 0xf0, 0xbb]);
         exec(&mut cpu, &mut mmu); // push bc
         assert_eq!(cpu.get_bc(), 0x1301);
         exec(&mut cpu, &mut mmu); // pop af
