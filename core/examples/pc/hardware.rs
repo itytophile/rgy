@@ -189,24 +189,6 @@ impl rgy::Hardware for Hardware {
         epoch.as_micros() as u64
     }
 
-    fn load_ram(&mut self, size: usize) -> Vec<u8> {
-        let mut ram = vec![0; size];
-
-        match &self.rampath {
-            Some(path) => match File::open(path) {
-                Ok(mut fs) => {
-                    fs.read_exact(&mut ram).expect("Couldn't read file");
-                    ram
-                }
-                Err(e) => {
-                    warn!("Couldn't open RAM file `{}`: {}", path, e);
-                    ram
-                }
-            },
-            None => ram,
-        }
-    }
-
     fn save_ram(&mut self, ram: &[u8]) {
         match &self.rampath {
             Some(path) => {

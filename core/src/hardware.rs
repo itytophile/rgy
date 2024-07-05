@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use crate::sound::{MixerStream, NoiseStream, ToneStream, WaveStream};
@@ -115,9 +114,6 @@ pub trait Hardware {
     fn sched(&mut self) -> bool {
         true
     }
-
-    /// Called when the CPU attempts to write save data to the cartridge battery-backed RAM.
-    fn load_ram(&mut self, size: usize) -> Vec<u8>;
 
     /// Called when the CPU attempts to read save data from the cartridge battery-backed RAM.
     fn save_ram(&mut self, ram: &[u8]);

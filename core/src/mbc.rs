@@ -49,7 +49,7 @@ impl MbcNone {
 struct Mbc1<'a> {
     hw: HardwareHandle<'a>,
     rom: Vec<u8>,
-    ram: Vec<u8>,
+    ram: [u8; 0x8000],
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -58,12 +58,10 @@ struct Mbc1<'a> {
 
 impl<'a> Mbc1<'a> {
     fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
-        let ram = hw.get().borrow_mut().load_ram(0x8000);
-
         Self {
             hw,
             rom,
-            ram,
+            ram: [0; 0x8000],
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,
@@ -154,19 +152,17 @@ impl<'a> Mbc1<'a> {
 struct Mbc2<'a> {
     hw: HardwareHandle<'a>,
     rom: Vec<u8>,
-    ram: Vec<u8>,
+    ram: [u8; 0x200],
     rom_bank: usize,
     ram_enable: bool,
 }
 
 impl<'a> Mbc2<'a> {
     fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
-        let ram = hw.get().borrow_mut().load_ram(0x200);
-
         Self {
             hw,
             rom,
-            ram,
+            ram: [0; 0x200],
             rom_bank: 1,
             ram_enable: false,
         }
@@ -236,7 +232,7 @@ impl<'a> Mbc2<'a> {
 struct Mbc3<'a> {
     hw: HardwareHandle<'a>,
     rom: Vec<u8>,
-    ram: Vec<u8>,
+    ram: [u8; 0x8000],
     rom_bank: usize,
     enable: bool,
     select: u8,
@@ -257,12 +253,10 @@ impl<'a> Drop for Mbc3<'a> {
 
 impl<'a> Mbc3<'a> {
     fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
-        let ram = hw.get().borrow_mut().load_ram(0x8000);
-
         let mut s = Self {
             hw,
             rom,
-            ram,
+            ram: [0; 0x8000],
             rom_bank: 0,
             enable: false,
             select: 0,
@@ -444,7 +438,7 @@ impl<'a> Mbc3<'a> {
 struct Mbc5<'a> {
     hw: HardwareHandle<'a>,
     rom: Vec<u8>,
-    ram: Vec<u8>,
+    ram: [u8; 0x20000],
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -452,12 +446,10 @@ struct Mbc5<'a> {
 
 impl<'a> Mbc5<'a> {
     fn new(hw: HardwareHandle<'a>, rom: Vec<u8>) -> Self {
-        let ram = hw.get().borrow_mut().load_ram(0x20000);
-
         Self {
             hw,
             rom,
-            ram,
+            ram: [0; 0x20000],
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,

@@ -56,11 +56,6 @@ impl rgy::Hardware for Hardware {
         true
     }
 
-    fn load_ram(&mut self, size: usize) -> Vec<u8> {
-        // Return save data.
-        vec![0; size]
-    }
-
     fn save_ram(&mut self, _ram: &[u8]) {
         // Store save data.
     }
