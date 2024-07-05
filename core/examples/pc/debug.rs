@@ -14,7 +14,7 @@ use std::sync::{
 use signal_hook;
 
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::{DefaultEditor, Editor};
 
 use structopt::StructOpt;
 
@@ -113,7 +113,7 @@ impl Debugger {
     fn prompt(&mut self, mmu: &Mmu) {
         self.prompt = true;
 
-        let mut rl = Editor::<()>::new();
+        let mut rl = DefaultEditor::new().unwrap();
 
         if rl.load_history(HISTORY_FILE).is_err() {
             println!("No previous history");
@@ -295,14 +295,14 @@ enum CmdBreak {
     #[structopt(name = "add")]
     Add {
         /// Address in hex
-        #[structopt(name = "addr", parse(try_from_str = "parse_addr"))]
+        #[structopt(name = "addr", parse(try_from_str = parse_addr))]
         addr: u16,
     },
     /// Remove a break point
     #[structopt(name = "remove")]
     Remove {
         /// Address in hex
-        #[structopt(name = "addr", parse(try_from_str = "parse_addr"))]
+        #[structopt(name = "addr", parse(try_from_str = parse_addr))]
         addr: u16,
     },
     /// List break points
@@ -422,10 +422,10 @@ enum CmdDump {
     #[structopt(name = "mem")]
     Mem {
         /// The start of the memory region to dump
-        #[structopt(name = "from", parse(try_from_str = "parse_addr"))]
+        #[structopt(name = "from", parse(try_from_str = parse_addr))]
         from: u16,
         /// The end of the memory region to dump (inclusive)
-        #[structopt(name = "to", parse(try_from_str = "parse_addr"))]
+        #[structopt(name = "to", parse(try_from_str = parse_addr))]
         to: u16,
     },
     /// Execution path
@@ -522,7 +522,7 @@ enum CmdWatch {
     #[structopt(name = "add")]
     Add {
         /// Address in hex
-        #[structopt(name = "addr", parse(try_from_str = "parse_addr"))]
+        #[structopt(name = "addr", parse(try_from_str = parse_addr))]
         addr: u16,
         /// Add watch only for read access
         #[structopt(long = "readonly", short = "r")]
@@ -535,7 +535,7 @@ enum CmdWatch {
     #[structopt(name = "remove")]
     Remove {
         /// Address in hex
-        #[structopt(name = "addr", parse(try_from_str = "parse_addr"))]
+        #[structopt(name = "addr", parse(try_from_str = parse_addr))]
         addr: u16,
         /// Remove watch only for read access
         #[structopt(long = "readonly", short = "r")]
@@ -631,7 +631,7 @@ struct Signal {
 impl Signal {
     fn new() -> Signal {
         let sig = Arc::new(AtomicBool::new(false));
-        signal_hook::flag::register(signal_hook::SIGINT, sig.clone())
+        signal_hook::flag::register(signal_hook::consts::SIGINT, sig.clone())
             .expect("Couldn't hook signal");
         Signal { sig }
     }
