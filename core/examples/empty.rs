@@ -29,7 +29,7 @@ impl rgy::Hardware for Hardware {
         false
     }
 
-    fn sound_play(&mut self, _stream: Box<dyn Stream>) {
+    fn sound_play(&mut self, _stream: &dyn Stream) {
         // Play the wave provided `Stream`.
     }
 

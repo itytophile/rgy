@@ -31,7 +31,7 @@ pub enum Key {
 }
 
 /// Sound wave stream which generates the wave to be played by the sound device.
-pub trait Stream: Send {
+pub trait Stream {
     /// The maximum value of the amplitude returned by this stream.
     fn max(&self) -> u16;
 
@@ -66,7 +66,7 @@ pub trait Hardware {
 
     /// Called when the emulator plays a sound.
     /// The stream in the argument is the stream which keeps returning wave patterns.
-    fn sound_play(&mut self, stream: Box<dyn Stream>);
+    fn sound_play(&mut self, stream: &dyn Stream);
 
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.

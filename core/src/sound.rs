@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
+use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use log::*;
 use spin::Mutex;
@@ -612,29 +613,29 @@ impl Stream for NoiseStream {
     }
 }
 
-struct Mixer {
+struct Mixer<'a> {
     so1_volume: usize,
     so2_volume: usize,
     so_mask: usize,
     enable: bool,
-    stream: MixerStream,
+    stream: MixerStream<'a>,
 }
 
-impl Mixer {
-    fn new() -> Self {
+impl<'a> Mixer<'a> {
+    fn new(enable: &'a Cell<bool>) -> Self {
         Self {
             so1_volume: 0,
             so2_volume: 0,
             so_mask: 0,
             enable: false,
-            stream: MixerStream::new(),
+            stream: MixerStream::new(enable),
         }
     }
 
     fn setup_stream(&self, hw: &HardwareHandle) {
         hw.get()
             .borrow_mut()
-            .sound_play(Box::new(self.stream.clone()))
+            .sound_play(&self.stream)
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
@@ -757,22 +758,22 @@ impl<T: Stream> Unit<T> {
 }
 
 #[derive(Clone)]
-struct MixerStream {
+struct MixerStream<'a> {
     tone1: Unit<ToneStream>,
     tone2: Unit<ToneStream>,
     wave: Unit<WaveStream>,
     noise: Unit<NoiseStream>,
-    enable: Arc<AtomicBool>,
+    enable: &'a Cell<bool>,
 }
 
-impl MixerStream {
-    fn new() -> Self {
+impl<'a> MixerStream<'a> {
+    fn new(enable: &'a Cell<bool>) -> Self {
         Self {
             tone1: Unit::new(),
             tone2: Unit::new(),
             wave: Unit::new(),
             noise: Unit::new(),
-            enable: Arc::new(AtomicBool::new(false)),
+            enable,
         }
     }
 
@@ -781,7 +782,7 @@ impl MixerStream {
     }
 }
 
-impl Stream for MixerStream {
+impl<'a> Stream for MixerStream<'a> {
     fn max(&self) -> u16 {
         // volume max = 7 * 2 = 14
         // amplitude max = 15
@@ -812,17 +813,17 @@ impl Stream for MixerStream {
     }
 }
 
-pub struct Sound {
+pub struct Sound<'a> {
     tone1: Tone,
     tone2: Tone,
     wave: Wave,
     noise: Noise,
-    mixer: Mixer,
+    mixer: Mixer<'a>,
 }
 
-impl Sound {
-    pub fn new(hw: HardwareHandle) -> Self {
-        let mixer = Mixer::new();
+impl<'a> Sound<'a> {
+    pub fn new(hw: HardwareHandle, enable: &'a Cell<bool>) -> Self {
+        let mixer = Mixer::new(enable);
 
         mixer.setup_stream(&hw);
 
@@ -836,7 +837,7 @@ impl Sound {
     }
 }
 
-impl IoHandler for Sound {
+impl<'a> IoHandler for Sound<'a> {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         if (0xff10..=0xff14).contains(&addr) {
             self.tone1.on_read(0xff10, addr)

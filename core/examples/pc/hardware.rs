@@ -170,7 +170,7 @@ impl rgy::Hardware for Hardware {
             .expect("Logic error in keystate map")
     }
 
-    fn sound_play(&mut self, stream: Box<dyn Stream>) {
+    fn sound_play(&mut self, stream: & dyn Stream) {
         self.pcm.play(stream)
     }
 
@@ -299,18 +299,18 @@ impl Pcm {
 }
 
 #[allow(unused)]
-enum SpeakerCmd {
-    Play(Box<dyn Stream>),
+enum SpeakerCmd<'a> {
+    Play(&'a dyn Stream),
     Stop,
 }
 
 #[derive(Clone)]
-pub struct SpeakerHandle {
-    tx: Sender<SpeakerCmd>,
+pub struct SpeakerHandle<'a> {
+    tx: Sender<SpeakerCmd<'a>>,
 }
 
-impl SpeakerHandle {
-    fn play(&self, stream: Box<dyn Stream>) {
+impl<'a> SpeakerHandle<'a> {
+    fn play(&self, stream: &dyn Stream) {
         let _ = self.tx.send(SpeakerCmd::Play(stream));
     }
 
