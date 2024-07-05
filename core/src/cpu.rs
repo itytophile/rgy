@@ -4,53 +4,33 @@ use crate::inst::decode;
 use crate::mmu::Mmu;
 use log::*;
 
-use alloc::fmt;
-
 /// Represents CPU state.
 #[derive(Clone)]
 pub struct Cpu {
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    f: u8,
-    h: u8,
-    l: u8,
-    pc: u16,
-    sp: u16,
-    ime: bool,
-    halt: bool,
-}
-
-impl fmt::Display for Cpu {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "a:  [{:02x}],  b:  [{:02x}]\n\
-             c:  [{:02x}],  d:  [{:02x}]\n\
-             e:  [{:02x}],  f:  [{:02x}]\n\
-             h:  [{:02x}],  l:  [{:02x}]\n\
-             pc: [{:04x}]\n\
-             sp: [{:04x}]\n\
-             flgs: [{}{}{}{}]\
-             ",
-            self.a,
-            self.b,
-            self.c,
-            self.d,
-            self.e,
-            self.f,
-            self.h,
-            self.l,
-            self.pc,
-            self.sp,
-            if self.get_zf() { "z" } else { "_" },
-            if self.get_nf() { "n" } else { "_" },
-            if self.get_hf() { "h" } else { "_" },
-            if self.get_cf() { "c" } else { "_" },
-        )
-    }
+    /// a register
+    pub a: u8,
+    /// b register
+    pub b: u8,
+    /// c register
+    pub c: u8,
+    /// d register
+    pub d: u8,
+    /// e register
+    pub e: u8,
+    /// f register
+    pub f: u8,
+    /// h register
+    pub h: u8,
+    /// l register
+    pub l: u8,
+    /// pc
+    pub pc: u16,
+    /// sp
+    pub sp: u16,
+    /// ime
+    pub ime: bool,
+    /// halt
+    pub halt: bool,
 }
 
 impl Default for Cpu {

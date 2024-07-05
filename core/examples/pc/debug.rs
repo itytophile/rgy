@@ -431,11 +431,38 @@ enum CmdDump {
     },
 }
 
+fn display(cpu: &Cpu) -> String {
+    format!(
+        "a:  [{:02x}],  b:  [{:02x}]\n\
+         c:  [{:02x}],  d:  [{:02x}]\n\
+         e:  [{:02x}],  f:  [{:02x}]\n\
+         h:  [{:02x}],  l:  [{:02x}]\n\
+         pc: [{:04x}]\n\
+         sp: [{:04x}]\n\
+         flgs: [{}{}{}{}]\
+         ",
+        cpu.a,
+        cpu.b,
+        cpu.c,
+        cpu.d,
+        cpu.e,
+        cpu.f,
+        cpu.h,
+        cpu.l,
+        cpu.pc,
+        cpu.sp,
+        if cpu.get_zf() { "z" } else { "_" },
+        if cpu.get_nf() { "n" } else { "_" },
+        if cpu.get_hf() { "h" } else { "_" },
+        if cpu.get_cf() { "c" } else { "_" },
+    )
+}
+
 impl CmdHandler for CmdDump {
     fn handle(&self, inner: &mut Debugger, mmu: &Mmu) -> CmdResult<bool> {
         match self {
             CmdDump::Cpu => {
-                println!("{}", inner.cpu_state);
+                println!("{}", display(&inner.cpu_state));
             }
             CmdDump::Stack { size } => {
                 let sp = inner.cpu_state.get_sp();
