@@ -37,10 +37,10 @@ impl Cgb {
 
 impl IoHandler for Cgb {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
-        if addr >= 0xc000 && addr <= 0xcfff {
+        if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             MemRead::Replace(self.wram_bank[0][off])
-        } else if addr >= 0xd000 && addr <= 0xdfff {
+        } else if (0xd000..=0xdfff).contains(&addr) {
             let off = addr as usize - 0xd000;
             MemRead::Replace(self.wram_bank[self.wram_select][off])
         } else if addr == 0xff4d {
@@ -59,10 +59,10 @@ impl IoHandler for Cgb {
     }
 
     fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
-        if addr >= 0xc000 && addr <= 0xcfff {
+        if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             self.wram_bank[0][off] = value;
-        } else if addr >= 0xd000 && addr <= 0xdfff {
+        } else if (0xd000..=0xdfff).contains(&addr) {
             let off = addr as usize - 0xd000;
             self.wram_bank[self.wram_select][off] = value;
         } else if addr == 0xff4d {

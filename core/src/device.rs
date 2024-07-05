@@ -22,12 +22,12 @@ impl<T> Device<T> {
     }
 
     /// Immutably borrow the underlying I/O handler.
-    pub fn borrow<'a>(&'a self) -> Ref<'a, T> {
+    pub fn borrow(&self) -> Ref<'_, T> {
         self.0.borrow()
     }
 
     /// Mutabully borrow the underlying I/O handler.
-    pub fn borrow_mut<'a>(&'a self) -> RefMut<'a, T> {
+    pub fn borrow_mut(&self) -> RefMut<'_, T> {
         self.0.borrow_mut()
     }
 }

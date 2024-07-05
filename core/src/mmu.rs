@@ -41,10 +41,18 @@ pub struct Handle(u64);
 pub struct Mmu {
     ram: Vec<u8>,
     handles: HashMap<Handle, (u16, u16)>,
+    #[allow(clippy::type_complexity)]
     handlers: HashMap<u16, Vec<(Handle, Rc<dyn MemHandler>)>>,
     hdgen: u64,
 }
 
+impl Default for Mmu {
+    fn default() -> Self {
+    Self::new()
+    }
+    }
+
+    
 impl Mmu {
     /// Create a new MMU instance.
     pub fn new() -> Mmu {
@@ -76,10 +84,7 @@ impl Mmu {
 
         for i in range.0..=range.1 {
             if self.handlers.contains_key(&i) {
-                match self.handlers.get_mut(&i) {
-                    Some(v) => v.push((handle.clone(), handler.clone())),
-                    None => {}
-                }
+                if let Some(v) = self.handlers.get_mut(&i) { v.push((handle.clone(), handler.clone())) }
             } else {
                 self.handlers
                     .insert(i, vec![(handle.clone(), handler.clone())]);
@@ -101,10 +106,7 @@ impl Mmu {
         };
 
         for i in range.0..range.1 {
-            match self.handlers.get_mut(&i) {
-                Some(v) => v.retain(|(hd, _)| hd != handle),
-                None => {}
-            }
+            if let Some(v) = self.handlers.get_mut(&i) { v.retain(|(hd, _)| hd != handle) }
         }
     }
 
@@ -119,7 +121,7 @@ impl Mmu {
             }
         }
 
-        if addr >= 0xe000 && addr <= 0xfdff {
+        if (0xe000..=0xfdff).contains(&addr) {
             // echo ram
             self.ram[addr as usize - 0x2000]
         } else {
@@ -142,7 +144,7 @@ impl Mmu {
             }
         }
 
-        if addr >= 0xe000 && addr <= 0xfdff {
+        if (0xe000..=0xfdff).contains(&addr) {
             // echo ram
             self.ram[addr as usize - 0x2000] = v
         } else {

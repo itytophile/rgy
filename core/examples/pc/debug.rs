@@ -11,16 +11,14 @@ use std::sync::{
     Arc,
 };
 
-use signal_hook;
-
 use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor, Editor};
+use rustyline::DefaultEditor;
 
 use structopt::StructOpt;
 
 use lazy_static::lazy_static;
 
-const HISTORY_FILE: &'static str = ".gy.txt";
+const HISTORY_FILE: &str = ".gy.txt";
 
 #[derive(Debug)]
 struct CmdError(String);
@@ -124,7 +122,7 @@ impl Debugger {
 
             match readline {
                 Ok(line) => {
-                    rl.add_history_entry(line.as_str());
+                    let _ = rl.add_history_entry(line.as_str());
 
                     match exec_cmd(self, mmu, &line) {
                         Ok(end) => {
@@ -225,19 +223,16 @@ fn exec_cmd(inner: &mut Debugger, mmu: &Mmu, line: &str) -> CmdResult<bool> {
 }
 
 fn find_cmd(s: &str) -> Option<&'static CmdInfo> {
-    for cmd in COMMANDS.iter() {
-        if cmd.name == s || cmd.short == Some(s) {
-            return Some(cmd);
-        }
-    }
-
-    None
+    COMMANDS
+        .iter()
+        .find(|&cmd| cmd.name == s || cmd.short == Some(s))
 }
 
 struct CmdInfo {
     name: &'static str,
     short: Option<&'static str>,
     desc: &'static str,
+    #[allow(clippy::type_complexity)]
     handler: Box<dyn Fn(&mut Debugger, &Mmu, &str) -> CmdResult<bool> + Send + Sync + 'static>,
 }
 
@@ -254,38 +249,37 @@ trait CmdHandler: StructOpt + Sized {
 }
 
 macro_rules! cc {
-    ($vec: ident, $name: expr, $short: expr, $desc: expr, $handler: tt) => {
-        $vec.push(CmdInfo {
+    ($name: expr, $short: expr, $desc: expr, $handler: tt) => {
+        CmdInfo {
             name: $name,
             desc: $desc,
             short: $short,
             handler: Box::new(|inner, mmu, line| $handler::parse(inner, mmu, line)),
-        });
+        }
     };
 }
 
 lazy_static! {
     static ref COMMANDS: Vec<CmdInfo> = {
-        let mut m = Vec::new();
-        cc!(m, "break", Some("b"), "Manage break points.", CmdBreak);
-        cc!(m, "watch", Some("w"), "Manage memory watches.", CmdWatch);
-        cc!(
-            m,
-            "help",
-            Some("h"),
-            "Show the list of commands available.",
-            CmdHelp
-        );
-        cc!(m, "quit", None, "Quit this emulator.", CmdQuit);
-        cc!(m, "cont", Some("c"), "Continue execution.", CmdContinue);
-        cc!(m, "step", Some("n"), "Step execution.", CmdStep);
-        cc!(m, "dump", Some("d"), "Dump information.", CmdDump);
-        m
+        vec![
+            cc!("break", Some("b"), "Manage break points.", CmdBreak),
+            cc!("watch", Some("w"), "Manage memory watches.", CmdWatch),
+            cc!(
+                "help",
+                Some("h"),
+                "Show the list of commands available.",
+                CmdHelp
+            ),
+            cc!("quit", None, "Quit this emulator.", CmdQuit),
+            cc!("cont", Some("c"), "Continue execution.", CmdContinue),
+            cc!("step", Some("n"), "Step execution.", CmdStep),
+            cc!("dump", Some("d"), "Dump information.", CmdDump),
+        ]
     };
 }
 
 fn parse_addr(s: &str) -> CmdResult<u16> {
-    u16::from_str_radix(s, 16).map_err(|e| CmdError::new(e))
+    u16::from_str_radix(s, 16).map_err(CmdError::new)
 }
 
 #[derive(StructOpt, Debug)]
@@ -321,7 +315,7 @@ impl CmdHandler for CmdBreak {
                 }
             }
             CmdBreak::Remove { addr } => {
-                if inner.breaks.remove(&addr) {
+                if inner.breaks.remove(addr) {
                     println!("Remove break point at {:04x}", addr);
                 } else {
                     println!("Break point isn't set at {:04x}", addr);
@@ -586,14 +580,14 @@ impl CmdHandler for CmdWatch {
                     return Ok(false);
                 }
                 if !writeonly {
-                    if inner.rd_watches.remove(&addr) {
+                    if inner.rd_watches.remove(addr) {
                         println!("Remove read watch at {:04x}", addr);
                     } else {
                         println!("Read watch is already unset at {:04x}", addr);
                     }
                 }
                 if !readonly {
-                    if inner.wr_watches.remove(&addr) {
+                    if inner.wr_watches.remove(addr) {
                         println!("Remove writeonly watch at {:04x}", addr);
                     } else {
                         println!("Write watch is already unset at {:04x}", addr);

@@ -6,6 +6,7 @@ use alloc::{vec, vec::Vec};
 use log::*;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 enum Mode {
     OAM,
     VRAM,
@@ -80,7 +81,7 @@ pub struct Gpu {
 
 fn to_palette(p: u8) -> Vec<Color> {
     vec![
-        ((p >> 0) & 0x3).into(),
+        (p & 0x3).into(),
         ((p >> 2) & 0x3).into(),
         ((p >> 4) & 0x3).into(),
         ((p >> 6) & 0x3).into(),
@@ -338,7 +339,7 @@ impl Hdma {
 impl Gpu {
     pub fn new(hw: HardwareHandle, irq: Irq) -> Self {
         Self {
-            irq: irq,
+            irq,
             clocks: 0,
             lyc_interrupt: false,
             oam_interrupt: false,
@@ -387,13 +388,10 @@ impl Gpu {
     }
 
     fn hdma_run(&mut self, mmu: &Mmu) {
-        match self.hdma.run() {
-            Some((dst, src, size)) => {
-                for i in 0..size {
-                    self.write_vram(dst + i, mmu.get8(src + i), self.vram_select);
-                }
+        if let Some((dst, src, size)) = self.hdma.run() {
+            for i in 0..size {
+                self.write_vram(dst + i, mmu.get8(src + i), self.vram_select);
             }
-            _ => {}
         }
     }
 
@@ -530,7 +528,7 @@ impl Gpu {
                     if x + 7 < self.wx as u16 {
                         continue;
                     }
-                    let xx = (x + 7 - self.wx as u16) as u16; // x - (wx - 7)
+                    let xx = x + 7 - self.wx as u16; // x - (wx - 7)
                     let tx = xx / 8;
                     let txoff = xx % 8;
 
@@ -548,7 +546,7 @@ impl Gpu {
         if self.spenable {
             for i in 0..40 {
                 let oam = 0xfe00 + i * 4;
-                let ypos = mmu.get8(oam + 0) as u16;
+                let ypos = mmu.get8(oam) as u16;
                 let xpos = mmu.get8(oam + 1) as u16;
                 let ti = mmu.get8(oam + 2);
                 let attr = self.get_sp_attr(mmu.get8(oam + 3));
@@ -558,7 +556,7 @@ impl Gpu {
                     // This sprite doesn't hit the current ly
                     continue;
                 }
-                let tyoff = ly as u16 + 16 - ypos; // ly - (ypos - 16)
+                let tyoff = ly + 16 - ypos; // ly - (ypos - 16)
                 if tyoff >= self.spsize {
                     // This sprite doesn't hit the current ly
                     continue;
@@ -778,7 +776,7 @@ impl Gpu {
 
 impl IoHandler for Gpu {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
-        if addr >= 0x8000 && addr <= 0x9fff {
+        if (0x8000..=0x9fff).contains(&addr) {
             MemRead::Replace(self.read_vram(addr, self.vram_select))
         } else if addr == 0xff40 {
             MemRead::Replace(self.on_read_ctrl())
@@ -838,7 +836,7 @@ impl IoHandler for Gpu {
 
     fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
         trace!("Write GPU register: {:04x} {:02x}", addr, value);
-        if addr >= 0x8000 && addr <= 0x9fff {
+        if (0x8000..=0x9fff).contains(&addr) {
             self.write_vram(addr, value, self.vram_select);
         } else if addr == 0xff40 {
             self.on_write_ctrl(value);

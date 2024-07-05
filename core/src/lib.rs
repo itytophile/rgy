@@ -88,19 +88,19 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     // Create the default config.
-//!     let cfg = Config::new();
 //!
-//!     // Create the hardware instance.
-//!     let hw = Hardware::new();
+//! // Create the default config.
+//! let cfg = Config::new();
 //!
-//!     // TODO: The content of a ROM file, which can be downloaded from the Internet.
-//!     let rom = vec![0u8; 1024];
+//! // Create the hardware instance.
+//! let hw = Hardware::new();
 //!
-//!     // Run the emulator.
-//!     rgy::run(cfg, &rom, hw);
-//! }
+//! // TODO: The content of a ROM file, which can be downloaded from the Internet.
+//! let rom = vec![0u8; 1024];
+//!
+//! // Run the emulator.
+//! rgy::run(cfg, &rom, hw);
+//!
 //! ```
 
 #![no_std]

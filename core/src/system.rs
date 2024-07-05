@@ -1,6 +1,6 @@
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
-use crate::debug::Debugger;
+use crate::debug::{Debugger, NullDebugger};
 use crate::device::Device;
 use crate::dma::Dma;
 use crate::fc::FreqControl;
@@ -26,6 +26,13 @@ pub struct Config {
     /// Don't adjust CPU frequency.
     pub(crate) native_speed: bool,
 }
+
+impl Default for Config {
+    fn default() -> Self {
+    Self::new()
+    }
+    }
+    
 
 impl Config {
     /// Create the default configuration.
@@ -199,7 +206,7 @@ where
 
 /// Run the emulator with the given configuration.
 pub fn run<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
-    run_inner(cfg, rom, hw, Debugger::empty())
+    run_inner(cfg, rom, hw, NullDebugger)
 }
 
 /// Run the emulator with the given configuration and debugger.

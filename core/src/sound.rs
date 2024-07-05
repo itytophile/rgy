@@ -187,6 +187,7 @@ impl WaveIndex {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 struct LFSR {
     value: u16,
     short: bool,
@@ -286,7 +287,7 @@ impl Tone {
     }
 
     fn on_write(&mut self, base: u16, addr: u16, value: u8) -> bool {
-        if addr == base + 0 {
+        if addr == base {
             self.sweep_time = ((value >> 4) & 0x7) as usize;
             self.sweep_sub = value & 0x08 != 0;
             self.sweep_shift = (value & 0x07) as usize;
@@ -429,7 +430,7 @@ impl Wave {
             self.freq
                 .set((self.freq.get() & !0x700) | (((value & 0x7) as usize) << 8));
             return value & 0x80 != 0;
-        } else if addr >= 0xff30 && addr <= 0xff3f {
+        } else if (0xff30..=0xff3f).contains(&addr) {
             self.wavebuf[(addr - 0xff30) as usize] = value;
         } else {
             unreachable!()
@@ -488,8 +489,8 @@ impl Stream for WaveStream {
         let amp = match self.wave.amp_shift.get() {
             0 => 0,
             1 => amp,
-            2 => (amp >> 1),
-            3 => (amp >> 2),
+            2 => amp >> 1,
+            3 => amp >> 2,
             _ => unreachable!(),
         };
 
@@ -510,7 +511,6 @@ struct Noise {
     div_freq: usize,
 
     counter: bool,
-    freq: usize,
 }
 
 impl Noise {
@@ -527,7 +527,6 @@ impl Noise {
             div_freq: 0,
 
             counter: false,
-            freq: 0,
         }
     }
 
@@ -839,15 +838,15 @@ impl Sound {
 
 impl IoHandler for Sound {
     fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
-        if addr >= 0xff10 && addr <= 0xff14 {
+        if (0xff10..=0xff14).contains(&addr) {
             self.tone1.on_read(0xff10, addr)
-        } else if addr >= 0xff15 && addr <= 0xff19 {
+        } else if (0xff15..=0xff19).contains(&addr) {
             self.tone2.on_read(0xff15, addr)
-        } else if addr >= 0xff1a && addr <= 0xff1e {
+        } else if (0xff1a..=0xff1e).contains(&addr) {
             self.wave.on_read(addr)
-        } else if addr >= 0xff20 && addr <= 0xff23 {
+        } else if (0xff20..=0xff23).contains(&addr) {
             self.noise.on_read(addr)
-        } else if addr >= 0xff24 && addr <= 0xff26 {
+        } else if (0xff24..=0xff26).contains(&addr) {
             self.mixer.on_read(addr)
         } else {
             MemRead::PassThrough
@@ -855,25 +854,25 @@ impl IoHandler for Sound {
     }
 
     fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
-        if addr >= 0xff10 && addr <= 0xff14 {
+        if (0xff10..=0xff14).contains(&addr) {
             if self.tone1.on_write(0xff10, addr, value) {
                 self.mixer.restart_tone1(self.tone1.clone());
             }
-        } else if addr >= 0xff15 && addr <= 0xff19 {
+        } else if (0xff15..=0xff19).contains(&addr) {
             if self.tone2.on_write(0xff15, addr, value) {
                 self.mixer.restart_tone2(self.tone2.clone());
             }
-        } else if addr >= 0xff1a && addr <= 0xff1e {
+        } else if (0xff1a..=0xff1e).contains(&addr) {
             if self.wave.on_write(addr, value) {
                 self.mixer.restart_wave(self.wave.clone());
             }
-        } else if addr >= 0xff30 && addr <= 0xff3f {
+        } else if (0xff30..=0xff3f).contains(&addr) {
             let _ = self.wave.on_write(addr, value);
-        } else if addr >= 0xff20 && addr <= 0xff23 {
+        } else if (0xff20..=0xff23).contains(&addr) {
             if self.noise.on_write(addr, value) {
                 self.mixer.restart_noise(self.noise.clone());
             }
-        } else if addr >= 0xff24 && addr <= 0xff26 {
+        } else if (0xff24..=0xff26).contains(&addr) {
             self.mixer.on_write(addr, value);
         } else {
             info!("Write sound: {:04x} {:02x}", addr, value);

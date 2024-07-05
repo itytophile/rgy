@@ -69,6 +69,12 @@ pub struct Ic {
     request: Rc<RefCell<Ints>>,
 }
 
+impl Default for Ic {
+    fn default() -> Self {
+    Self::new()
+    }
+    }
+
 impl Ic {
     pub fn new() -> Ic {
         Ic {

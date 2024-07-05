@@ -53,6 +53,12 @@ impl fmt::Display for Cpu {
     }
 }
 
+impl Default for Cpu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Cpu {
     /// Create a new CPU state.
     pub fn new() -> Cpu {
@@ -172,36 +178,36 @@ impl Cpu {
     /// Updates the value of `z` flag in the flag register.
     pub fn set_zf(&mut self, v: bool) {
         if v {
-            self.f = self.f | 0x80
+            self.f |= 0x80
         } else {
-            self.f = self.f & !0x80
+            self.f &= !0x80
         }
     }
 
     /// Updates the value of `n` flag in the flag register.
     pub fn set_nf(&mut self, v: bool) {
         if v {
-            self.f = self.f | 0x40
+            self.f |= 0x40
         } else {
-            self.f = self.f & !0x40
+            self.f &= !0x40
         }
     }
 
     /// Updates the value of `h` flag in the flag register.
     pub fn set_hf(&mut self, v: bool) {
         if v {
-            self.f = self.f | 0x20
+            self.f |= 0x20
         } else {
-            self.f = self.f & !0x20
+            self.f &= !0x20
         }
     }
 
     /// Updates the value of `c` flag in the flag register.
     pub fn set_cf(&mut self, v: bool) {
         if v {
-            self.f = self.f | 0x10
+            self.f |= 0x10
         } else {
-            self.f = self.f & !0x10
+            self.f &= !0x10
         }
     }
 
@@ -375,13 +381,13 @@ mod test {
     use alloc::{vec, vec::Vec};
 
     fn write(mmu: &mut Mmu, m: Vec<u8>) {
-        for i in 0..m.len() {
-            mmu.set8(i as u16, m[i]);
+        for (i, m) in m.into_iter().enumerate() {
+            mmu.set8(i as u16, m);
         }
     }
 
     fn exec(cpu: &mut Cpu, mmu: &mut Mmu) {
-        let (code, arg) = cpu.fetch(&mmu);
+        let (code, arg) = cpu.fetch(mmu);
 
         let (_, size) = decode(code, arg, cpu, mmu);
 
@@ -428,6 +434,6 @@ mod test {
         assert_eq!(cpu.get_a(), 0x00);
         assert_eq!(cpu.get_e(), 0x00);
         exec(&mut cpu, &mut mmu); // cp e
-        assert_eq!(cpu.get_zf(), true);
+        assert!(cpu.get_zf());
     }
 }
