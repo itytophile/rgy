@@ -711,7 +711,7 @@ impl<T> Default for UnitRaw<T> {
     }
 }
 
-impl<T> Unit<T> {
+impl<T: Stream> Unit<T> {
     // None, 0
     pub fn new(raw: &'static UnitRaw<T>) -> Self {
         Self {
@@ -719,9 +719,7 @@ impl<T> Unit<T> {
             volume: &raw.volume,
         }
     }
-}
 
-impl<T: Stream> Unit<T> {
     fn on(&self) -> bool {
         self.stream.lock().is_some()
     }
