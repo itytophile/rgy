@@ -21,10 +21,10 @@ pub enum MemWrite {
 /// The handler to intercept memory access from the CPU.
 pub trait MemHandler {
     /// The function is called when the CPU attempts to read from the memory.
-    fn on_read(&self, mmu: &Mmu, addr: u16) -> MemRead;
+    fn on_read(&self, addr: u16) -> MemRead;
 
     /// The function is called when the CPU attempts to write to the memory.
-    fn on_write(&self, mmu: &Mmu, addr: u16, value: u8) -> MemWrite;
+    fn on_write(&self, addr: u16, value: u8) -> MemWrite;
 }
 
 /// The memory management unit (MMU)
@@ -74,7 +74,7 @@ impl<'a> Mmu<'a> {
     /// Reads one byte from the given address in the memory.
     pub fn get8(&self, addr: u16) -> u8 {
         for handler in Self::get_handlers_from_address(&self.handlers, addr) {
-            match handler.on_read(self, addr) {
+            match handler.on_read(addr) {
                 MemRead::Replace(alt) => return alt,
                 MemRead::PassThrough => {}
             }
@@ -90,7 +90,7 @@ impl<'a> Mmu<'a> {
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
         for handler in Self::get_handlers_from_address(&self.handlers, addr) {
-            match handler.on_write(self, addr, v) {
+            match handler.on_write(addr, v) {
                 MemWrite::Replace(alt) => {
                     self.ram[addr as usize] = alt;
                     return;

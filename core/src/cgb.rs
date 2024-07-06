@@ -1,6 +1,6 @@
 use crate::{
     device::IoHandler,
-    mmu::{MemRead, MemWrite, Mmu},
+    mmu::{MemRead, MemWrite},
 };
 use log::*;
 
@@ -35,7 +35,7 @@ impl Cgb {
 }
 
 impl IoHandler for Cgb {
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             MemRead::Replace(self.wram_bank[0][off])
@@ -57,7 +57,7 @@ impl IoHandler for Cgb {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             self.wram_bank[0][off] = value;

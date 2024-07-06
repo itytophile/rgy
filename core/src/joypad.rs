@@ -1,7 +1,7 @@
 use crate::device::IoHandler;
 use crate::hardware::{HardwareHandle, Key};
 use crate::ic::Irq;
-use crate::mmu::{MemRead, MemWrite, Mmu};
+use crate::mmu::{MemRead, MemWrite};
 use log::*;
 
 pub struct Joypad<'a> {
@@ -59,7 +59,7 @@ impl<'a> Joypad<'a> {
 }
 
 impl<'a> IoHandler for Joypad<'a> {
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr == 0xff00 {
             debug!("Joypad read: dir: {:02x}", self.select);
 
@@ -69,7 +69,7 @@ impl<'a> IoHandler for Joypad<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr == 0xff00 {
             self.select = value & 0xf0;
         }

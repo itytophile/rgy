@@ -1,7 +1,7 @@
 use crate::device::IoHandler;
 use crate::hardware::HardwareHandle;
 use crate::ic::Irq;
-use crate::mmu::{MemRead, MemWrite, Mmu};
+use crate::mmu::{MemRead, MemWrite};
 use log::*;
 
 pub struct Serial<'a> {
@@ -54,7 +54,7 @@ impl<'a> Serial<'a> {
 }
 
 impl<'a> IoHandler for Serial<'a> {
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr == 0xff01 {
             MemRead::Replace(self.data)
         } else if addr == 0xff02 {
@@ -64,7 +64,7 @@ impl<'a> IoHandler for Serial<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr == 0xff01 {
             self.data = value;
             MemWrite::Block

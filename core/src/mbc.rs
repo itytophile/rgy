@@ -1,6 +1,6 @@
 use crate::device::IoHandler;
 use crate::hardware::HardwareHandle;
-use crate::mmu::{MemRead, MemWrite, Mmu};
+use crate::mmu::{MemRead, MemWrite};
 use log::*;
 
 const BOOT_ROM: &[u8] = {
@@ -680,7 +680,7 @@ impl<'a> Mbc<'a> {
 }
 
 impl<'a> IoHandler for Mbc<'a> {
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if self.use_boot_rom && self.in_boot_rom(addr) {
             MemRead::Replace(BOOT_ROM[addr as usize])
         } else {
@@ -688,7 +688,7 @@ impl<'a> IoHandler for Mbc<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if self.use_boot_rom && addr < 0x100 {
             unreachable!("Writing to boot ROM")
         } else if addr == 0xff50 {

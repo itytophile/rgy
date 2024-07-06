@@ -4,7 +4,7 @@ use spin::Mutex;
 
 use crate::device::IoHandler;
 use crate::hardware::{HardwareHandle, Stream};
-use crate::mmu::{MemRead, MemWrite, Mmu};
+use crate::mmu::{MemRead, MemWrite};
 
 trait AtomicHelper {
     type Item;
@@ -812,7 +812,7 @@ impl Sound {
 }
 
 impl IoHandler for Sound {
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if (0xff10..=0xff14).contains(&addr) {
             self.tone1.on_read(0xff10, addr)
         } else if (0xff15..=0xff19).contains(&addr) {
@@ -828,7 +828,7 @@ impl IoHandler for Sound {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if (0xff10..=0xff14).contains(&addr) {
             if self.tone1.on_write(0xff10, addr, value) {
                 self.mixer.restart_tone1(self.tone1.clone());
