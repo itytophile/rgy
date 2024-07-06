@@ -2,7 +2,7 @@ use core::cell::RefCell;
 
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
-use crate::debug::{Debugger, NullDebugger};
+use crate::debug::Debugger;
 use crate::device::{Device, IoHandler, IoMemHandler};
 use crate::dma::Dma;
 use crate::fc::FreqControl;
@@ -348,7 +348,7 @@ where
         raw_devices: RawDevices::new(
             rom,
             hw_handle,
-            Wave::new(WAVE.init(WaveRaw::new())),
+            Wave::new(WAVE.init(WaveRaw::default())),
             Mixer::new(MixerStream::new(
                 Unit::new(TONE_UNIT1.init(UnitRaw::default())),
                 Unit::new(TONE_UNIT2.init(UnitRaw::default())),

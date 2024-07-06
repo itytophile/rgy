@@ -394,8 +394,8 @@ pub struct WaveRaw {
     freq: AtomicUsize,
 }
 
-impl WaveRaw {
-    pub fn new() -> Self {
+impl Default for WaveRaw {
+    fn default() -> Self {
         Self {
             amp_shift: AtomicUsize::new(0),
             freq: AtomicUsize::new(0),

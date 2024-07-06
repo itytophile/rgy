@@ -10,7 +10,7 @@ use crate::{
 
 use log::*;
 use rgy::{debug::NullDebugger, Config};
-use std::{path::PathBuf, thread, time::Duration};
+use std::{path::PathBuf, time::Duration};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

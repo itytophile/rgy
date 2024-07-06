@@ -1,4 +1,4 @@
-use std::{thread, time::Duration};
+use std::time::Duration;
 
 use rgy::{debug::NullDebugger, Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
 

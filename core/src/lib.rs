@@ -99,7 +99,7 @@
 //! ```
 
 #![no_std]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 
 mod alu;
 mod cgb;
@@ -134,4 +134,4 @@ pub mod mmu;
 mod hardware;
 
 pub use crate::hardware::{Hardware, Key, SoundStream, Stream, VRAM_HEIGHT, VRAM_WIDTH};
-pub use crate::system::{ Config, System};
+pub use crate::system::{Config, System};
