@@ -199,6 +199,42 @@ impl<'a, 'b> System<'a, 'b> {
         let cpu = Cpu::new();
         let mut mmu = Mmu::new();
 
+        // let ranges = [
+        //     ((0xc000, 0xdfff)),
+        //     ((0xff4d, 0xff4d)),
+        //     ((0xff56, 0xff56)),
+        //     ((0xff70, 0xff70)),
+        //     ((0x0000, 0x7fff)),
+        //     ((0xff50, 0xff50)),
+        //     ((0xa000, 0xbfff)),
+        //     ((0xff10, 0xff3f)),
+        //     ((0xff46, 0xff46)),
+        //     ((0x8000, 0x9fff)),
+        //     ((0xff40, 0xff45)),
+        //     ((0xff47, 0xff4b)),
+        //     ((0xff4f, 0xff4f)),
+        //     ((0xff51, 0xff55)),
+        //     ((0xff68, 0xff6b)),
+        //     ((0xff0f, 0xff0f)),
+        //     ((0xffff, 0xffff)),
+        //     ((0xff00, 0xff00)),
+        //     ((0xff04, 0xff07)),
+        //     ((0xff01, 0xff02)),
+        // ];
+
+        // for i in ranges {
+        //     for j in ranges {
+        //         if i != j
+        //             && ((i.0 <= j.1 && i.0 >= j.0)
+        //                 || (i.1 <= j.1 && i.1 >= j.0)
+        //                 || (j.0 <= i.1 && j.0 >= i.0)
+        //                 || (j.1 <= i.1 && j.1 >= i.0))
+        //         {
+        //             panic!("{:x?} {:x?}", i, j)
+        //         }
+        //     }
+        // }
+
         mmu.add_handler((0xc000, 0xdfff), &handlers.cgb);
         mmu.add_handler((0xff4d, 0xff4d), &handlers.cgb);
         mmu.add_handler((0xff56, 0xff56), &handlers.cgb);
@@ -212,7 +248,10 @@ impl<'a, 'b> System<'a, 'b> {
         mmu.add_handler((0xff46, 0xff46), &handlers.dma);
 
         mmu.add_handler((0x8000, 0x9fff), &handlers.gpu);
-        mmu.add_handler((0xff40, 0xff55), &handlers.gpu);
+        mmu.add_handler((0xff40, 0xff45), &handlers.gpu);
+        mmu.add_handler((0xff47, 0xff4b), &handlers.gpu);
+        mmu.add_handler((0xff4f, 0xff4f), &handlers.gpu);
+        mmu.add_handler((0xff51, 0xff55), &handlers.gpu);
         mmu.add_handler((0xff68, 0xff6b), &handlers.gpu);
 
         mmu.add_handler((0xff0f, 0xff0f), &handlers.ic);

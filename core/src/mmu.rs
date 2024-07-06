@@ -35,7 +35,7 @@ pub trait MemHandler {
 pub struct Mmu<'a> {
     ram: [u8; 0x10000],
     #[allow(clippy::type_complexity)]
-    handlers: ArrayVec<((u16, u16), &'a dyn MemHandler), 18>,
+    handlers: ArrayVec<((u16, u16), &'a dyn MemHandler), 20>,
 }
 
 impl Default for Mmu<'_> {
