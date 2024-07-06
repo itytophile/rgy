@@ -2,29 +2,9 @@ use std::time::Duration;
 
 use rgy::{debug::NullDebugger, Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
 
-struct Hardware {
-    display: Vec<Vec<u32>>,
-}
-
-impl Hardware {
-    fn new() -> Self {
-        // Create a frame buffer with the size VRAM_WIDTH * VRAM_HEIGHT.
-        let display = vec![vec![0u32; VRAM_HEIGHT]; VRAM_WIDTH];
-
-        Self { display }
-    }
-}
+struct Hardware;
 
 impl rgy::Hardware for Hardware {
-    fn vram_update(&mut self, line: usize, buffer: &[u32]) {
-        // `line` corresponds to the y coordinate.
-        let y = line;
-
-        for (x, col) in buffer.iter().enumerate() {
-            self.display[x][y] = *col;
-        }
-    }
-
     fn joypad_pressed(&mut self, key: Key) -> bool {
         // Read a keyboard device and check if the `key` is pressed or not.
         println!("Check if {:?} is pressed", key);
@@ -67,8 +47,10 @@ fn main() {
     // Create the default config.
     let cfg = Config::new();
 
+    let mut display = vec![vec![0u32; VRAM_HEIGHT]; VRAM_WIDTH];
+
     // Create the hardware instance.
-    let hw = Hardware::new();
+    let hw = Hardware;
 
     // The content of a ROM file, which can be downloaded from the Internet.
     let rom = vec![0u8; 1024];
@@ -87,6 +69,13 @@ fn main() {
         &handlers,
     );
     while let Some(poll_state) = sys.poll() {
+        if let Some((line, buffer)) = poll_state.line_to_draw {
+            let y = line as usize;
+
+            for (x, col) in buffer.iter().enumerate() {
+                display[x][y] = *col;
+            }
+        }
         spin_sleep::sleep(Duration::from_nanos(poll_state.delay));
     }
 }

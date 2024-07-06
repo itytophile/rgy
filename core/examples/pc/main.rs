@@ -1,16 +1,17 @@
 mod debug;
 mod hardware;
-mod loader;
 
-use crate::{
-    debug::Debugger,
-    hardware::Hardware,
-    loader::{load_rom, Loader},
-};
+use crate::{debug::Debugger, hardware::Hardware};
 
 use log::*;
-use rgy::{debug::NullDebugger, Config};
-use std::{path::PathBuf, time::Duration};
+use rgy::{debug::NullDebugger, Config, VRAM_WIDTH};
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -58,29 +59,33 @@ fn set_affinity() {
     }
 }
 
+pub fn load_rom<P: AsRef<Path>>(path: P) -> Vec<u8> {
+    let mut f = File::open(path).expect("Couldn't open file");
+    let mut buf = Vec::new();
+
+    f.read_to_end(&mut buf).expect("Couldn't read file");
+
+    buf
+}
+
 fn main() {
     let opt = Opt::from_args();
 
     env_logger::init();
 
     let hw = Hardware::new(opt.ram.clone());
+    let vram = hw.vram.clone();
     let hw1 = hw.clone();
 
     std::thread::spawn(move || {
-        let (rom, hw) = if opt.rom.is_dir() {
-            let mut ldr = Loader::new(&opt.rom);
-
-            utils::select(&mut ldr, hw1)
-        } else {
-            (load_rom(&opt.rom), hw1)
-        };
+        let (rom, hw) = (load_rom(&opt.rom), hw1);
 
         set_affinity();
 
         if opt.debug {
-            run(Debugger::new(), hw, &rom, to_cfg(opt));
+            run(Debugger::new(), hw, &rom, to_cfg(opt), vram);
         } else {
-            run(NullDebugger, hw, &rom, to_cfg(opt));
+            run(NullDebugger, hw, &rom, to_cfg(opt), vram);
         }
     });
 
@@ -92,6 +97,7 @@ fn run<D: rgy::debug::Debugger + 'static, H: rgy::Hardware + 'static>(
     hw: H,
     rom: &[u8],
     cfg: Config,
+    vram: Arc<Mutex<Vec<u32>>>,
 ) {
     let state0 = rgy::system::get_stack_state0(hw, debugger);
     let state1 = rgy::system::get_stack_state1(&state0, rom);
@@ -106,7 +112,16 @@ fn run<D: rgy::debug::Debugger + 'static, H: rgy::Hardware + 'static>(
         &handlers,
     );
     while let Some(poll_state) = sys.poll() {
-        println!("{}", poll_state.delay);
+        if let Some((line, buf)) = poll_state.line_to_draw {
+            println!("coucou");
+            let mut vram = vram.lock().unwrap();
+            for i in 0..buf.len() {
+                let base = line as usize * VRAM_WIDTH;
+                vram[base + i] = buf[i];
+            }
+        }
+
+        // println!("{}", poll_state.delay);
         spin_sleep::sleep(Duration::from_nanos(poll_state.delay));
     }
 }

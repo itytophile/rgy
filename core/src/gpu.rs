@@ -1,5 +1,5 @@
 use crate::device::IoHandler;
-use crate::hardware::{HardwareHandle, VRAM_HEIGHT, VRAM_WIDTH};
+use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
 use log::*;
@@ -65,7 +65,6 @@ pub struct Gpu<'a> {
     spsize: u16,
     spenable: bool,
     bgenable: bool,
-    hw: HardwareHandle<'a>,
 
     bg_palette: [Color; 4],
     obj_palette0: [Color; 4],
@@ -336,7 +335,7 @@ impl Hdma {
 }
 
 impl<'a> Gpu<'a> {
-    pub fn new(hw: HardwareHandle<'a>, irq: Irq<'a>) -> Self {
+    pub fn new(irq: Irq<'a>) -> Self {
         Self {
             irq,
             clocks: 0,
@@ -359,7 +358,6 @@ impl<'a> Gpu<'a> {
             spsize: 8,
             spenable: false,
             bgenable: false,
-            hw,
             bg_palette: [
                 Color::White,
                 Color::LightGray,
@@ -394,8 +392,10 @@ impl<'a> Gpu<'a> {
         }
     }
 
-    pub fn step(&mut self, time: usize, mmu: &mut Mmu) {
+    pub fn step(&mut self, time: usize, mmu: &mut Mmu) -> Option<(u8, [u32; VRAM_WIDTH])> {
         let clocks = self.clocks + time;
+
+        let mut line_to_draw = None;
 
         let (clocks, mode) = match &self.mode {
             Mode::OAM => {
@@ -407,7 +407,7 @@ impl<'a> Gpu<'a> {
             }
             Mode::VRAM => {
                 if clocks >= 172 {
-                    self.draw(mmu);
+                    line_to_draw = self.draw(mmu);
                     self.hdma_run(mmu);
 
                     if self.hblank_interrupt {
@@ -471,11 +471,13 @@ impl<'a> Gpu<'a> {
 
         self.clocks = clocks;
         self.mode = mode;
+
+        line_to_draw
     }
 
-    fn draw(&mut self, mmu: &Mmu) {
+    fn draw(&mut self, mmu: &Mmu) -> Option<(u8, [u32; VRAM_WIDTH])> {
         if self.ly >= VRAM_HEIGHT as u8 {
-            return;
+            return None;
         }
 
         let mut buf = [0; VRAM_WIDTH];
@@ -608,10 +610,7 @@ impl<'a> Gpu<'a> {
             }
         }
 
-        self.hw
-            .get()
-            .borrow_mut()
-            .vram_update(self.ly as usize, &buf);
+        Some((self.ly, buf))
     }
 
     fn on_write_ctrl(&mut self, value: u8) {

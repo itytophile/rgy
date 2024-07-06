@@ -15,7 +15,7 @@ use rgy::{Key, SoundStream, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 #[derive(Clone)]
 pub struct Hardware {
     rampath: Option<String>,
-    vram: Arc<Mutex<Vec<u32>>>,
+    pub vram: Arc<Mutex<Vec<u32>>>,
     pcm: SpeakerHandle,
     keystate: Arc<Mutex<HashMap<Key, bool>>>,
     escape: Arc<AtomicBool>,
@@ -153,14 +153,6 @@ impl Hardware {
 }
 
 impl rgy::Hardware for Hardware {
-    fn vram_update(&mut self, line: usize, buf: &[u32]) {
-        let mut vram = self.vram.lock().unwrap();
-        for i in 0..buf.len() {
-            let base = line * VRAM_WIDTH;
-            vram[base + i] = buf[i];
-        }
-    }
-
     fn joypad_pressed(&mut self, key: Key) -> bool {
         *self
             .keystate

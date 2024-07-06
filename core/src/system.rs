@@ -17,6 +17,7 @@ use crate::sound::{
     Mixer, MixerStream, NoiseStream, Sound, ToneStream, Unit, UnitRaw, Wave, WaveRaw, WaveStream,
 };
 use crate::timer::Timer;
+use crate::VRAM_WIDTH;
 use log::*;
 use static_cell::StaticCell;
 
@@ -116,7 +117,7 @@ impl<'a> RawDevices<'a> {
         Self {
             sound: RefCell::new(Sound::new(hw.clone(), wave, mixer)),
             ic: RefCell::new(ic),
-            gpu: RefCell::new(Gpu::new(hw.clone(), irq.clone())),
+            gpu: RefCell::new(Gpu::new(irq.clone())),
             joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
             timer: RefCell::new(Timer::new(irq.clone())),
             serial: RefCell::new(Serial::new(hw.clone(), irq.clone())),
@@ -273,7 +274,7 @@ where
         time += self.cpu.check_interrupt(&mut self.mmu, &self.ic);
 
         self.dma.borrow_mut().step(&mut self.mmu);
-        self.gpu.borrow_mut().step(time, &mut self.mmu);
+        let line_to_draw = self.gpu.borrow_mut().step(time, &mut self.mmu);
         self.timer.borrow_mut().step(time);
         self.serial.borrow_mut().step(time);
         self.joypad.borrow_mut().poll();
@@ -282,9 +283,13 @@ where
             self.fc.adjust(time);
             PollState {
                 delay: self.fc.delay(),
+                line_to_draw,
             }
         } else {
-            PollState { delay: 0 }
+            PollState {
+                delay: 0,
+                line_to_draw,
+            }
         }
     }
 
@@ -302,6 +307,7 @@ where
 
 pub struct PollState {
     pub delay: u64, // nano seconds
+    pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
 }
 
 static TONE_UNIT1: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
