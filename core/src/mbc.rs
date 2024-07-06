@@ -431,6 +431,7 @@ impl<'a> Mbc3<'a> {
     }
 }
 
+#[cfg(feature = "mb5")]
 struct Mbc5<'a> {
     hw: HardwareHandle<'a>,
     rom: &'a [u8],
@@ -440,6 +441,7 @@ struct Mbc5<'a> {
     ram_enable: bool,
 }
 
+#[cfg(feature = "mb5")]
 impl<'a> Mbc5<'a> {
     fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
         Self {
@@ -535,6 +537,7 @@ enum MbcType<'a> {
     Mbc1(Mbc1<'a>),
     Mbc2(Mbc2<'a>),
     Mbc3(Mbc3<'a>),
+    #[cfg(feature = "mb5")]
     Mbc5(Mbc5<'a>),
     HuC1(HuC1<'a>),
 }
@@ -549,7 +552,12 @@ impl<'a> MbcType<'a> {
             0x0b..=0x0d => unimplemented!("MMM01: {:02x}", code),
             0x0f..=0x13 => MbcType::Mbc3(Mbc3::new(hw, rom)),
             0x15..=0x17 => unimplemented!("Mbc4: {:02x}", code),
-            0x19..=0x1e => MbcType::Mbc5(Mbc5::new(hw, rom)),
+            0x19..=0x1e => {
+                #[cfg(not(feature = "mb5"))]
+                panic!("Provide the mb5 feature at build");
+                #[cfg(feature = "mb5")]
+                MbcType::Mbc5(Mbc5::new(hw, rom))
+            },
             0xfc => unimplemented!("POCKET CAMERA"),
             0xfd => unimplemented!("BANDAI TAMAS"),
             0xfe => unimplemented!("HuC3"),
@@ -564,6 +572,7 @@ impl<'a> MbcType<'a> {
             MbcType::Mbc1(c) => c.on_read(mmu, addr),
             MbcType::Mbc2(c) => c.on_read(mmu, addr),
             MbcType::Mbc3(c) => c.on_read(mmu, addr),
+            #[cfg(feature = "mb5")]
             MbcType::Mbc5(c) => c.on_read(mmu, addr),
             MbcType::HuC1(c) => c.on_read(mmu, addr),
         }
@@ -575,6 +584,7 @@ impl<'a> MbcType<'a> {
             MbcType::Mbc1(c) => c.on_write(mmu, addr, value),
             MbcType::Mbc2(c) => c.on_write(mmu, addr, value),
             MbcType::Mbc3(c) => c.on_write(mmu, addr, value),
+            #[cfg(feature = "mb5")]
             MbcType::Mbc5(c) => c.on_write(mmu, addr, value),
             MbcType::HuC1(c) => c.on_write(mmu, addr, value),
         }

@@ -30,5 +30,6 @@ core_affinity = "0.8"
 utils = { path = "../utils" }
 
 [features]
-default = []
+default = ["mb5"]
 color = []
+mb5 = []
