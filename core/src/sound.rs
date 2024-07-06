@@ -383,34 +383,20 @@ impl Stream for ToneStream {
 pub struct Wave {
     enable: bool,
     sound_len: usize,
-    amp_shift: &'static AtomicUsize,
+    amp_shift: usize,
     counter: bool,
-    freq: &'static AtomicUsize,
+    freq: usize,
     wavebuf: [u8; 16],
 }
 
-pub struct WaveRaw {
-    amp_shift: AtomicUsize,
-    freq: AtomicUsize,
-}
-
-impl Default for WaveRaw {
-    fn default() -> Self {
-        Self {
-            amp_shift: AtomicUsize::new(0),
-            freq: AtomicUsize::new(0),
-        }
-    }
-}
-
 impl Wave {
-    pub fn new(raw: &'static WaveRaw) -> Self {
+    pub fn new() -> Self {
         Self {
             enable: false,
             sound_len: 0,
-            amp_shift: &raw.amp_shift,
+            amp_shift: 0,
             counter: false,
-            freq: &raw.freq,
+            freq: 0,
             wavebuf: [0; 16],
         }
     }
@@ -433,15 +419,14 @@ impl Wave {
             self.sound_len = value as usize;
         } else if addr == 0xff1c {
             debug!("Wave amp shift: {:02x}", value);
-            self.amp_shift.set((value as usize >> 5) & 0x3);
+            self.amp_shift = (value as usize >> 5) & 0x3;
         } else if addr == 0xff1d {
             debug!("Wave freq1: {:02x}", value);
-            self.freq.set((self.freq.get() & !0xff) | value as usize);
+            self.freq = (self.freq & !0xff) | value as usize;
         } else if addr == 0xff1e {
             debug!("Wave freq2: {:02x}", value);
             self.counter = value & 0x40 != 0;
-            self.freq
-                .set((self.freq.get() & !0x700) | (((value & 0x7) as usize) << 8));
+            self.freq = (self.freq & !0x700) | (((value & 0x7) as usize) << 8);
             return value & 0x80 != 0;
         } else if (0xff30..=0xff3f).contains(&addr) {
             self.wavebuf[(addr - 0xff30) as usize] = value;
@@ -489,7 +474,7 @@ impl Stream for WaveStream {
         }
 
         let samples = self.wave.wavebuf.len() * 2;
-        let freq = 65536 / (2048 - self.wave.freq.get());
+        let freq = 65536 / (2048 - self.wave.freq);
         let index_freq = freq * samples;
         let index = self.index.index(rate, index_freq, samples);
 
@@ -499,7 +484,7 @@ impl Stream for WaveStream {
             self.wave.wavebuf[index / 2] & 0xf
         };
 
-        let amp = match self.wave.amp_shift.get() {
+        let amp = match self.wave.amp_shift {
             0 => 0,
             1 => amp,
             2 => amp >> 1,
@@ -847,13 +832,13 @@ pub struct Sound {
 }
 
 impl Sound {
-    pub fn new(hw: HardwareHandle, wave: Wave, mixer: Mixer) -> Self {
+    pub fn new(hw: HardwareHandle, mixer: Mixer) -> Self {
         mixer.setup_stream(&hw);
 
         Self {
             tone1: Tone::new(),
             tone2: Tone::new(),
-            wave,
+            wave: Wave::new(),
             noise: Noise::new(),
             mixer,
         }

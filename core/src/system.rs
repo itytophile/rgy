@@ -13,9 +13,7 @@ use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::mmu::Mmu;
 use crate::serial::Serial;
-use crate::sound::{
-    Mixer, MixerStream, NoiseStream, Sound, ToneStream, Unit, UnitRaw, Wave, WaveRaw, WaveStream,
-};
+use crate::sound::{Mixer, MixerStream, NoiseStream, Sound, ToneStream, Unit, UnitRaw, WaveStream};
 use crate::timer::Timer;
 use crate::VRAM_WIDTH;
 use log::*;
@@ -105,17 +103,11 @@ pub struct RawDevices<'a> {
 }
 
 impl<'a> RawDevices<'a> {
-    pub fn new(
-        rom: &'a [u8],
-        hw: HardwareHandle<'a>,
-        wave: Wave,
-        mixer: Mixer,
-        ic_cells: &'a IcCells,
-    ) -> Self {
+    pub fn new(rom: &'a [u8], hw: HardwareHandle<'a>, mixer: Mixer, ic_cells: &'a IcCells) -> Self {
         let ic = Ic::new(ic_cells);
         let irq = ic.irq();
         Self {
-            sound: RefCell::new(Sound::new(hw.clone(), wave, mixer)),
+            sound: RefCell::new(Sound::new(hw.clone(), mixer)),
             ic: RefCell::new(ic),
             gpu: RefCell::new(Gpu::new(irq.clone())),
             joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
@@ -314,7 +306,6 @@ static TONE_UNIT1: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
 static TONE_UNIT2: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
 static WAVE_UNIT: StaticCell<UnitRaw<WaveStream>> = StaticCell::new();
 static NOISE_UNIT: StaticCell<UnitRaw<NoiseStream>> = StaticCell::new();
-static WAVE: StaticCell<WaveRaw> = StaticCell::new();
 
 pub struct StackState0<D, H> {
     pub dbg_cell: RefCell<D>,
@@ -354,7 +345,6 @@ where
         raw_devices: RawDevices::new(
             rom,
             hw_handle,
-            Wave::new(WAVE.init(WaveRaw::default())),
             Mixer::new(MixerStream::new(
                 Unit::new(TONE_UNIT1.init(UnitRaw::default())),
                 Unit::new(TONE_UNIT2.init(UnitRaw::default())),
