@@ -110,9 +110,7 @@ impl<'a> Mmu<'a> {
 
     /// Reads two bytes from the given addresss in the memory.
     pub fn get16(&self, addr: u16) -> u16 {
-        let l = self.get8(addr);
-        let h = self.get8(addr + 1);
-        (h as u16) << 8 | l as u16
+        u16::from_le_bytes([self.get8(addr), self.get8(addr + 1)])
     }
 
     /// Writes two bytes at the given address in the memory.
