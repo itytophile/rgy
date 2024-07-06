@@ -2,8 +2,7 @@ use core::cell::RefCell;
 
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
-use crate::debug::Debugger;
-use crate::device::{Device, IoHandler, IoMemHandler};
+use crate::device::{Device, IoMemHandler};
 use crate::dma::Dma;
 use crate::fc::FreqControl;
 use crate::gpu::Gpu;
@@ -75,13 +74,12 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<'a, 'b, D> {
+pub struct System<'a, 'b> {
     cfg: Config,
     hw: HardwareHandle<'a>,
     fc: FreqControl<'a>,
     cpu: Cpu,
     mmu: Mmu<'a>,
-    dbg: Device<'a, D>,
     ic: Device<'a, Ic<'b>>,
     gpu: Device<'a, Gpu<'b>>,
     joypad: Device<'a, Joypad<'b>>,
@@ -186,16 +184,11 @@ impl<'a, 'b> Handlers<'a, 'b> {
     }
 }
 
-impl<'a, 'b, D> System<'a, 'b, D>
-where
-    D: Debugger + 'static,
-{
+impl<'a, 'b> System<'a, 'b> {
     /// Create a new emulator context.
     pub fn new(
         cfg: Config,
         hw_handle: HardwareHandle<'a>,
-        dbg: &'a RefCell<D>,
-        dbg_handler: &'a IoMemHandler<'a, D>,
         devices: Devices<'a, 'b>,
         handlers: &'a Handlers,
     ) -> Self {
@@ -203,11 +196,8 @@ where
 
         let mut fc = FreqControl::new(hw_handle.clone(), &cfg);
 
-        let dbg = Device::mediate(dbg);
         let cpu = Cpu::new();
         let mut mmu = Mmu::new();
-
-        mmu.add_handler((0x0000, 0xffff), dbg_handler);
 
         mmu.add_handler((0xc000, 0xdfff), &handlers.cgb);
         mmu.add_handler((0xff4d, 0xff4d), &handlers.cgb);
@@ -231,8 +221,6 @@ where
         mmu.add_handler((0xff04, 0xff07), &handlers.timer);
         mmu.add_handler((0xff01, 0xff02), &handlers.serial);
 
-        dbg.borrow_mut().init(&mmu);
-
         info!("Starting...");
 
         fc.reset();
@@ -243,7 +231,6 @@ where
             fc,
             cpu,
             mmu,
-            dbg,
             ic: devices.ic,
             gpu: devices.gpu,
             joypad: devices.joypad,
@@ -254,13 +241,6 @@ where
     }
 
     fn step(&mut self) -> PollState {
-        {
-            let mut dbg = self.dbg.borrow_mut();
-            dbg.check_signal();
-            dbg.take_cpu_snapshot(self.cpu.clone());
-            dbg.on_decode(&self.mmu);
-        }
-
         let mut time = self.cpu.execute(&mut self.mmu);
 
         time += self.cpu.check_interrupt(&mut self.mmu, &self.ic);
@@ -307,40 +287,29 @@ static TONE_UNIT2: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
 static WAVE_UNIT: StaticCell<UnitRaw<WaveStream>> = StaticCell::new();
 static NOISE_UNIT: StaticCell<UnitRaw<NoiseStream>> = StaticCell::new();
 
-pub struct StackState0<D, H> {
-    pub dbg_cell: RefCell<D>,
+pub struct StackState0<H> {
     pub hw_cell: RefCell<H>,
     pub ic_cells: IcCells,
 }
 
-pub fn get_stack_state0<H: Hardware + 'static, D: Debugger + 'static>(
-    hw: H,
-    dbg: D,
-) -> StackState0<D, H> {
+pub fn get_stack_state0<H: Hardware + 'static>(hw: H) -> StackState0<H> {
     StackState0 {
-        dbg_cell: RefCell::new(dbg),
         hw_cell: RefCell::new(hw),
         ic_cells: IcCells::default(),
     }
 }
 
-pub struct StackState1<'a, D> {
-    pub dbg_handler: IoMemHandler<'a, D>,
+pub struct StackState1<'a> {
     pub hw_handle: HardwareHandle<'a>,
     pub raw_devices: RawDevices<'a>,
 }
 
-pub fn get_stack_state1<'a, D, H>(
-    state0: &'a StackState0<D, H>,
-    rom: &'a [u8],
-) -> StackState1<'a, D>
+pub fn get_stack_state1<'a, H>(state0: &'a StackState0<H>, rom: &'a [u8]) -> StackState1<'a>
 where
-    D: IoHandler,
     H: Hardware + 'static,
 {
     let hw_handle = HardwareHandle::new(&state0.hw_cell);
     StackState1 {
-        dbg_handler: Device::mediate(&state0.dbg_cell).handler(),
         hw_handle: hw_handle.clone(),
         raw_devices: RawDevices::new(
             rom,

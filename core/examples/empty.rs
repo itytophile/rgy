@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rgy::{debug::NullDebugger, Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware;
 
@@ -56,18 +56,11 @@ fn main() {
     let rom = vec![0u8; 1024];
 
     // Run the emulator.
-    let state0 = rgy::system::get_stack_state0(hw, NullDebugger);
+    let state0 = rgy::system::get_stack_state0(hw);
     let state1 = rgy::system::get_stack_state1(&state0, &rom);
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
-    let mut sys = rgy::System::new(
-        cfg,
-        state1.hw_handle,
-        &state0.dbg_cell,
-        &state1.dbg_handler,
-        devices.clone(),
-        &handlers,
-    );
+    let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
     while let Some(poll_state) = sys.poll() {
         if let Some((line, buffer)) = poll_state.line_to_draw {
             let y = line as usize;

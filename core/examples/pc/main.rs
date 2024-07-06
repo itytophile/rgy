@@ -1,10 +1,9 @@
-mod debug;
 mod hardware;
 
-use crate::{debug::Debugger, hardware::Hardware};
+use crate::hardware::Hardware;
 
 use log::*;
-use rgy::{debug::NullDebugger, Config, VRAM_WIDTH};
+use rgy::{Config, VRAM_WIDTH};
 use std::{
     fs::File,
     io::Read,
@@ -28,9 +27,6 @@ pub struct Opt {
     /// Don't adjust cpu frequency
     #[structopt(short = "n", long = "native")]
     native_speed: bool,
-    /// Enable debug mode
-    #[structopt(short = "d", long = "debug")]
-    debug: bool,
     /// RAM file name
     #[structopt(short = "r", long = "ram")]
     ram: Option<String>,
@@ -82,35 +78,18 @@ fn main() {
 
         set_affinity();
 
-        if opt.debug {
-            run(Debugger::new(), hw, &rom, to_cfg(opt), vram);
-        } else {
-            run(NullDebugger, hw, &rom, to_cfg(opt), vram);
-        }
+        run(hw, &rom, to_cfg(opt), vram);
     });
 
     hw.run();
 }
 
-fn run<D: rgy::debug::Debugger + 'static, H: rgy::Hardware + 'static>(
-    debugger: D,
-    hw: H,
-    rom: &[u8],
-    cfg: Config,
-    vram: Arc<Mutex<Vec<u32>>>,
-) {
-    let state0 = rgy::system::get_stack_state0(hw, debugger);
+fn run<H: rgy::Hardware + 'static>(hw: H, rom: &[u8], cfg: Config, vram: Arc<Mutex<Vec<u32>>>) {
+    let state0 = rgy::system::get_stack_state0(hw);
     let state1 = rgy::system::get_stack_state1(&state0, rom);
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
-    let mut sys = rgy::System::new(
-        cfg,
-        state1.hw_handle,
-        &state0.dbg_cell,
-        &state1.dbg_handler,
-        devices.clone(),
-        &handlers,
-    );
+    let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
     while let Some(poll_state) = sys.poll() {
         if let Some((line, buf)) = poll_state.line_to_draw {
             let mut vram = vram.lock().unwrap();

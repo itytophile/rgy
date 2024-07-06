@@ -118,9 +118,6 @@ mod timer;
 /// CPU state.
 pub mod cpu;
 
-/// Debugger interface.
-pub mod debug;
-
 /// Adaptor to register devices to MMU.
 pub mod device;
 
