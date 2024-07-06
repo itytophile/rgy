@@ -111,7 +111,8 @@ mod joypad;
 mod mbc;
 mod serial;
 mod sound;
-mod system;
+/// System
+pub mod system;
 mod timer;
 
 /// CPU state.
@@ -133,4 +134,4 @@ pub mod mmu;
 mod hardware;
 
 pub use crate::hardware::{Hardware, Key, SoundStream, Stream, VRAM_HEIGHT, VRAM_WIDTH};
-pub use crate::system::{run, run_debug, Config, System};
+pub use crate::system::{ Config, System};

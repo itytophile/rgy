@@ -28,6 +28,7 @@ cpal = "0.9"
 signal-hook = "0.3"
 core_affinity = "0.8"
 utils = { path = "../utils" }
+spin_sleep = "1"
 
 [features]
 default = ["mb5"]

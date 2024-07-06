@@ -3,7 +3,7 @@ use core::cell::RefCell;
 use crate::cgb::Cgb;
 use crate::cpu::Cpu;
 use crate::debug::{Debugger, NullDebugger};
-use crate::device::{Device, IoMemHandler};
+use crate::device::{Device, IoHandler, IoMemHandler};
 use crate::dma::Dma;
 use crate::fc::FreqControl;
 use crate::gpu::Gpu;
@@ -91,7 +91,7 @@ pub struct System<'a, 'b, D> {
     dma: Device<'a, Dma>,
 }
 
-struct RawDevices<'a> {
+pub struct RawDevices<'a> {
     sound: RefCell<Sound>,
     ic: RefCell<Ic<'a>>,
     gpu: RefCell<Gpu<'a>>,
@@ -141,7 +141,7 @@ pub struct Devices<'a, 'b> {
 }
 
 impl<'a, 'b> Devices<'a, 'b> {
-    fn new(devices: &'a RawDevices<'b>) -> Self {
+    pub fn new(devices: &'a RawDevices<'b>) -> Self {
         let sound = Device::new(&devices.sound);
         let ic = Device::new(&devices.ic);
         let gpu = Device::new(&devices.gpu);
@@ -178,7 +178,7 @@ pub struct Handlers<'a, 'b> {
 }
 
 impl<'a, 'b> Handlers<'a, 'b> {
-    fn new(devices: Devices<'a, 'b>) -> Self {
+    pub fn new(devices: Devices<'a, 'b>) -> Self {
         Self {
             sound: devices.sound.handler(),
             ic: devices.ic.handler(),
@@ -260,7 +260,7 @@ where
         }
     }
 
-    fn step(&mut self) {
+    fn step(&mut self) -> PollState {
         {
             let mut dbg = self.dbg.borrow_mut();
             dbg.check_signal();
@@ -280,36 +280,28 @@ where
 
         if !self.cfg.native_speed {
             self.fc.adjust(time);
+            PollState {
+                delay: self.fc.delay(),
+            }
+        } else {
+            PollState { delay: 0 }
         }
     }
 
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self) -> bool {
+    pub fn poll(&mut self) -> Option<PollState> {
         if !self.hw.get().borrow_mut().sched() {
-            return false;
+            return None;
         }
 
-        self.step();
-
-        true
+        Some(self.step())
     }
 }
 
-/// Run the emulator with the given configuration.
-pub fn run<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
-    run_inner(cfg, rom, hw, NullDebugger)
-}
-
-/// Run the emulator with the given configuration and debugger.
-pub fn run_debug<T: Hardware + 'static, D: Debugger + 'static>(
-    cfg: Config,
-    rom: &[u8],
-    hw: T,
-    dbg: D,
-) {
-    run_inner(cfg, rom, hw, dbg)
+pub struct PollState {
+    pub delay: u64, // nano seconds
 }
 
 static TONE_UNIT1: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
@@ -318,27 +310,52 @@ static WAVE_UNIT: StaticCell<UnitRaw<WaveStream>> = StaticCell::new();
 static NOISE_UNIT: StaticCell<UnitRaw<NoiseStream>> = StaticCell::new();
 static WAVE: StaticCell<WaveRaw> = StaticCell::new();
 
-fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u8], hw: T, dbg: D) {
-    let dbg_cell = &RefCell::new(dbg);
-    let dbg = Device::mediate(dbg_cell);
-    let hw_cell = RefCell::new(hw);
-    let hw_handle = HardwareHandle::new(&hw_cell);
-    let ic_cells = IcCells::default();
-    let raw_devices = RawDevices::new(
-        rom,
-        hw_handle.clone(),
-        Wave::new(WAVE.init(WaveRaw::new())),
-        Mixer::new(MixerStream::new(
-            Unit::new(TONE_UNIT1.init(UnitRaw::default())),
-            Unit::new(TONE_UNIT2.init(UnitRaw::default())),
-            Unit::new(WAVE_UNIT.init(UnitRaw::default())),
-            Unit::new(NOISE_UNIT.init(UnitRaw::default())),
-        )),
-        &ic_cells,
-    );
-    let devices: Devices = Devices::new(&raw_devices);
-    let dbg_handle = dbg.handler();
-    let handlers = Handlers::new(devices.clone());
-    let mut sys = System::new(cfg, hw_handle, dbg_cell, &dbg_handle, devices, &handlers);
-    while sys.poll() {}
+pub struct StackState0<D, H> {
+    pub dbg_cell: RefCell<D>,
+    pub hw_cell: RefCell<H>,
+    pub ic_cells: IcCells,
+}
+
+pub fn get_stack_state0<H: Hardware + 'static, D: Debugger + 'static>(
+    hw: H,
+    dbg: D,
+) -> StackState0<D, H> {
+    StackState0 {
+        dbg_cell: RefCell::new(dbg),
+        hw_cell: RefCell::new(hw),
+        ic_cells: IcCells::default(),
+    }
+}
+
+pub struct StackState1<'a, D> {
+    pub dbg_handler: IoMemHandler<'a, D>,
+    pub hw_handle: HardwareHandle<'a>,
+    pub raw_devices: RawDevices<'a>,
+}
+
+pub fn get_stack_state1<'a, D, H>(
+    state0: &'a StackState0<D, H>,
+    rom: &'a [u8],
+) -> StackState1<'a, D>
+where
+    D: IoHandler,
+    H: Hardware + 'static,
+{
+    let hw_handle = HardwareHandle::new(&state0.hw_cell);
+    StackState1 {
+        dbg_handler: Device::mediate(&state0.dbg_cell).handler(),
+        hw_handle: hw_handle.clone(),
+        raw_devices: RawDevices::new(
+            rom,
+            hw_handle,
+            Wave::new(WAVE.init(WaveRaw::new())),
+            Mixer::new(MixerStream::new(
+                Unit::new(TONE_UNIT1.init(UnitRaw::default())),
+                Unit::new(TONE_UNIT2.init(UnitRaw::default())),
+                Unit::new(WAVE_UNIT.init(UnitRaw::default())),
+                Unit::new(NOISE_UNIT.init(UnitRaw::default())),
+            )),
+            &state0.ic_cells,
+        ),
+    }
 }

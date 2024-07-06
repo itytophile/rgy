@@ -1,4 +1,6 @@
-use rgy::{Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
+use std::{thread, time::Duration};
+
+use rgy::{debug::NullDebugger, Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
     display: Vec<Vec<u32>>,
@@ -72,5 +74,19 @@ fn main() {
     let rom = vec![0u8; 1024];
 
     // Run the emulator.
-    rgy::run(cfg, &rom, hw);
+    let state0 = rgy::system::get_stack_state0(hw, NullDebugger);
+    let state1 = rgy::system::get_stack_state1(&state0, &rom);
+    let devices = rgy::system::Devices::new(&state1.raw_devices);
+    let handlers = rgy::system::Handlers::new(devices.clone());
+    let mut sys = rgy::System::new(
+        cfg,
+        state1.hw_handle,
+        &state0.dbg_cell,
+        &state1.dbg_handler,
+        devices.clone(),
+        &handlers,
+    );
+    while let Some(poll_state) = sys.poll() {
+        spin_sleep::sleep(Duration::from_nanos(poll_state.delay));
+    }
 }

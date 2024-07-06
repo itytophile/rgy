@@ -32,10 +32,6 @@ impl<'a> FreqControl<'a> {
     pub fn adjust(&mut self, time: usize) {
         self.cycles += time as u64;
 
-        for _ in 0..self.delay {
-            let _ = unsafe { core::ptr::read_volatile(&self.sample) };
-        }
-
         if self.cycles > self.sample {
             self.cycles -= self.sample;
 
@@ -60,5 +56,9 @@ impl<'a> FreqControl<'a> {
 
             self.last = now;
         }
+    }
+
+    pub fn delay(&self) -> u64 {
+        self.delay
     }
 }
