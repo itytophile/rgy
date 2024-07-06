@@ -557,7 +557,7 @@ impl<'a> MbcType<'a> {
                 panic!("Provide the mb5 feature at build");
                 #[cfg(feature = "mb5")]
                 MbcType::Mbc5(Mbc5::new(hw, rom))
-            },
+            }
             0xfc => unimplemented!("POCKET CAMERA"),
             0xfd => unimplemented!("BANDAI TAMAS"),
             0xfe => unimplemented!("HuC3"),

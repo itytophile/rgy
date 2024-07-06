@@ -81,7 +81,7 @@ pub struct System<'a, 'b, D> {
     hw: HardwareHandle<'a>,
     fc: FreqControl<'a>,
     cpu: Cpu,
-    mmu: Option<Mmu<'a>>,
+    mmu: Mmu<'a>,
     dbg: Device<'a, D>,
     ic: Device<'a, Ic<'b>>,
     gpu: Device<'a, Gpu<'b>>,
@@ -244,8 +244,6 @@ where
 
         fc.reset();
 
-        let mmu = Some(mmu);
-
         Self {
             cfg,
             hw: hw_handle,
@@ -262,20 +260,20 @@ where
         }
     }
 
-    fn step(&mut self, mut mmu: Mmu<'a>) -> Mmu<'a> {
+    fn step(&mut self) {
         {
             let mut dbg = self.dbg.borrow_mut();
             dbg.check_signal();
             dbg.take_cpu_snapshot(self.cpu.clone());
-            dbg.on_decode(&mmu);
+            dbg.on_decode(&self.mmu);
         }
 
-        let mut time = self.cpu.execute(&mut mmu);
+        let mut time = self.cpu.execute(&mut self.mmu);
 
-        time += self.cpu.check_interrupt(&mut mmu, &self.ic);
+        time += self.cpu.check_interrupt(&mut self.mmu, &self.ic);
 
-        self.dma.borrow_mut().step(&mut mmu);
-        self.gpu.borrow_mut().step(time, &mut mmu);
+        self.dma.borrow_mut().step(&mut self.mmu);
+        self.gpu.borrow_mut().step(time, &mut self.mmu);
         self.timer.borrow_mut().step(time);
         self.serial.borrow_mut().step(time);
         self.joypad.borrow_mut().poll();
@@ -283,8 +281,6 @@ where
         if !self.cfg.native_speed {
             self.fc.adjust(time);
         }
-
-        mmu
     }
 
     /// Run a single step of emulation.
@@ -295,8 +291,7 @@ where
             return false;
         }
 
-        let mmu = self.mmu.take().unwrap();
-        self.mmu = Some(self.step(mmu));
+        self.step();
 
         true
     }
