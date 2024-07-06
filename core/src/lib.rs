@@ -110,8 +110,7 @@ mod ic;
 mod joypad;
 mod mbc;
 mod serial;
-mod sound;
-/// System
+pub mod sound;
 pub mod system;
 mod timer;
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rgy::{Config, Key, SoundStream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{sound::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware;
 
@@ -11,7 +11,7 @@ impl rgy::Hardware for Hardware {
         false
     }
 
-    fn sound_play(&mut self, _stream: SoundStream) {
+    fn sound_play(&mut self, _stream: MixerStream) {
         // Play the wave provided `Stream`.
     }
 

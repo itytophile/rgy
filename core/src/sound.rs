@@ -5,7 +5,6 @@ use spin::Mutex;
 use crate::device::IoHandler;
 use crate::hardware::{HardwareHandle, Stream};
 use crate::mmu::{MemRead, MemWrite, Mmu};
-use crate::SoundStream;
 
 trait AtomicHelper {
     type Item;
@@ -379,7 +378,7 @@ impl Stream for ToneStream {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Wave {
     enable: bool,
     sound_len: usize,
@@ -390,17 +389,6 @@ pub struct Wave {
 }
 
 impl Wave {
-    pub fn new() -> Self {
-        Self {
-            enable: false,
-            sound_len: 0,
-            amp_shift: 0,
-            counter: false,
-            freq: 0,
-            wavebuf: [0; 16],
-        }
-    }
-
     fn on_read(&mut self, addr: u16) -> MemRead {
         if addr == 0xff1d {
             MemRead::Replace(0xff)
@@ -630,9 +618,7 @@ impl Mixer {
     }
 
     fn setup_stream(&self, hw: &HardwareHandle) {
-        hw.get()
-            .borrow_mut()
-            .sound_play(SoundStream::Mixer(self.stream.clone()))
+        hw.get().borrow_mut().sound_play(self.stream.clone())
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
@@ -838,7 +824,7 @@ impl Sound {
         Self {
             tone1: Tone::new(),
             tone2: Tone::new(),
-            wave: Wave::new(),
+            wave: Wave::default(),
             noise: Noise::new(),
             mixer,
         }

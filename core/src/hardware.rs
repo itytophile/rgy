@@ -94,7 +94,7 @@ pub trait Hardware {
 
     /// Called when the emulator plays a sound.
     /// The stream in the argument is the stream which keeps returning wave patterns.
-    fn sound_play(&mut self, stream: SoundStream);
+    fn sound_play(&mut self, stream: MixerStream);
 
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.

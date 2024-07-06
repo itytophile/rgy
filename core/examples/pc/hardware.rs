@@ -1,5 +1,6 @@
 use log::*;
 use minifb::{Scale, Window, WindowOptions};
+use rgy::sound::MixerStream;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
@@ -10,7 +11,7 @@ use std::sync::{
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rgy::{Key, SoundStream, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 
 #[derive(Clone)]
 pub struct Hardware {
@@ -162,7 +163,7 @@ impl rgy::Hardware for Hardware {
             .expect("Logic error in keystate map")
     }
 
-    fn sound_play(&mut self, stream: SoundStream) {
+    fn sound_play(&mut self, stream: MixerStream) {
         self.pcm.play(stream)
     }
 
@@ -272,7 +273,7 @@ impl Pcm {
 
 #[allow(unused)]
 enum SpeakerCmd {
-    Play(SoundStream),
+    Play(MixerStream),
     Stop,
 }
 
@@ -282,7 +283,7 @@ pub struct SpeakerHandle {
 }
 
 impl SpeakerHandle {
-    fn play(&self, stream: SoundStream) {
+    fn play(&self, stream: MixerStream) {
         let _ = self.tx.send(SpeakerCmd::Play(stream));
     }
 
