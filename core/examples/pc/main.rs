@@ -113,12 +113,9 @@ fn run<D: rgy::debug::Debugger + 'static, H: rgy::Hardware + 'static>(
     );
     while let Some(poll_state) = sys.poll() {
         if let Some((line, buf)) = poll_state.line_to_draw {
-            println!("coucou");
             let mut vram = vram.lock().unwrap();
-            for i in 0..buf.len() {
-                let base = line as usize * VRAM_WIDTH;
-                vram[base + i] = buf[i];
-            }
+            let base = line as usize * VRAM_WIDTH;
+            vram[base..base + buf.len()].copy_from_slice(&buf);
         }
 
         // println!("{}", poll_state.delay);

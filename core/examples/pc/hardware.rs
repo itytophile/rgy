@@ -261,9 +261,7 @@ impl Pcm {
                             None => 0.0,
                         };
 
-                        for out in sample.iter_mut() {
-                            *out = value;
-                        }
+                        sample.fill(value);
                     }
                 }
                 _ => (),
