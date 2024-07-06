@@ -58,11 +58,11 @@ impl<'a> Mmu<'a> {
         self.handlers.push((range, handler));
     }
 
-    fn get_handlers_from_address<'b>(
+    fn get_handler_from_address<'b>(
         handlers: &'b [((u16, u16), &dyn MemHandler)],
         addr: u16,
-    ) -> impl Iterator<Item = &'b dyn MemHandler> + 'b {
-        handlers.iter().filter_map(move |(range, handler)| {
+    ) -> Option<&'b dyn MemHandler> {
+        handlers.iter().find_map(move |(range, handler)| {
             if (range.0..=range.1).contains(&addr) {
                 Some(*handler)
             } else {
@@ -73,7 +73,7 @@ impl<'a> Mmu<'a> {
 
     /// Reads one byte from the given address in the memory.
     pub fn get8(&self, addr: u16) -> u8 {
-        for handler in Self::get_handlers_from_address(&self.handlers, addr) {
+        if let Some(handler) = Self::get_handler_from_address(&self.handlers, addr) {
             match handler.on_read(addr) {
                 MemRead::Replace(alt) => return alt,
                 MemRead::PassThrough => {}
@@ -89,7 +89,7 @@ impl<'a> Mmu<'a> {
 
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
-        for handler in Self::get_handlers_from_address(&self.handlers, addr) {
+        if let Some(handler) = Self::get_handler_from_address(&self.handlers, addr) {
             match handler.on_write(addr, v) {
                 MemWrite::Replace(alt) => {
                     self.ram[addr as usize] = alt;
