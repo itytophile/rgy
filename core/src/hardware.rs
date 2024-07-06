@@ -1,6 +1,6 @@
 use core::cell::RefCell;
 
-use crate::sound::{MixerStream, NoiseStream, ToneStream, WaveStream};
+use crate::sound::MixerStream;
 
 /// The width of the VRAM.
 pub const VRAM_WIDTH: usize = 160;
@@ -29,43 +29,8 @@ pub enum Key {
     Start,
 }
 
-/// Enum that represents how sound can be played
-pub enum SoundStream {
-    /// Wave stream
-    Wave(WaveStream),
-    /// Tone stream
-    Tone(ToneStream),
-    /// Noise stream
-    Noise(NoiseStream),
-    /// Mixer stream
-    Mixer(MixerStream),
-}
-
-impl Stream for SoundStream {
-    fn max(&self) -> u16 {
-        match self {
-            SoundStream::Wave(s) => s.max(),
-            SoundStream::Tone(s) => s.max(),
-            SoundStream::Noise(s) => s.max(),
-            SoundStream::Mixer(s) => s.max(),
-        }
-    }
-
-    fn next(&mut self, rate: u32) -> u16 {
-        match self {
-            SoundStream::Wave(s) => s.next(rate),
-            SoundStream::Tone(s) => s.next(rate),
-            SoundStream::Noise(s) => s.next(rate),
-            SoundStream::Mixer(s) => s.next(rate),
-        }
-    }
-}
-
 /// Sound wave stream which generates the wave to be played by the sound device.
 pub trait Stream {
-    /// The maximum value of the amplitude returned by this stream.
-    fn max(&self) -> u16;
-
     /// The argument takes the sample rate, and the return value indicates the amplitude,
     /// whose max value is determined by [`Stream::max`][].
     fn next(&mut self, rate: u32) -> u16;

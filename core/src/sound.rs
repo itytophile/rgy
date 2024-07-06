@@ -342,10 +342,6 @@ impl ToneStream {
 }
 
 impl Stream for ToneStream {
-    fn max(&self) -> u16 {
-        unreachable!()
-    }
-
     fn next(&mut self, rate: u32) -> u16 {
         let rate = rate as usize;
 
@@ -445,10 +441,6 @@ impl WaveStream {
 }
 
 impl Stream for WaveStream {
-    fn max(&self) -> u16 {
-        unreachable!()
-    }
-
     fn next(&mut self, rate: u32) -> u16 {
         if !self.wave.enable {
             return 0;
@@ -565,10 +557,6 @@ impl NoiseStream {
 }
 
 impl Stream for NoiseStream {
-    fn max(&self) -> u16 {
-        unreachable!()
-    }
-
     fn next(&mut self, rate: u32) -> u16 {
         let rate = rate as usize;
 
@@ -780,17 +768,11 @@ impl MixerStream {
     fn volume(&self, amp: u16, vol: u16) -> u16 {
         amp * vol
     }
+
+    pub const MAX: u16 = 840 * 3;
 }
 
 impl Stream for MixerStream {
-    fn max(&self) -> u16 {
-        // volume max = 7 * 2 = 14
-        // amplitude max = 15
-        // total volume max = 14 * 15 * 4 = 840
-        // * 3 to soften the sound
-        840 * 3
-    }
-
     fn next(&mut self, rate: u32) -> u16 {
         let mut vol = 0;
 

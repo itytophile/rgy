@@ -129,5 +129,5 @@ pub mod mmu;
 /// Hardware interface, which abstracts OS-specific functions.
 mod hardware;
 
-pub use crate::hardware::{Hardware, Key, SoundStream, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+pub use crate::hardware::{Hardware, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 pub use crate::system::{Config, System};
