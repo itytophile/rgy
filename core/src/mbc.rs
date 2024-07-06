@@ -23,7 +23,7 @@ impl<'a> MbcNone<'a> {
         Self { rom }
     }
 
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr <= 0x7fff {
             MemRead::Replace(self.rom[addr as usize])
         } else {
@@ -31,7 +31,7 @@ impl<'a> MbcNone<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr <= 0x7fff {
             MemWrite::Block
         } else if (0xa000..=0xbfff).contains(&addr) {
@@ -65,7 +65,7 @@ impl<'a> Mbc1<'a> {
         }
     }
 
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr <= 0x3fff {
             MemRead::Replace(self.rom[addr as usize])
         } else if (0x4000..=0x7fff).contains(&addr) {
@@ -98,7 +98,7 @@ impl<'a> Mbc1<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr <= 0x1fff {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
@@ -164,7 +164,7 @@ impl<'a> Mbc2<'a> {
         }
     }
 
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr <= 0x3fff {
             MemRead::Replace(self.rom[addr as usize])
         } else if (0x4000..=0x7fff).contains(&addr) {
@@ -183,7 +183,7 @@ impl<'a> Mbc2<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr <= 0x1fff {
             if addr & 0x100 == 0 {
                 self.ram_enable = (value & 0x0f) == 0x0a;
@@ -276,7 +276,7 @@ impl<'a> Mbc3<'a> {
         self.hw.get().borrow_mut().clock() / 1_000_000
     }
 
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr <= 0x3fff {
             MemRead::Replace(self.rom[addr as usize])
         } else if (0x4000..=0x7fff).contains(&addr) {
@@ -303,7 +303,7 @@ impl<'a> Mbc3<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr <= 0x1fff {
             if value == 0x00 {
                 info!("External RAM/RTC disabled");
@@ -454,7 +454,7 @@ impl<'a> Mbc5<'a> {
         }
     }
 
-    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         if addr <= 0x3fff {
             MemRead::Replace(self.rom[addr as usize])
         } else if (0x4000..=0x7fff).contains(&addr) {
@@ -475,7 +475,7 @@ impl<'a> Mbc5<'a> {
         }
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         if addr <= 0x1fff {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
@@ -523,11 +523,11 @@ impl<'a> HuC1<'a> {
         Self { rom }
     }
 
-    fn on_read(&mut self, _mmu: &Mmu, _addr: u16) -> MemRead {
+    fn on_read(&mut self, _addr: u16) -> MemRead {
         unimplemented!()
     }
 
-    fn on_write(&mut self, _mmu: &Mmu, _addr: u16, _value: u8) -> MemWrite {
+    fn on_write(&mut self, _addr: u16, _value: u8) -> MemWrite {
         unimplemented!()
     }
 }
@@ -566,27 +566,27 @@ impl<'a> MbcType<'a> {
         }
     }
 
-    fn on_read(&mut self, mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         match self {
-            MbcType::None(c) => c.on_read(mmu, addr),
-            MbcType::Mbc1(c) => c.on_read(mmu, addr),
-            MbcType::Mbc2(c) => c.on_read(mmu, addr),
-            MbcType::Mbc3(c) => c.on_read(mmu, addr),
+            MbcType::None(c) => c.on_read(addr),
+            MbcType::Mbc1(c) => c.on_read(addr),
+            MbcType::Mbc2(c) => c.on_read(addr),
+            MbcType::Mbc3(c) => c.on_read(addr),
             #[cfg(feature = "mb5")]
-            MbcType::Mbc5(c) => c.on_read(mmu, addr),
-            MbcType::HuC1(c) => c.on_read(mmu, addr),
+            MbcType::Mbc5(c) => c.on_read(addr),
+            MbcType::HuC1(c) => c.on_read(addr),
         }
     }
 
-    fn on_write(&mut self, mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         match self {
-            MbcType::None(c) => c.on_write(mmu, addr, value),
-            MbcType::Mbc1(c) => c.on_write(mmu, addr, value),
-            MbcType::Mbc2(c) => c.on_write(mmu, addr, value),
-            MbcType::Mbc3(c) => c.on_write(mmu, addr, value),
+            MbcType::None(c) => c.on_write(addr, value),
+            MbcType::Mbc1(c) => c.on_write(addr, value),
+            MbcType::Mbc2(c) => c.on_write(addr, value),
+            MbcType::Mbc3(c) => c.on_write(addr, value),
             #[cfg(feature = "mb5")]
-            MbcType::Mbc5(c) => c.on_write(mmu, addr, value),
-            MbcType::HuC1(c) => c.on_write(mmu, addr, value),
+            MbcType::Mbc5(c) => c.on_write(addr, value),
+            MbcType::HuC1(c) => c.on_write(addr, value),
         }
     }
 }
@@ -642,12 +642,12 @@ impl<'a> Cartridge<'a> {
         }
     }
 
-    fn on_read(&mut self, mmu: &Mmu, addr: u16) -> MemRead {
-        self.mbc.on_read(mmu, addr)
+    fn on_read(&mut self, addr: u16) -> MemRead {
+        self.mbc.on_read(addr)
     }
 
-    fn on_write(&mut self, mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
-        self.mbc.on_write(mmu, addr, value)
+    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+        self.mbc.on_write(addr, value)
     }
 }
 
@@ -680,15 +680,15 @@ impl<'a> Mbc<'a> {
 }
 
 impl<'a> IoHandler for Mbc<'a> {
-    fn on_read(&mut self, mmu: &Mmu, addr: u16) -> MemRead {
+    fn on_read(&mut self, _mmu: &Mmu, addr: u16) -> MemRead {
         if self.use_boot_rom && self.in_boot_rom(addr) {
             MemRead::Replace(BOOT_ROM[addr as usize])
         } else {
-            self.cartridge.on_read(mmu, addr)
+            self.cartridge.on_read(addr)
         }
     }
 
-    fn on_write(&mut self, mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, _mmu: &Mmu, addr: u16, value: u8) -> MemWrite {
         if self.use_boot_rom && addr < 0x100 {
             unreachable!("Writing to boot ROM")
         } else if addr == 0xff50 {
@@ -696,7 +696,7 @@ impl<'a> IoHandler for Mbc<'a> {
             self.use_boot_rom = false;
             MemWrite::Block
         } else {
-            self.cartridge.on_write(mmu, addr, value)
+            self.cartridge.on_write(addr, value)
         }
     }
 }
