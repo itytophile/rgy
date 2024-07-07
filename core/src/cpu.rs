@@ -1,4 +1,3 @@
-use crate::ic::Ic;
 use crate::inst::decode;
 use crate::mmu::Mmu;
 use log::*;
@@ -355,8 +354,13 @@ impl Cpu {
 
 #[cfg(test)]
 mod test {
+    use core::cell::RefCell;
+
     use super::*;
-    use crate::{ic::Irq, inst::decode, sound::MixerStream};
+    use crate::{
+        hardware::HardwareHandle, ic::Irq, inst::decode, joypad::Joypad, mbc::Mbc,
+        mmu::MemHandlers, serial::Serial, sound::MixerStream, Hardware, Key,
+    };
 
     fn write(mmu: &mut Mmu, m: &[u8]) {
         for (i, m) in m.iter().enumerate() {
@@ -372,16 +376,56 @@ mod test {
         cpu.set_pc(cpu.get_pc().wrapping_add(size as u16));
     }
 
+    struct EmptyHardware;
+
+    impl Hardware for EmptyHardware {
+        fn joypad_pressed(&mut self, _: Key) -> bool {
+            false
+        }
+
+        fn clock(&mut self) -> u64 {
+            0
+        }
+
+        fn send_byte(&mut self, _b: u8) {}
+
+        fn recv_byte(&mut self) -> Option<u8> {
+            None
+        }
+
+        fn sched(&mut self) -> bool {
+            true
+        }
+
+        fn save_ram(&mut self, _ram: &[u8]) {}
+    }
+
     #[test]
     fn op_00af() {
         let mut mixer_stream = MixerStream::default();
         let mut mmu = Default::default();
         let mut irq = Irq::default();
+        let hw = RefCell::new(EmptyHardware);
+
+        let hw_handle = HardwareHandle::new(&hw);
+
+        let mut handlers = MemHandlers {
+            ic: Default::default(),
+            gpu: Default::default(),
+            joypad: Joypad::new(hw_handle.clone()),
+            timer: Default::default(),
+            serial: Serial::new(hw_handle.clone()),
+            dma: Default::default(),
+            cgb: Default::default(),
+            mbc: Mbc::new(hw_handle, &[]),
+            sound: Default::default(),
+        };
         // xor a
         let mut mmu = Mmu {
             inner: &mut mmu,
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
+            handlers: &mut handlers,
         };
         let mut cpu = Cpu::new();
 
@@ -399,10 +443,28 @@ mod test {
         let mut mixer_stream = MixerStream::default();
         let mut mmu = Default::default();
         let mut irq = Irq::default();
+
+        let hw = RefCell::new(EmptyHardware);
+
+        let hw_handle = HardwareHandle::new(&hw);
+
+        let mut handlers = MemHandlers {
+            ic: Default::default(),
+            gpu: Default::default(),
+            joypad: Joypad::new(hw_handle.clone()),
+            timer: Default::default(),
+            serial: Serial::new(hw_handle.clone()),
+            dma: Default::default(),
+            cgb: Default::default(),
+            mbc: Mbc::new(hw_handle, &[]),
+            sound: Default::default(),
+        };
+
         let mut mmu = Mmu {
             inner: &mut mmu,
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
+            handlers: &mut handlers,
         };
         let mut cpu = Cpu::new();
 
