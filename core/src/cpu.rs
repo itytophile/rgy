@@ -94,12 +94,12 @@ impl Cpu {
 
     /// Check if pending interrupts in the interrupt controller,
     /// and process them if any.
-    pub fn check_interrupt(&mut self, mmu: &mut Mmu, ic: &Ic) -> usize {
+    pub fn check_interrupt(&mut self, mmu: &mut Mmu) -> usize {
         if !self.ime {
             if self.halt {
                 // If HALT is executed while interrupt is disabled,
                 // the interrupt wakes up CPU without being consumed.
-                if let Some(value) = ic.peek(mmu.irq) {
+                if let Some(value) = mmu.handlers.ic.peek(mmu.irq) {
                     debug!("Interrupted on halt + ime=0: {:02x}", value);
                     self.halt = false;
                 }
@@ -107,7 +107,7 @@ impl Cpu {
 
             0
         } else {
-            let value = match ic.poll(mmu.irq) {
+            let value = match mmu.handlers.ic.poll(mmu.irq) {
                 Some(value) => value,
                 None => return 0,
             };

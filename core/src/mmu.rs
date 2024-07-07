@@ -1,4 +1,4 @@
-use crate::{device::IoHandler, ic::Irq, sound::MixerStream, System};
+use crate::{cgb::Cgb, device::IoHandler, dma::Dma, gpu::Gpu, ic::{Ic, Irq}, joypad::Joypad, mbc::Mbc, serial::Serial, sound::{MixerStream, Sound}, timer::Timer};
 
 /// The variants to control memory read access from the CPU.
 pub enum MemRead {
@@ -27,7 +27,7 @@ pub struct Mmu<'a, 'b> {
     pub inner: &'b mut MmuWithoutMixerStream,
     pub mixer_stream: &'b mut MixerStream,
     pub irq: &'b mut Irq,
-    pub system: &'b mut System<'a>,
+    pub handlers: &'b mut MemHandlers<'a>,
 }
 
 pub struct MmuWithoutMixerStream {
@@ -40,32 +40,44 @@ impl<'a> Default for MmuWithoutMixerStream {
     }
 }
 
+pub struct MemHandlers<'a> {
+    pub cgb: Cgb,
+    pub mbc: Mbc<'a>,
+    pub sound: Sound,
+    pub dma: Dma,
+    pub gpu: Gpu,
+    pub ic: Ic,
+    pub joypad: Joypad<'a>,
+    pub timer: Timer,
+    pub serial: Serial<'a>
+}
+
 impl<'a, 'b> Mmu<'a, 'b> {
     fn on_read(&mut self, addr: u16) -> Option<MemRead> {
         match addr {
             0xc000..=0xdfff | 0xff4d | 0xff56 | 0xff70 => {
-                Some(self.system.cgb.on_read(addr, self.mixer_stream, self.irq))
+                Some(self.handlers.cgb.on_read(addr, self.mixer_stream, self.irq))
             }
             0x0000..=0x7fff | 0xff50 | 0xa000..=0xbfff => {
-                Some(self.system.mbc.on_read(addr, self.mixer_stream, self.irq))
+                Some(self.handlers.mbc.on_read(addr, self.mixer_stream, self.irq))
             }
-            0xff10..=0xff3f => Some(self.system.sound.on_read(addr, self.mixer_stream, self.irq)),
-            0xff46 => Some(self.system.dma.on_read(addr, self.mixer_stream, self.irq)),
+            0xff10..=0xff3f => Some(self.handlers.sound.on_read(addr, self.mixer_stream, self.irq)),
+            0xff46 => Some(self.handlers.dma.on_read(addr, self.mixer_stream, self.irq)),
             0x8000..=0x9fff
             | 0xff40..=0xff45
             | 0xff47..=0xff4b
             | 0xff4f
             | 0xff51..=0xff55
-            | 0xff68..=0xff6b => Some(self.system.gpu.on_read(addr, self.mixer_stream, self.irq)),
-            0xff0f | 0xffff => Some(self.system.ic.on_read(addr, self.mixer_stream, self.irq)),
+            | 0xff68..=0xff6b => Some(self.handlers.gpu.on_read(addr, self.mixer_stream, self.irq)),
+            0xff0f | 0xffff => Some(self.handlers.ic.on_read(addr, self.mixer_stream, self.irq)),
             0xff00 => Some(
-                self.system
+                self.handlers
                     .joypad
                     .on_read(addr, self.mixer_stream, self.irq),
             ),
-            0xff04..=0xff07 => Some(self.system.timer.on_read(addr, self.mixer_stream, self.irq)),
+            0xff04..=0xff07 => Some(self.handlers.timer.on_read(addr, self.mixer_stream, self.irq)),
             0xff01..=0xff02 => Some(
-                self.system
+                self.handlers
                     .serial
                     .on_read(addr, self.mixer_stream, self.irq),
             ),
@@ -75,26 +87,26 @@ impl<'a, 'b> Mmu<'a, 'b> {
 
     fn on_write(&mut self, addr: u16, v: u8) -> Option<MemWrite> {
         match addr {
-            0xc000..=0xdfff | 0xff4d | 0xff56 | 0xff70 => Some(self.system.cgb.on_write(
+            0xc000..=0xdfff | 0xff4d | 0xff56 | 0xff70 => Some(self.handlers.cgb.on_write(
                 addr,
                 v,
                 self.mixer_stream,
                 self.irq,
             )),
-            0x0000..=0x7fff | 0xff50 | 0xa000..=0xbfff => Some(self.system.mbc.on_write(
+            0x0000..=0x7fff | 0xff50 | 0xa000..=0xbfff => Some(self.handlers.mbc.on_write(
                 addr,
                 v,
                 self.mixer_stream,
                 self.irq,
             )),
-            0xff10..=0xff3f => Some(self.system.sound.on_write(
+            0xff10..=0xff3f => Some(self.handlers.sound.on_write(
                 addr,
                 v,
                 self.mixer_stream,
                 self.irq,
             )),
             0xff46 => Some(
-                self.system
+                self.handlers
                     .dma
                     .on_write(addr, v, self.mixer_stream, self.irq),
             ),
@@ -103,29 +115,29 @@ impl<'a, 'b> Mmu<'a, 'b> {
             | 0xff47..=0xff4b
             | 0xff4f
             | 0xff51..=0xff55
-            | 0xff68..=0xff6b => Some(self.system.gpu.on_write(
+            | 0xff68..=0xff6b => Some(self.handlers.gpu.on_write(
                 addr,
                 v,
                 self.mixer_stream,
                 self.irq,
             )),
             0xff0f | 0xffff => Some(
-                self.system
+                self.handlers
                     .ic
                     .on_write(addr, v, self.mixer_stream, self.irq),
             ),
             0xff00 => Some(
-                self.system
+                self.handlers
                     .joypad
                     .on_write(addr, v, self.mixer_stream, self.irq),
             ),
-            0xff04..=0xff07 => Some(self.system.timer.on_write(
+            0xff04..=0xff07 => Some(self.handlers.timer.on_write(
                 addr,
                 v,
                 self.mixer_stream,
                 self.irq,
             )),
-            0xff01..=0xff02 => Some(self.system.serial.on_write(
+            0xff01..=0xff02 => Some(self.handlers.serial.on_write(
                 addr,
                 v,
                 self.mixer_stream,

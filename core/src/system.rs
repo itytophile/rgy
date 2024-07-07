@@ -8,7 +8,7 @@ use crate::hardware::{Hardware, HardwareHandle};
 use crate::ic::{Ic, Irq};
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
-use crate::mmu::{Mmu, MmuWithoutMixerStream};
+use crate::mmu::{MemHandlers, Mmu, MmuWithoutMixerStream};
 use crate::serial::Serial;
 use crate::sound::{MixerStream, Sound};
 use crate::timer::Timer;
@@ -19,16 +19,8 @@ use log::*;
 pub struct System<'a> {
     pub hw: HardwareHandle<'a>,
     pub cpu: Cpu,
-    pub mmu: MmuWithoutMixerStream,
-    pub ic: Ic,
-    pub gpu: Gpu,
-    pub joypad: Joypad<'a>,
-    pub timer: Timer,
-    pub serial: Serial<'a>,
-    pub dma: Dma,
-    pub cgb: Cgb,
-    pub mbc: Mbc<'a>,
-    pub sound: Sound
+    pub handlers: MemHandlers<'a>,
+    pub mmu: MmuWithoutMixerStream
 }
 
 
@@ -44,7 +36,7 @@ impl<'a> System<'a> {
         info!("Initializing...");
 
         let cpu = Cpu::new();
-        let mut mmu = MmuWithoutMixerStream::default();
+        let mmu = MmuWithoutMixerStream::default();
 
         info!("Starting...");
 
@@ -52,15 +44,17 @@ impl<'a> System<'a> {
             hw: hw_handle.clone(),
             cpu,
             mmu,
-            ic: Default::default(),
-            gpu: Default::default(),
-            joypad: Joypad::new(hw_handle.clone()),
-            timer: Default::default(),
-            serial: Serial::new(hw_handle.clone()),
-            dma: Default::default(),
-            cgb: Default::default(),
-            mbc: Mbc::new(hw_handle, rom),
-            sound: Default::default()
+            handlers: MemHandlers { 
+                ic: Default::default(),
+                gpu: Default::default(),
+                joypad: Joypad::new(hw_handle.clone()),
+                timer: Default::default(),
+                serial: Serial::new(hw_handle.clone()),
+                dma: Default::default(),
+                cgb: Default::default(),
+                mbc: Mbc::new(hw_handle, rom),
+                sound: Default::default() }
+            
         }
     }
 
@@ -69,16 +63,17 @@ impl<'a> System<'a> {
             inner: &mut self.mmu,
             mixer_stream,
             irq,
+            handlers: &mut self.handlers
         };
         let mut time = self.cpu.execute(&mut mmu);
 
-        time += self.cpu.check_interrupt(&mut mmu, &self.ic);
+        time += self.cpu.check_interrupt(&mut mmu);
 
-        self.dma.step(&mut mmu);
-        let line_to_draw = self.gpu.step(time, &mut mmu);
-        self.timer.step(time, irq);
-        self.serial.step(time, irq);
-        self.joypad.poll(irq);
+        self.handlers.dma.step(&mut mmu);
+        let line_to_draw = self.handlers.gpu.step(time, &mut mmu);
+        self.handlers.timer.step(time, irq);
+        self.handlers.serial.step(time, irq);
+        self.handlers.joypad.poll(irq);
 
         PollState { line_to_draw }
     }
