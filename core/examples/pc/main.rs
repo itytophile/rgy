@@ -59,8 +59,6 @@ fn run<H: rgy::Hardware + 'static>(
 ) {
     let state0 = rgy::system::get_stack_state0(hw);
     let state1 = rgy::system::get_stack_state1(&state0);
-    let devices = rgy::system::Devices::new(&state1.raw_devices);
-    let handlers = rgy::system::Handlers::new(devices.clone());
     let mut sys = rgy::System::new(state1.hw_handle, rom);
 
     let mut lock = None;

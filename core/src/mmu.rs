@@ -34,7 +34,7 @@ pub struct MmuWithoutMixerStream {
     pub ram: [u8; 0x10000],
 }
 
-impl<'a> Default for MmuWithoutMixerStream {
+impl Default for MmuWithoutMixerStream {
     fn default() -> Self {
         Self { ram: [0; 0x10000] }
     }
@@ -148,9 +148,8 @@ impl<'a, 'b> Mmu<'a, 'b> {
     }
     /// Reads one byte from the given address in the memory.
     pub fn get8(&mut self, addr: u16) -> u8 {
-        match self.on_read(addr) {
-            Some(MemRead::Replace(alt)) => return alt,
-            _ => {}
+        if let Some(MemRead::Replace(alt)) =  self.on_read(addr)  {
+            return alt
         }
         if (0xe000..=0xfdff).contains(&addr) {
             // echo ram

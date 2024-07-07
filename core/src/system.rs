@@ -1,17 +1,13 @@
 use core::cell::RefCell;
 
-use crate::cgb::Cgb;
 use crate::cpu::Cpu;
-use crate::dma::Dma;
-use crate::gpu::Gpu;
 use crate::hardware::{Hardware, HardwareHandle};
-use crate::ic::{Ic, Irq};
+use crate::ic::Irq;
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::mmu::{MemHandlers, Mmu, MmuWithoutMixerStream};
 use crate::serial::Serial;
-use crate::sound::{MixerStream, Sound};
-use crate::timer::Timer;
+use crate::sound::MixerStream;
 use crate::VRAM_WIDTH;
 use log::*;
 
@@ -20,19 +16,12 @@ pub struct System<'a> {
     pub hw: HardwareHandle<'a>,
     pub cpu: Cpu,
     pub handlers: MemHandlers<'a>,
-    pub mmu: MmuWithoutMixerStream
+    pub mmu: MmuWithoutMixerStream,
 }
-
-
-
-
 
 impl<'a> System<'a> {
     /// Create a new emulator context.
-    pub fn new(
-        hw_handle: HardwareHandle<'a>,
-        rom: &'a [u8]
-    ) -> Self {
+    pub fn new(hw_handle: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
         info!("Initializing...");
 
         let cpu = Cpu::new();
@@ -44,7 +33,7 @@ impl<'a> System<'a> {
             hw: hw_handle.clone(),
             cpu,
             mmu,
-            handlers: MemHandlers { 
+            handlers: MemHandlers {
                 ic: Default::default(),
                 gpu: Default::default(),
                 joypad: Joypad::new(hw_handle.clone()),
@@ -53,8 +42,8 @@ impl<'a> System<'a> {
                 dma: Default::default(),
                 cgb: Default::default(),
                 mbc: Mbc::new(hw_handle, rom),
-                sound: Default::default() }
-            
+                sound: Default::default(),
+            },
         }
     }
 
@@ -63,7 +52,7 @@ impl<'a> System<'a> {
             inner: &mut self.mmu,
             mixer_stream,
             irq,
-            handlers: &mut self.handlers
+            handlers: &mut self.handlers,
         };
         let mut time = self.cpu.execute(&mut mmu);
 
@@ -109,7 +98,7 @@ pub struct StackState1<'a> {
     pub hw_handle: HardwareHandle<'a>,
 }
 
-pub fn get_stack_state1<'a, H>(state0: &'a StackState0<H>) -> StackState1<'a>
+pub fn get_stack_state1<H>(state0: &StackState0<H>) -> StackState1<'_>
 where
     H: Hardware + 'static,
 {

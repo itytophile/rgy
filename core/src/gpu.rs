@@ -99,7 +99,7 @@ struct SpriteAttribute<'a> {
     attr: MapAttribute<'a>,
 }
 
-struct MapAttribute<'a> {
+pub struct MapAttribute<'a> {
     pub palette: &'a [Color],
     pub vram_bank: usize,
     pub xflip: bool,
@@ -107,7 +107,7 @@ struct MapAttribute<'a> {
     pub priority: bool,
 }
 
-struct ColorPalette {
+pub struct ColorPalette {
     cols: [[Color; 4]; 8],
     index: usize,
     auto_inc: bool,
@@ -155,7 +155,7 @@ impl ColorPalette {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Color {
+pub enum Color {
     White,
     LightGray,
     DarkGray,
@@ -257,7 +257,7 @@ impl From<u8> for Color {
     }
 }
 
-struct Hdma {
+pub struct Hdma {
     on: bool,
     src_low: u8,
     src_high: u8,
