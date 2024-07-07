@@ -9,9 +9,15 @@ use log::*;
 // https://gbdev.io/pandocs/MBCs.html
 
 // https://gbdev.io/pandocs/Memory_Map.html#memory-map
+
 // From cartridge, switchable bank if any
 const EXTERNAL_RAM_START: u16 = 0xa000;
 const EXTERNAL_RAM_END: u16 = 0xbfff;
+// From cartridge, usually a fixed bank
+const ROM_BANK_00_END: u16 = 0x3fff;
+// From cartridge, switchable bank via mapper (if any)
+const ROM_BANK_01_NN_START: u16 = 0x4000;
+const ROM_BANK_01_NN_END: u16 = 0x7fff;
 
 const BOOT_ROM: &[u8] = {
     #[cfg(feature = "color")]
@@ -34,7 +40,7 @@ impl<'a> MbcNone<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= 0x7fff {
+        if addr <= ROM_BANK_01_NN_END {
             MemRead::Replace(self.rom[addr as usize])
         } else {
             MemRead::PassThrough
@@ -42,7 +48,7 @@ impl<'a> MbcNone<'a> {
     }
 
     fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
-        if addr <= 0x7fff {
+        if addr <= ROM_BANK_01_NN_END {
             MemWrite::Block
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             MemWrite::PassThrough
@@ -75,9 +81,9 @@ impl<'a> Mbc1<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= 0x3fff {
+        if addr <= ROM_BANK_00_END {
             MemRead::Replace(self.rom[addr as usize])
-        } else if (0x4000..=0x7fff).contains(&addr) {
+        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
             let rom_bank = self.rom_bank.max(1);
 
             // ROM bank 0x20, 0x40, 0x60 are somehow not available
@@ -88,8 +94,8 @@ impl<'a> Mbc1<'a> {
                 rom_bank
             };
 
-            let base = rom_bank * 0x4000;
-            let offset = addr as usize - 0x4000;
+            let base = rom_bank * usize::from(ROM_BANK_01_NN_START);
+            let offset = usize::from(addr) - usize::from(ROM_BANK_01_NN_START);
             let addr = (base + offset) & (self.rom.len() - 1);
             MemRead::Replace(self.rom[addr])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
@@ -118,18 +124,18 @@ impl<'a> Mbc1<'a> {
                 hw.save_ram(self.ram.as_slice());
             }
             MemWrite::Block
-        } else if (0x2000..=0x3fff).contains(&addr) {
+        } else if (0x2000..=ROM_BANK_00_END).contains(&addr) {
             self.rom_bank = (self.rom_bank & !0x1f) | (value as usize & 0x1f);
             debug!("Switch ROM bank to {:02x}", self.rom_bank);
             MemWrite::Block
-        } else if (0x4000..=0x5fff).contains(&addr) {
+        } else if (ROM_BANK_01_NN_START..=0x5fff).contains(&addr) {
             if self.ram_select {
                 self.ram_bank = value as usize & 0x3;
             } else {
                 self.rom_bank = (self.rom_bank & !0x60) | ((value as usize & 0x3) << 5);
             }
             MemWrite::Block
-        } else if (0x6000..=0x7fff).contains(&addr) {
+        } else if (0x6000..=ROM_BANK_01_NN_END).contains(&addr) {
             if value == 0x00 {
                 self.ram_select = false;
             } else if value == 0x01 {
@@ -173,11 +179,11 @@ impl<'a> Mbc2<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= 0x3fff {
+        if addr <= ROM_BANK_00_END {
             MemRead::Replace(self.rom[addr as usize])
-        } else if (0x4000..=0x7fff).contains(&addr) {
-            let base = self.rom_bank.max(1) * 0x4000;
-            let offset = addr as usize - 0x4000;
+        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
+            let base = self.rom_bank.max(1) * usize::from(ROM_BANK_01_NN_START);
+            let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=0xa1ff).contains(&addr) {
             if self.ram_enable {
@@ -211,13 +217,13 @@ impl<'a> Mbc2<'a> {
                 }
             }
             MemWrite::Block
-        } else if (0x2000..=0x3fff).contains(&addr) {
+        } else if (0x2000..=ROM_BANK_00_END).contains(&addr) {
             if addr & 0x100 != 0 {
                 self.rom_bank = (value as usize & 0xf).max(1);
                 debug!("Switch ROM bank to {:02x}", self.rom_bank);
             }
             MemWrite::Block
-        } else if (0x4000..=0x7fff).contains(&addr) {
+        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
             warn!("Writing to read-only range: {:04x} {:02x}", addr, value);
             MemWrite::Block
         } else if (EXTERNAL_RAM_START..=0xa1ff).contains(&addr) {
@@ -280,12 +286,12 @@ impl<'a> Mbc3<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= 0x3fff {
+        if addr <= ROM_BANK_00_END {
             MemRead::Replace(self.rom[addr as usize])
-        } else if (0x4000..=0x7fff).contains(&addr) {
+        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
             let rom_bank = self.rom_bank.max(1);
-            let base = rom_bank * 0x4000;
-            let offset = addr as usize - 0x4000;
+            let base = rom_bank * usize::from(ROM_BANK_01_NN_START);
+            let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             match self.select {
@@ -316,16 +322,16 @@ impl<'a> Mbc3<'a> {
                 self.enable = true;
             }
             MemWrite::Block
-        } else if (0x2000..=0x3fff).contains(&addr) {
+        } else if (0x2000..=ROM_BANK_00_END).contains(&addr) {
             self.rom_bank = value as usize & 0x7f;
             trace!("Switch ROM bank to {}", self.rom_bank);
             MemWrite::Block
-        } else if (0x4000..=0x5fff).contains(&addr) {
+        } else if (ROM_BANK_01_NN_START..=0x5fff).contains(&addr) {
             self.select = value;
             self.save(hw);
             debug!("Select RAM bank/RTC: {:02x}", self.select);
             MemWrite::Block
-        } else if (0x6000..=0x7fff).contains(&addr) {
+        } else if (0x6000..=ROM_BANK_01_NN_END).contains(&addr) {
             if self.prelatch {
                 if value == 0x01 {
                     self.latch(hw);
@@ -457,11 +463,11 @@ impl<'a> Mbc5<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= 0x3fff {
+        if addr <= ROM_BANK_00_END {
             MemRead::Replace(self.rom[addr as usize])
-        } else if (0x4000..=0x7fff).contains(&addr) {
-            let base = self.rom_bank * 0x4000;
-            let offset = addr as usize - 0x4000;
+        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
+            let base = self.rom_bank * usize::from(ROM_BANK_01_NN_START);
+            let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             if self.ram_enable {
@@ -492,11 +498,11 @@ impl<'a> Mbc5<'a> {
             self.rom_bank = (self.rom_bank & !0xff) | value as usize;
             debug!("Switch ROM bank to {:02x}", self.rom_bank);
             MemWrite::Block
-        } else if (0x3000..=0x3fff).contains(&addr) {
+        } else if (0x3000..=ROM_BANK_00_END).contains(&addr) {
             self.rom_bank = (self.rom_bank & !0x100) | (value as usize & 1) << 8;
             debug!("Switch ROM bank to {:02x}", self.rom_bank);
             MemWrite::Block
-        } else if (0x4000..=0x5fff).contains(&addr) {
+        } else if (ROM_BANK_01_NN_START..=0x5fff).contains(&addr) {
             self.ram_bank = value as usize & 0xf;
             MemWrite::Block
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
