@@ -1,5 +1,6 @@
 use crate::inst::decode;
 use crate::mmu::Mmu;
+use crate::Hardware;
 use log::*;
 
 /// Represents CPU state.
@@ -68,7 +69,7 @@ impl Cpu {
     /// decodes it, and updates the CPU/memory state accordingly.
     /// The return value is the number of clock cycles consumed by the instruction.
     /// If the CPU is in the halt state, the function does nothing but returns a fixed clock cycle.
-    pub fn execute(&mut self, mmu: &mut Mmu) -> usize {
+    pub fn execute(&mut self, mmu: &mut Mmu<impl Hardware>) -> usize {
         if self.halt {
             4
         } else {
@@ -93,7 +94,7 @@ impl Cpu {
 
     /// Check if pending interrupts in the interrupt controller,
     /// and process them if any.
-    pub fn check_interrupt(&mut self, mmu: &mut Mmu) -> usize {
+    pub fn check_interrupt(&mut self, mmu: &mut Mmu<impl Hardware>) -> usize {
         if !self.ime {
             if self.halt {
                 // If HALT is executed while interrupt is disabled,
@@ -121,7 +122,7 @@ impl Cpu {
         }
     }
 
-    fn interrupted(&mut self, mmu: &mut Mmu, value: u8) {
+    fn interrupted(&mut self, mmu: &mut Mmu<impl Hardware>, value: u8) {
         self.disable_interrupt();
 
         self.push(mmu, self.get_pc());
@@ -324,21 +325,21 @@ impl Cpu {
     }
 
     /// Pushes a 16-bit value to the stack, updating the stack pointer register.
-    pub fn push(&mut self, mmu: &mut Mmu, v: u16) {
+    pub fn push(&mut self, mmu: &mut Mmu<impl Hardware>, v: u16) {
         let p = self.get_sp().wrapping_sub(2);
         self.set_sp(self.get_sp().wrapping_sub(2));
         mmu.set16(p, v)
     }
 
     /// Pops a 16-bit value from the stack, updating the stack pointer register.
-    pub fn pop(&mut self, mmu: &mut Mmu) -> u16 {
+    pub fn pop(&mut self, mmu: &mut Mmu<impl Hardware>) -> u16 {
         let p = self.get_sp();
         self.set_sp(self.get_sp().wrapping_add(2));
         mmu.get16(p)
     }
 
     /// Fetches an opcode from the memory and returns it with its length.
-    pub fn fetch(&self, mmu: &mut Mmu) -> (u16, u16) {
+    pub fn fetch(&self, mmu: &mut Mmu<impl Hardware>) -> (u16, u16) {
         let pc = self.get_pc();
 
         let fb = mmu.get8(pc);
@@ -362,13 +363,13 @@ mod test {
         mmu::MemHandlers, serial::Serial, sound::MixerStream, Hardware, Key,
     };
 
-    fn write(mmu: &mut Mmu, m: &[u8]) {
+    fn write(mmu: &mut Mmu<impl Hardware>, m: &[u8]) {
         for (i, m) in m.iter().enumerate() {
             mmu.set8(i as u16, *m);
         }
     }
 
-    fn exec(cpu: &mut Cpu, mmu: &mut Mmu) {
+    fn exec(cpu: &mut Cpu, mmu: &mut Mmu<impl Hardware>) {
         let (code, arg) = cpu.fetch(mmu);
 
         let (_, size) = decode(code, arg, cpu, mmu);
@@ -401,9 +402,7 @@ mod test {
         let mut mixer_stream = MixerStream::default();
         let mut mmu = Default::default();
         let mut irq = Irq::default();
-        let hw = RefCell::new(EmptyHardware);
-
-        let hw_handle = HardwareHandle::new(&hw);
+        let mut hw =EmptyHardware;
 
         let mut handlers = MemHandlers {
             ic: Default::default(),
@@ -413,7 +412,7 @@ mod test {
             serial: Serial::new(hw_handle.clone()),
             dma: Default::default(),
             cgb: Default::default(),
-            mbc: Mbc::new(hw_handle, &[]),
+            mbc: Mbc::new( &[], &mut hw),
             sound: Default::default(),
         };
         // xor a
@@ -440,9 +439,7 @@ mod test {
         let mut mmu = Default::default();
         let mut irq = Irq::default();
 
-        let hw = RefCell::new(EmptyHardware);
-
-        let hw_handle = HardwareHandle::new(&hw);
+        let mut hw = EmptyHardware;
 
         let mut handlers = MemHandlers {
             ic: Default::default(),
@@ -452,7 +449,7 @@ mod test {
             serial: Serial::new(hw_handle.clone()),
             dma: Default::default(),
             cgb: Default::default(),
-            mbc: Mbc::new(hw_handle, &[]),
+            mbc: Mbc::new( &[], &mut hw),
             sound: Default::default(),
         };
 
@@ -461,6 +458,7 @@ mod test {
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
             handlers: &mut handlers,
+            hw: &mut hw
         };
         let mut cpu = Cpu::new();
 

@@ -3,6 +3,7 @@ use crate::hardware::HardwareHandle;
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
+use crate::Hardware;
 use log::*;
 
 pub struct Serial<'a> {
@@ -63,7 +64,7 @@ impl<'a> IoHandler for Serial<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq, _: &mut impl Hardware) -> MemWrite {
         if addr == 0xff01 {
             self.data = value;
             MemWrite::Block

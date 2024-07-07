@@ -1,6 +1,7 @@
 use crate::device::IoHandler;
 use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
+use crate::Hardware;
 use log::*;
 
 #[derive(Default)]
@@ -110,7 +111,7 @@ impl IoHandler for Ic {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, irq: &mut Irq) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, irq: &mut Irq, _: &mut impl Hardware) -> MemWrite {
         if addr == 0xffff {
             info!("Write interrupt enable: {:02x}", value);
             self.enable.set(value);

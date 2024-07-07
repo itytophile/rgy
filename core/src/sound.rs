@@ -4,6 +4,7 @@ use crate::device::IoHandler;
 use crate::hardware::Stream;
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
+use crate::Hardware;
 
 struct Sweep {
     enable: bool,
@@ -704,6 +705,7 @@ impl IoHandler for Sound {
         value: u8,
         mixer_stream: &mut MixerStream,
         _: &mut Irq,
+        _: &mut impl Hardware
     ) -> MemWrite {
         if (0xff10..=0xff14).contains(&addr) {
             if self.tone1.on_write(0xff10, addr, value) {

@@ -1,8 +1,8 @@
 use crate::device::IoHandler;
-use crate::hardware::HardwareHandle;
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
+use crate::Hardware;
 use log::*;
 
 const BOOT_ROM: &[u8] = {
@@ -45,7 +45,6 @@ impl<'a> MbcNone<'a> {
 }
 
 struct Mbc1<'a> {
-    hw: HardwareHandle<'a>,
     rom: &'a [u8],
     ram: [u8; 0x8000],
     rom_bank: usize,
@@ -55,9 +54,8 @@ struct Mbc1<'a> {
 }
 
 impl<'a> Mbc1<'a> {
-    fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
+    fn new(rom: &'a [u8]) -> Self {
         Self {
-            hw,
             rom,
             ram: [0; 0x8000],
             rom_bank: 0,
@@ -100,7 +98,7 @@ impl<'a> Mbc1<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
         if addr <= 0x1fff {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
@@ -108,7 +106,7 @@ impl<'a> Mbc1<'a> {
             } else {
                 info!("External RAM disabled");
                 self.ram_enable = false;
-                self.hw.get().borrow_mut().save_ram(&self.ram);
+                hw.save_ram(&self.ram);
             }
             MemWrite::Block
         } else if (0x2000..=0x3fff).contains(&addr) {
@@ -148,7 +146,6 @@ impl<'a> Mbc1<'a> {
 }
 
 struct Mbc2<'a> {
-    hw: HardwareHandle<'a>,
     rom: &'a [u8],
     ram: [u8; 0x200],
     rom_bank: usize,
@@ -156,9 +153,8 @@ struct Mbc2<'a> {
 }
 
 impl<'a> Mbc2<'a> {
-    fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
+    fn new(rom: &'a [u8]) -> Self {
         Self {
-            hw,
             rom,
             ram: [0; 0x200],
             rom_bank: 1,
@@ -185,7 +181,7 @@ impl<'a> Mbc2<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
         if addr <= 0x1fff {
             if addr & 0x100 == 0 {
                 self.ram_enable = (value & 0x0f) == 0x0a;
@@ -199,7 +195,7 @@ impl<'a> Mbc2<'a> {
                     value
                 );
                 if !self.ram_enable {
-                    self.hw.get().borrow_mut().save_ram(&self.ram);
+                    hw.save_ram(&self.ram);
                 }
             }
             MemWrite::Block
@@ -228,7 +224,6 @@ impl<'a> Mbc2<'a> {
 }
 
 struct Mbc3<'a> {
-    hw: HardwareHandle<'a>,
     rom: &'a [u8],
     ram: [u8; 0x8000],
     rom_bank: usize,
@@ -243,16 +238,10 @@ struct Mbc3<'a> {
     prelatch: bool,
 }
 
-impl<'a> Drop for Mbc3<'a> {
-    fn drop(&mut self) {
-        self.save();
-    }
-}
 
 impl<'a> Mbc3<'a> {
-    fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
+    fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         let mut s = Self {
-            hw,
             rom,
             ram: [0; 0x8000],
             rom_bank: 0,
@@ -266,16 +255,16 @@ impl<'a> Mbc3<'a> {
             epoch: 0,
             prelatch: false,
         };
-        s.update_epoch();
+        s.update_epoch(hw);
         s
     }
 
-    fn save(&mut self) {
-        self.hw.get().borrow_mut().save_ram(&self.ram);
+    fn save(&mut self, hw: &mut impl Hardware) {
+        hw.save_ram(&self.ram);
     }
 
-    fn epoch(&self) -> u64 {
-        self.hw.get().borrow_mut().clock() / 1_000_000
+    fn epoch(&self, hw: &mut impl Hardware) -> u64 {
+        hw.clock() / 1_000_000
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
@@ -305,7 +294,7 @@ impl<'a> Mbc3<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
         if addr <= 0x1fff {
             if value == 0x00 {
                 info!("External RAM/RTC disabled");
@@ -321,13 +310,13 @@ impl<'a> Mbc3<'a> {
             MemWrite::Block
         } else if (0x4000..=0x5fff).contains(&addr) {
             self.select = value;
-            self.save();
+            self.save(hw);
             debug!("Select RAM bank/RTC: {:02x}", self.select);
             MemWrite::Block
         } else if (0x6000..=0x7fff).contains(&addr) {
             if self.prelatch {
                 if value == 0x01 {
-                    self.latch();
+                    self.latch(hw);
                 }
                 self.prelatch = false;
             } else if value == 0x00 {
@@ -344,27 +333,27 @@ impl<'a> Mbc3<'a> {
                 }
                 0x08 => {
                     self.rtc_secs = value;
-                    self.update_epoch();
+                    self.update_epoch(hw);
                     MemWrite::Block
                 }
                 0x09 => {
                     self.rtc_mins = value;
-                    self.update_epoch();
+                    self.update_epoch(hw);
                     MemWrite::Block
                 }
                 0x0a => {
                     self.rtc_hours = value;
-                    self.update_epoch();
+                    self.update_epoch(hw);
                     MemWrite::Block
                 }
                 0x0b => {
                     self.rtc_day_low = value;
-                    self.update_epoch();
+                    self.update_epoch(hw);
                     MemWrite::Block
                 }
                 0x0c => {
                     self.rtc_day_high = value;
-                    self.update_epoch();
+                    self.update_epoch(hw);
                     MemWrite::Block
                 }
                 s => unimplemented!("Unknown selector: {:02x}", s),
@@ -374,8 +363,8 @@ impl<'a> Mbc3<'a> {
         }
     }
 
-    fn update_epoch(&mut self) {
-        self.epoch = self.epoch();
+    fn update_epoch(&mut self, hw: &mut impl Hardware) {
+        self.epoch = self.epoch(hw);
     }
 
     fn day(&self) -> u64 {
@@ -402,9 +391,9 @@ impl<'a> Mbc3<'a> {
         self.rtc_day_high = (self.rtc_day_high & !1) | ((d >> 8) & 1) as u8;
     }
 
-    fn latch(&mut self) {
+    fn latch(&mut self, hw: &mut impl Hardware) {
         let new_epoch = if self.rtc_day_high & 0x40 == 0 {
-            self.epoch()
+            self.epoch(hw)
         } else {
             // Halt
             self.epoch
@@ -435,7 +424,6 @@ impl<'a> Mbc3<'a> {
 
 #[cfg(feature = "mb5")]
 struct Mbc5<'a> {
-    hw: HardwareHandle<'a>,
     rom: &'a [u8],
     ram: [u8; 0x20000],
     rom_bank: usize,
@@ -445,9 +433,8 @@ struct Mbc5<'a> {
 
 #[cfg(feature = "mb5")]
 impl<'a> Mbc5<'a> {
-    fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
+    fn new(rom: &'a [u8]) -> Self {
         Self {
-            hw,
             rom,
             ram: [0; 0x20000],
             rom_bank: 0,
@@ -477,7 +464,7 @@ impl<'a> Mbc5<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
         if addr <= 0x1fff {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
@@ -485,7 +472,7 @@ impl<'a> Mbc5<'a> {
             } else {
                 info!("External RAM disabled");
                 self.ram_enable = false;
-                self.hw.get().borrow_mut().save_ram(&self.ram);
+                hw.save_ram(&self.ram);
             }
             MemWrite::Block
         } else if (0x2000..=0x2fff).contains(&addr) {
@@ -545,20 +532,20 @@ enum MbcType<'a> {
 }
 
 impl<'a> MbcType<'a> {
-    fn new(hw: HardwareHandle<'a>, code: u8, rom: &'a [u8]) -> Self {
+    fn new(code: u8, rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         match code {
             0x00 => MbcType::None(MbcNone::new(rom)),
-            0x01..=0x03 => MbcType::Mbc1(Mbc1::new(hw, rom)),
-            0x05 | 0x06 => MbcType::Mbc2(Mbc2::new(hw, rom)),
+            0x01..=0x03 => MbcType::Mbc1(Mbc1::new( rom)),
+            0x05 | 0x06 => MbcType::Mbc2(Mbc2::new( rom)),
             0x08 | 0x09 => unimplemented!("ROM+RAM: {:02x}", code),
             0x0b..=0x0d => unimplemented!("MMM01: {:02x}", code),
-            0x0f..=0x13 => MbcType::Mbc3(Mbc3::new(hw, rom)),
+            0x0f..=0x13 => MbcType::Mbc3(Mbc3::new( rom, hw)),
             0x15..=0x17 => unimplemented!("Mbc4: {:02x}", code),
             0x19..=0x1e => {
                 #[cfg(not(feature = "mb5"))]
                 panic!("Provide the mb5 feature at build");
                 #[cfg(feature = "mb5")]
-                MbcType::Mbc5(Mbc5::new(hw, rom))
+                MbcType::Mbc5(Mbc5::new( rom))
             }
             0xfc => unimplemented!("POCKET CAMERA"),
             0xfd => unimplemented!("BANDAI TAMAS"),
@@ -580,14 +567,14 @@ impl<'a> MbcType<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
         match self {
             MbcType::None(c) => c.on_write(addr, value),
-            MbcType::Mbc1(c) => c.on_write(addr, value),
-            MbcType::Mbc2(c) => c.on_write(addr, value),
-            MbcType::Mbc3(c) => c.on_write(addr, value),
+            MbcType::Mbc1(c) => c.on_write(addr, value, hw),
+            MbcType::Mbc2(c) => c.on_write(addr, value, hw),
+            MbcType::Mbc3(c) => c.on_write(addr, value, hw),
             #[cfg(feature = "mb5")]
-            MbcType::Mbc5(c) => c.on_write(addr, value),
+            MbcType::Mbc5(c) => c.on_write(addr, value, hw),
             MbcType::HuC1(c) => c.on_write(addr, value),
         }
     }
@@ -626,7 +613,7 @@ fn verify(rom: &[u8], checksum: u16) {
 }
 
 impl<'a> Cartridge<'a> {
-    fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
+    fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         let checksum = (rom[0x14e] as u16) << 8 | (rom[0x14f] as u16);
 
         verify(rom, checksum);
@@ -636,7 +623,7 @@ impl<'a> Cartridge<'a> {
             // cgb_only: rom[0x143] == 0xc0,
             // license_old: rom[0x14b],
             // sgb: rom[0x146] == 0x03,
-            mbc: MbcType::new(hw, rom[0x147], rom),
+            mbc: MbcType::new( rom[0x147], rom, hw),
             // rom_size: rom[0x148],
             // ram_size: rom[0x149],
             // dstcode: rom[0x14a],
@@ -648,8 +635,8 @@ impl<'a> Cartridge<'a> {
         self.mbc.on_read(addr)
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
-        self.mbc.on_write(addr, value)
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
+        self.mbc.on_write(addr, value,hw)
     }
 }
 
@@ -659,8 +646,8 @@ pub struct Mbc<'a> {
 }
 
 impl<'a> Mbc<'a> {
-    pub fn new(hw: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
-        let cartridge = Cartridge::new(hw, rom);
+    pub fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
+        let cartridge = Cartridge::new( rom, hw);
 
         Self {
             cartridge,
@@ -690,7 +677,7 @@ impl<'a> IoHandler for Mbc<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq, hw: &mut impl Hardware) -> MemWrite {
         if self.use_boot_rom && addr < 0x100 {
             unreachable!("Writing to boot ROM")
         } else if addr == 0xff50 {
@@ -698,7 +685,7 @@ impl<'a> IoHandler for Mbc<'a> {
             self.use_boot_rom = false;
             MemWrite::Block
         } else {
-            self.cartridge.on_write(addr, value)
+            self.cartridge.on_write(addr, value, hw)
         }
     }
 }
