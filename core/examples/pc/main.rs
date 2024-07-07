@@ -3,7 +3,7 @@ mod hardware;
 use crate::hardware::Hardware;
 
 use log::*;
-use rgy::{Config, VRAM_WIDTH};
+use rgy::{sound::MixerStream, Config, VRAM_WIDTH};
 use std::{
     fs::File,
     io::Read,
@@ -69,8 +69,10 @@ fn main() {
 
     env_logger::init();
 
-    let hw = Hardware::new(opt.ram.clone());
+    let mixer_stream = Arc::new(Mutex::new(MixerStream::default()));
+    let hw = Hardware::new(opt.ram.clone(), mixer_stream.clone());
     let vram = hw.vram.clone();
+
     let hw1 = hw.clone();
 
     std::thread::spawn(move || {
@@ -78,19 +80,25 @@ fn main() {
 
         set_affinity();
 
-        run(hw, &rom, to_cfg(opt), vram);
+        run(hw, &rom, to_cfg(opt), vram, mixer_stream);
     });
 
     hw.run();
 }
 
-fn run<H: rgy::Hardware + 'static>(hw: H, rom: &[u8], cfg: Config, vram: Arc<Mutex<Vec<u32>>>) {
+fn run<H: rgy::Hardware + 'static>(
+    hw: H,
+    rom: &[u8],
+    cfg: Config,
+    vram: Arc<Mutex<Vec<u32>>>,
+    mixer_stream: Arc<Mutex<MixerStream>>,
+) {
     let state0 = rgy::system::get_stack_state0(hw);
     let state1 = rgy::system::get_stack_state1(&state0, rom);
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
     let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
-    while let Some(poll_state) = sys.poll() {
+    while let Some(poll_state) = sys.poll(&mut mixer_stream.lock().unwrap()) {
         if let Some((line, buf)) = poll_state.line_to_draw {
             let mut vram = vram.lock().unwrap();
             let base = line as usize * VRAM_WIDTH;

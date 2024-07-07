@@ -11,10 +11,6 @@ impl rgy::Hardware for Hardware {
         false
     }
 
-    fn sound_play(&mut self, _stream: MixerStream) {
-        // Play the wave provided `Stream`.
-    }
-
     fn clock(&mut self) -> u64 {
         // Return the epoch in microseconds.
         let epoch = std::time::SystemTime::now()
@@ -61,7 +57,9 @@ fn main() {
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
     let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
-    while let Some(poll_state) = sys.poll() {
+    let mut mixer_stream = MixerStream::default();
+
+    while let Some(poll_state) = sys.poll(&mut mixer_stream) {
         if let Some((line, buffer)) = poll_state.line_to_draw {
             let y = line as usize;
 

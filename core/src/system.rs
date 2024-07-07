@@ -273,7 +273,7 @@ impl<'a, 'b> System<'a, 'b> {
         }
     }
 
-    fn step(&mut self, mixer_stream: &'a mut MixerStream) -> PollState {
+    fn step(&mut self, mixer_stream: &mut MixerStream) -> PollState {
         let mut mmu = Mmu {
             inner: &mut self.mmu,
             mixer_stream,
@@ -305,7 +305,7 @@ impl<'a, 'b> System<'a, 'b> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self, mixer_stream: &'a mut MixerStream) -> Option<PollState> {
+    pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> Option<PollState> {
         if !self.hw.get().borrow_mut().sched() {
             return None;
         }

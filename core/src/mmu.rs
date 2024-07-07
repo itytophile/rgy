@@ -36,7 +36,7 @@ pub trait MemHandler {
 /// and to modify the memory access behaviour.
 pub struct Mmu<'a, 'b> {
     pub inner: &'b mut MmuWithoutMixerStream<'a>,
-    pub mixer_stream: &'a mut MixerStream,
+    pub mixer_stream: &'b mut MixerStream,
 }
 
 pub struct MmuWithoutMixerStream<'a> {
