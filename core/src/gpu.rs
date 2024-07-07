@@ -39,9 +39,7 @@ impl From<u8> for Mode {
     }
 }
 
-pub struct Gpu<'a> {
-    irq: Irq<'a>,
-
+pub struct Gpu {
     clocks: usize,
 
     lyc_interrupt: bool,
@@ -335,10 +333,9 @@ impl Hdma {
     }
 }
 
-impl<'a> Gpu<'a> {
-    pub fn new(irq: Irq<'a>) -> Self {
+impl Default for Gpu {
+    fn default() -> Self {
         Self {
-            irq,
             clocks: 0,
             lyc_interrupt: false,
             oam_interrupt: false,
@@ -384,7 +381,9 @@ impl<'a> Gpu<'a> {
             hdma: Hdma::new(),
         }
     }
+}
 
+impl Gpu {
     fn hdma_run(&mut self, mmu: &Mmu) {
         if let Some((dst, src, size)) = self.hdma.run() {
             for i in 0..size {
@@ -412,7 +411,7 @@ impl<'a> Gpu<'a> {
                     self.hdma_run(mmu);
 
                     if self.hblank_interrupt {
-                        self.irq.lcd(true);
+                        mmu.irq.lcd(true);
                     }
 
                     (0, Mode::HBlank)
@@ -426,16 +425,16 @@ impl<'a> Gpu<'a> {
 
                     // ly becomes 144 before vblank interrupt
                     if self.ly > 143 {
-                        self.irq.vblank(true);
+                        mmu.irq.vblank(true);
 
                         if self.vblank_interrupt {
-                            self.irq.lcd(true);
+                            mmu.irq.lcd(true);
                         }
 
                         (0, Mode::VBlank)
                     } else {
                         if self.oam_interrupt {
-                            self.irq.lcd(true);
+                            mmu.irq.lcd(true);
                         }
 
                         (0, Mode::OAM)
@@ -452,7 +451,7 @@ impl<'a> Gpu<'a> {
                         self.ly = 0;
 
                         if self.oam_interrupt {
-                            self.irq.lcd(true);
+                            mmu.irq.lcd(true);
                         }
 
                         (0, Mode::OAM)
@@ -467,7 +466,7 @@ impl<'a> Gpu<'a> {
         };
 
         if self.lyc_interrupt && self.lyc == self.ly {
-            self.irq.lcd(true);
+            mmu.irq.lcd(true);
         }
 
         self.clocks = clocks;
@@ -614,7 +613,7 @@ impl<'a> Gpu<'a> {
         Some((self.ly, buf))
     }
 
-    fn on_write_ctrl(&mut self, value: u8) {
+    fn on_write_ctrl(&mut self, value: u8, irq: &mut Irq) {
         let old_enable = self.enable;
 
         self.enable = value & 0x80 != 0;
@@ -630,11 +629,11 @@ impl<'a> Gpu<'a> {
             info!("LCD enabled");
             self.clocks = 0;
             self.mode = Mode::HBlank;
-            self.irq.vblank(false);
+            irq.vblank(false);
         } else if old_enable && !self.enable {
             info!("LCD disabled");
             self.mode = Mode::None;
-            self.irq.vblank(false);
+            irq.vblank(false);
         }
 
         debug!("Write ctrl: {:02x}", value);
@@ -770,8 +769,8 @@ impl<'a> Gpu<'a> {
     }
 }
 
-impl<'a> IoHandler for Gpu<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
+impl IoHandler for Gpu {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
         if (0x8000..=0x9fff).contains(&addr) {
             MemRead::Replace(self.read_vram(addr, self.vram_select))
         } else if addr == 0xff40 {
@@ -830,12 +829,12 @@ impl<'a> IoHandler for Gpu<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, irq: &mut Irq) -> MemWrite {
         trace!("Write GPU register: {:04x} {:02x}", addr, value);
         if (0x8000..=0x9fff).contains(&addr) {
             self.write_vram(addr, value, self.vram_select);
         } else if addr == 0xff40 {
-            self.on_write_ctrl(value);
+            self.on_write_ctrl(value, irq);
         } else if addr == 0xff41 {
             self.on_write_status(value);
         } else if addr == 0xff42 {

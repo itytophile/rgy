@@ -6,7 +6,7 @@ use crate::device::{Device, IoMemHandler};
 use crate::dma::Dma;
 use crate::gpu::Gpu;
 use crate::hardware::{Hardware, HardwareHandle};
-use crate::ic::{Ic, IcCells};
+use crate::ic::{Ic, Irq};
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::mmu::{Mmu, MmuWithoutMixerStream};
@@ -21,20 +21,20 @@ pub struct System<'a, 'b> {
     hw: HardwareHandle<'a>,
     cpu: Cpu,
     mmu: MmuWithoutMixerStream<'a>,
-    ic: Device<'a, Ic<'b>>,
-    gpu: Device<'a, Gpu<'b>>,
+    ic: Device<'a, Ic>,
+    gpu: Device<'a, Gpu>,
     joypad: Device<'a, Joypad<'b>>,
-    timer: Device<'a, Timer<'b>>,
+    timer: Device<'a, Timer>,
     serial: Device<'a, Serial<'b>>,
     dma: Device<'a, Dma>,
 }
 
 pub struct RawDevices<'a> {
     sound: RefCell<Sound>,
-    ic: RefCell<Ic<'a>>,
-    gpu: RefCell<Gpu<'a>>,
+    ic: RefCell<Ic>,
+    gpu: RefCell<Gpu>,
     joypad: RefCell<Joypad<'a>>,
-    timer: RefCell<Timer<'a>>,
+    timer: RefCell<Timer>,
     serial: RefCell<Serial<'a>>,
     mbc: RefCell<Mbc<'a>>,
     cgb: RefCell<Cgb>,
@@ -42,16 +42,14 @@ pub struct RawDevices<'a> {
 }
 
 impl<'a> RawDevices<'a> {
-    pub fn new(rom: &'a [u8], hw: HardwareHandle<'a>, ic_cells: &'a IcCells) -> Self {
-        let ic = Ic::new(ic_cells);
-        let irq = ic.irq();
+    pub fn new(rom: &'a [u8], hw: HardwareHandle<'a>) -> Self {
         Self {
             sound: RefCell::new(Sound::default()),
-            ic: RefCell::new(ic),
-            gpu: RefCell::new(Gpu::new(irq.clone())),
-            joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
-            timer: RefCell::new(Timer::new(irq.clone())),
-            serial: RefCell::new(Serial::new(hw.clone(), irq.clone())),
+            ic: RefCell::new(Default::default()),
+            gpu: RefCell::new(Default::default()),
+            joypad: RefCell::new(Joypad::new(hw.clone())),
+            timer: RefCell::new(Default::default()),
+            serial: RefCell::new(Serial::new(hw.clone())),
             mbc: RefCell::new(Mbc::new(hw.clone(), rom)),
             cgb: RefCell::new(Cgb::new()),
             dma: RefCell::new(Dma::new()),
@@ -62,10 +60,10 @@ impl<'a> RawDevices<'a> {
 #[derive(Clone)]
 pub struct Devices<'a, 'b> {
     sound: Device<'a, Sound>,
-    ic: Device<'a, Ic<'b>>,
-    gpu: Device<'a, Gpu<'b>>,
+    ic: Device<'a, Ic>,
+    gpu: Device<'a, Gpu>,
     joypad: Device<'a, Joypad<'b>>,
-    timer: Device<'a, Timer<'b>>,
+    timer: Device<'a, Timer>,
     serial: Device<'a, Serial<'b>>,
     mbc: Device<'a, Mbc<'b>>,
     cgb: Device<'a, Cgb>,
@@ -99,10 +97,10 @@ impl<'a, 'b> Devices<'a, 'b> {
 
 pub struct Handlers<'a, 'b> {
     sound: IoMemHandler<'a, Sound>,
-    ic: IoMemHandler<'a, Ic<'b>>,
-    gpu: IoMemHandler<'a, Gpu<'b>>,
+    ic: IoMemHandler<'a, Ic>,
+    gpu: IoMemHandler<'a, Gpu>,
     joypad: IoMemHandler<'a, Joypad<'b>>,
-    timer: IoMemHandler<'a, Timer<'b>>,
+    timer: IoMemHandler<'a, Timer>,
     serial: IoMemHandler<'a, Serial<'b>>,
     mbc: IoMemHandler<'a, Mbc<'b>>,
     cgb: IoMemHandler<'a, Cgb>,
@@ -208,10 +206,11 @@ impl<'a, 'b> System<'a, 'b> {
         }
     }
 
-    fn step(&mut self, mixer_stream: &mut MixerStream) -> PollState {
+    fn step(&mut self, mixer_stream: &mut MixerStream, irq: &mut Irq) -> PollState {
         let mut mmu = Mmu {
             inner: &mut self.mmu,
             mixer_stream,
+            irq,
         };
         let mut time = self.cpu.execute(&mut mmu);
 
@@ -219,9 +218,9 @@ impl<'a, 'b> System<'a, 'b> {
 
         self.dma.borrow_mut().step(&mut mmu);
         let line_to_draw = self.gpu.borrow_mut().step(time, &mut mmu);
-        self.timer.borrow_mut().step(time);
-        self.serial.borrow_mut().step(time);
-        self.joypad.borrow_mut().poll();
+        self.timer.borrow_mut().step(time, irq);
+        self.serial.borrow_mut().step(time, irq);
+        self.joypad.borrow_mut().poll(irq);
 
         PollState { line_to_draw }
     }
@@ -229,12 +228,12 @@ impl<'a, 'b> System<'a, 'b> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> Option<PollState> {
+    pub fn poll(&mut self, mixer_stream: &mut MixerStream, irq: &mut Irq) -> Option<PollState> {
         if !self.hw.get().borrow_mut().sched() {
             return None;
         }
 
-        Some(self.step(mixer_stream))
+        Some(self.step(mixer_stream, irq))
     }
 }
 
@@ -244,13 +243,11 @@ pub struct PollState {
 
 pub struct StackState0<H> {
     pub hw_cell: RefCell<H>,
-    pub ic_cells: IcCells,
 }
 
 pub fn get_stack_state0<H: Hardware + 'static>(hw: H) -> StackState0<H> {
     StackState0 {
         hw_cell: RefCell::new(hw),
-        ic_cells: IcCells::default(),
     }
 }
 
@@ -266,6 +263,6 @@ where
     let hw_handle = HardwareHandle::new(&state0.hw_cell);
     StackState1 {
         hw_handle: hw_handle.clone(),
-        raw_devices: RawDevices::new(rom, hw_handle, &state0.ic_cells),
+        raw_devices: RawDevices::new(rom, hw_handle),
     }
 }

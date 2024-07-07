@@ -100,7 +100,7 @@ impl Cpu {
             if self.halt {
                 // If HALT is executed while interrupt is disabled,
                 // the interrupt wakes up CPU without being consumed.
-                if let Some(value) = ic.borrow_mut().peek() {
+                if let Some(value) = ic.borrow_mut().peek(mmu.irq) {
                     debug!("Interrupted on halt + ime=0: {:02x}", value);
                     self.halt = false;
                 }
@@ -108,7 +108,7 @@ impl Cpu {
 
             0
         } else {
-            let value = match ic.borrow_mut().poll() {
+            let value = match ic.borrow_mut().poll(mmu.irq) {
                 Some(value) => value,
                 None => return 0,
             };
@@ -357,7 +357,7 @@ impl Cpu {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{inst::decode, sound::MixerStream};
+    use crate::{ic::Irq, inst::decode, sound::MixerStream};
 
     fn write(mmu: &mut Mmu, m: &[u8]) {
         for (i, m) in m.iter().enumerate() {
@@ -377,10 +377,12 @@ mod test {
     fn op_00af() {
         let mut mixer_stream = MixerStream::default();
         let mut mmu = Default::default();
+        let mut irq = Irq::default();
         // xor a
         let mut mmu = Mmu {
             inner: &mut mmu,
             mixer_stream: &mut mixer_stream,
+            irq: &mut irq,
         };
         let mut cpu = Cpu::new();
 
@@ -397,9 +399,11 @@ mod test {
         // pop af
         let mut mixer_stream = MixerStream::default();
         let mut mmu = Default::default();
+        let mut irq = Irq::default();
         let mut mmu = Mmu {
             inner: &mut mmu,
             mixer_stream: &mut mixer_stream,
+            irq: &mut irq,
         };
         let mut cpu = Cpu::new();
 

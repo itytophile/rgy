@@ -1,4 +1,5 @@
 use crate::device::IoHandler;
+use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
 use crate::sound::MixerStream;
 use log::*;
@@ -29,7 +30,7 @@ impl Dma {
 }
 
 impl IoHandler for Dma {
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
         assert_eq!(addr, 0xff46);
         debug!("Start DMA transfer: {:02x}", self.src);
         self.on = true;
@@ -37,7 +38,7 @@ impl IoHandler for Dma {
         MemWrite::Block
     }
 
-    fn on_read(&mut self, _addr: u16, _: &MixerStream) -> MemRead {
+    fn on_read(&mut self, _addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
         MemRead::Replace(0)
     }
 }

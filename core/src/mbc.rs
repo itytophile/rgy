@@ -1,5 +1,6 @@
 use crate::device::IoHandler;
 use crate::hardware::HardwareHandle;
+use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
 use log::*;
@@ -681,7 +682,7 @@ impl<'a> Mbc<'a> {
 }
 
 impl<'a> IoHandler for Mbc<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
         if self.use_boot_rom && self.in_boot_rom(addr) {
             MemRead::Replace(BOOT_ROM[addr as usize])
         } else {
@@ -689,7 +690,7 @@ impl<'a> IoHandler for Mbc<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
         if self.use_boot_rom && addr < 0x100 {
             unreachable!("Writing to boot ROM")
         } else if addr == 0xff50 {

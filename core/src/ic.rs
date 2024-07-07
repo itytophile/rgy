@@ -1,37 +1,32 @@
 use crate::device::IoHandler;
 use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
-use core::cell::RefCell;
 use log::*;
 
-#[derive(Clone)]
-pub struct Irq<'a> {
-    request: &'a RefCell<Ints>,
+#[derive(Default)]
+pub struct Irq {
+    request: Ints,
 }
 
-impl<'a> Irq<'a> {
-    fn new(request: &'a RefCell<Ints>) -> Self {
-        Irq { request }
+impl Irq {
+    pub fn vblank(&mut self, v: bool) {
+        self.request.vblank = v;
     }
 
-    pub fn vblank(&self, v: bool) {
-        self.request.borrow_mut().vblank = v;
+    pub fn lcd(&mut self, v: bool) {
+        self.request.lcd = v;
     }
 
-    pub fn lcd(&self, v: bool) {
-        self.request.borrow_mut().lcd = v;
+    pub fn timer(&mut self, v: bool) {
+        self.request.timer = v;
     }
 
-    pub fn timer(&self, v: bool) {
-        self.request.borrow_mut().timer = v;
+    pub fn serial(&mut self, v: bool) {
+        self.request.serial = v;
     }
 
-    pub fn serial(&self, v: bool) {
-        self.request.borrow_mut().serial = v;
-    }
-
-    pub fn joypad(&self, v: bool) {
-        self.request.borrow_mut().joypad = v;
+    pub fn joypad(&mut self, v: bool) {
+        self.request.joypad = v;
     }
 }
 
@@ -64,63 +59,35 @@ impl Ints {
     }
 }
 
-pub struct Ic<'a> {
-    enable: &'a RefCell<Ints>,
-    request: &'a RefCell<Ints>,
+#[derive(Default)]
+pub struct Ic {
+    enable: Ints,
 }
 
-pub struct IcCells {
-    enable: RefCell<Ints>,
-    request: RefCell<Ints>,
-}
-
-impl Default for IcCells {
-    fn default() -> Self {
-        Self {
-            enable: RefCell::new(Ints::default()),
-            request: RefCell::new(Ints::default()),
-        }
-    }
-}
-
-impl<'a> Ic<'a> {
-    pub fn new(cells: &'a IcCells) -> Ic<'a> {
-        Ic {
-            enable: &cells.enable,
-            request: &cells.request,
-        }
+impl Ic {
+    pub fn peek(&self, irq: &mut Irq) -> Option<u8> {
+        self.check(false, irq)
     }
 
-    pub fn irq(&self) -> Irq<'a> {
-        Irq::new(self.request)
+    pub fn poll(&self, irq: &mut Irq) -> Option<u8> {
+        self.check(true, irq)
     }
 
-    pub fn peek(&self) -> Option<u8> {
-        self.check(false)
-    }
-
-    pub fn poll(&self) -> Option<u8> {
-        self.check(true)
-    }
-
-    fn check(&self, consume: bool) -> Option<u8> {
-        let e = self.enable.borrow();
-        let mut r = self.request.borrow_mut();
-
-        if e.vblank && r.vblank {
-            r.vblank = !consume;
+    fn check(&self, consume: bool, irq: &mut Irq) -> Option<u8> {
+        if self.enable.vblank && irq.request.vblank {
+            irq.request.vblank = !consume;
             Some(0x40)
-        } else if e.lcd && r.lcd {
-            r.lcd = !consume;
+        } else if self.enable.lcd && irq.request.lcd {
+            irq.request.lcd = !consume;
             Some(0x48)
-        } else if e.timer && r.timer {
-            r.timer = !consume;
+        } else if self.enable.timer && irq.request.timer {
+            irq.request.timer = !consume;
             Some(0x50)
-        } else if e.serial && r.serial {
-            r.serial = !consume;
+        } else if self.enable.serial && irq.request.serial {
+            irq.request.serial = !consume;
             Some(0x58)
-        } else if e.joypad && r.joypad {
-            r.joypad = !consume;
+        } else if self.enable.joypad && irq.request.joypad {
+            irq.request.joypad = !consume;
             Some(0x60)
         } else {
             None
@@ -128,14 +95,14 @@ impl<'a> Ic<'a> {
     }
 }
 
-impl<'a> IoHandler for Ic<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
+impl IoHandler for Ic {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, irq: &Irq) -> MemRead {
         if addr == 0xffff {
-            let v = self.enable.borrow().get();
+            let v = self.enable.get();
             info!("Read interrupt enable: {:02x}", v);
             MemRead::Replace(v)
         } else if addr == 0xff0f {
-            let v = self.request.borrow().get();
+            let v = irq.request.get();
             info!("Read interrupt: {:02x}", v);
             MemRead::Replace(v)
         } else {
@@ -143,14 +110,14 @@ impl<'a> IoHandler for Ic<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, irq: &mut Irq) -> MemWrite {
         if addr == 0xffff {
             info!("Write interrupt enable: {:02x}", value);
-            self.enable.borrow_mut().set(value);
+            self.enable.set(value);
             MemWrite::Block
         } else if addr == 0xff0f {
             info!("Write interrupt: {:02x}", value);
-            self.request.borrow_mut().set(value);
+            irq.request.set(value);
             MemWrite::Block
         } else {
             info!("Writing to IC register: {:04x}", addr);

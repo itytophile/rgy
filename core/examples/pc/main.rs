@@ -64,8 +64,9 @@ fn run<H: rgy::Hardware + 'static>(
     let mut sys = rgy::System::new(state1.hw_handle, devices.clone(), &handlers);
 
     let mut lock = None;
+    let mut irq = Default::default();
 
-    while let Some(poll_state) = sys.poll(&mut mixer_stream.lock().unwrap()) {
+    while let Some(poll_state) = sys.poll(&mut mixer_stream.lock().unwrap(), &mut irq) {
         if let Some((line, buf)) = poll_state.line_to_draw {
             let mut vram = lock.unwrap_or_else(|| vram.lock().unwrap());
             let base = line as usize * VRAM_WIDTH;

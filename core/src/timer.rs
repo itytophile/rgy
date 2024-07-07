@@ -4,8 +4,8 @@ use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
 use log::*;
 
-pub struct Timer<'a> {
-    irq: Irq<'a>,
+#[derive(Default)]
+pub struct Timer {
     div: u8,
     div_clocks: usize,
     tim: u8,
@@ -14,19 +14,7 @@ pub struct Timer<'a> {
     ctrl: u8,
 }
 
-impl<'a> Timer<'a> {
-    pub fn new(irq: Irq<'a>) -> Self {
-        Self {
-            irq,
-            div: 0,
-            div_clocks: 0,
-            tim: 0,
-            tim_clocks: 0,
-            tim_load: 0,
-            ctrl: 0,
-        }
-    }
-
+impl Timer {
     fn tim_clock_reset(&mut self) {
         self.tim_clocks = match self.ctrl & 0x3 {
             0x0 => 1024, // 4096Hz = 1024 cpu clocks
@@ -41,7 +29,7 @@ impl<'a> Timer<'a> {
         self.div_clocks = 256; // 16384Hz = 256 cpu clocks
     }
 
-    pub fn step(&mut self, time: usize) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq) {
         if self.div_clocks < time {
             self.div = self.div.wrapping_add(1);
             let rem = time - self.div_clocks;
@@ -63,7 +51,7 @@ impl<'a> Timer<'a> {
                 self.tim = tim;
                 if of {
                     self.tim = self.tim_load;
-                    self.irq.timer(true);
+                    irq.timer(true);
                 }
                 self.tim_clock_reset();
                 if rem <= self.tim_clocks {
@@ -78,8 +66,8 @@ impl<'a> Timer<'a> {
     }
 }
 
-impl<'a> IoHandler for Timer<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
+impl IoHandler for Timer {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
         info!("Timer read: {:04x}", addr);
         match addr {
             0xff04 => MemRead::Replace(self.div),
@@ -90,7 +78,7 @@ impl<'a> IoHandler for Timer<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
         info!("Timer write: {:04x} {:02x}", addr, value);
         match addr {
             0xff04 => self.div = 0,

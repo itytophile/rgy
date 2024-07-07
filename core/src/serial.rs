@@ -7,7 +7,6 @@ use log::*;
 
 pub struct Serial<'a> {
     hw: HardwareHandle<'a>,
-    irq: Irq<'a>,
     data: u8,
     recv: u8,
     ctrl: u8,
@@ -15,10 +14,9 @@ pub struct Serial<'a> {
 }
 
 impl<'a> Serial<'a> {
-    pub fn new(hw: HardwareHandle<'a>, irq: Irq<'a>) -> Self {
+    pub fn new(hw: HardwareHandle<'a>) -> Self {
         Self {
             hw,
-            irq,
             data: 0,
             recv: 0,
             ctrl: 0,
@@ -26,7 +24,7 @@ impl<'a> Serial<'a> {
         }
     }
 
-    pub fn step(&mut self, time: usize) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq) {
         if self.ctrl & 0x80 == 0 {
             // No transfer
             return;
@@ -39,7 +37,7 @@ impl<'a> Serial<'a> {
 
                 // End of transfer
                 self.ctrl &= !0x80;
-                self.irq.serial(true);
+                irq.serial(true);
             } else {
                 self.clock -= time;
             }
@@ -49,13 +47,13 @@ impl<'a> Serial<'a> {
 
             // End of transfer
             self.ctrl &= !0x80;
-            self.irq.serial(true);
+            irq.serial(true);
         }
     }
 }
 
 impl<'a> IoHandler for Serial<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
         if addr == 0xff01 {
             MemRead::Replace(self.data)
         } else if addr == 0xff02 {
@@ -65,7 +63,7 @@ impl<'a> IoHandler for Serial<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
         if addr == 0xff01 {
             self.data = value;
             MemWrite::Block

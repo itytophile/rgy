@@ -7,28 +7,26 @@ use log::*;
 
 pub struct Joypad<'a> {
     hw: HardwareHandle<'a>,
-    irq: Irq<'a>,
     select: u8,
     pressed: u8,
 }
 
 impl<'a> Joypad<'a> {
-    pub fn new(hw: HardwareHandle<'a>, irq: Irq<'a>) -> Self {
+    pub fn new(hw: HardwareHandle<'a>) -> Self {
         Self {
             hw,
-            irq,
             select: 0xff,
             pressed: 0x0f,
         }
     }
 
-    pub fn poll(&mut self) {
+    pub fn poll(&mut self, irq: &mut Irq) {
         let pressed = self.check();
 
         for i in 0..4 {
             let bit = 1 << i;
             if self.pressed & bit != 0 && pressed & bit == 0 {
-                self.irq.joypad(true);
+                irq.joypad(true);
                 break;
             }
         }
@@ -60,7 +58,7 @@ impl<'a> Joypad<'a> {
 }
 
 impl<'a> IoHandler for Joypad<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
         if addr == 0xff00 {
             debug!("Joypad read: dir: {:02x}", self.select);
 
@@ -70,7 +68,7 @@ impl<'a> IoHandler for Joypad<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq) -> MemWrite {
         if addr == 0xff00 {
             self.select = value & 0xf0;
         }

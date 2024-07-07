@@ -53,8 +53,9 @@ fn main() {
     let handlers = rgy::system::Handlers::new(devices.clone());
     let mut sys = rgy::System::new(state1.hw_handle, devices.clone(), &handlers);
     let mut mixer_stream = MixerStream::default();
+    let mut irq = Default::default();
 
-    while let Some(poll_state) = sys.poll(&mut mixer_stream) {
+    while let Some(poll_state) = sys.poll(&mut mixer_stream, &mut irq) {
         if let Some((line, buffer)) = poll_state.line_to_draw {
             let y = line as usize;
 

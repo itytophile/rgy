@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 
-use crate::sound::MixerStream;
+use crate::{ic::Irq, sound::MixerStream};
 
 /// The variants to control memory read access from the CPU.
 pub enum MemRead {
@@ -23,10 +23,16 @@ pub enum MemWrite {
 /// The handler to intercept memory access from the CPU.
 pub trait MemHandler {
     /// The function is called when the CPU attempts to read from the memory.
-    fn on_read(&self, addr: u16, mixer_stream: &MixerStream) -> MemRead;
+    fn on_read(&self, addr: u16, mixer_stream: &MixerStream, irq: &Irq) -> MemRead;
 
     /// The function is called when the CPU attempts to write to the memory.
-    fn on_write(&self, addr: u16, value: u8, mixer_stream: &mut MixerStream) -> MemWrite;
+    fn on_write(
+        &self,
+        addr: u16,
+        value: u8,
+        mixer_stream: &mut MixerStream,
+        irq: &mut Irq,
+    ) -> MemWrite;
 }
 
 /// The memory management unit (MMU)
@@ -37,6 +43,7 @@ pub trait MemHandler {
 pub struct Mmu<'a, 'b> {
     pub inner: &'b mut MmuWithoutMixerStream<'a>,
     pub mixer_stream: &'b mut MixerStream,
+    pub irq: &'b mut Irq,
 }
 
 pub struct MmuWithoutMixerStream<'a> {
@@ -77,7 +84,7 @@ impl<'a, 'b> Mmu<'a, 'b> {
     /// Reads one byte from the given address in the memory.
     pub fn get8(&self, addr: u16) -> u8 {
         if let Some(handler) = get_handler_from_address(&self.inner.handlers, addr) {
-            match handler.on_read(addr, self.mixer_stream) {
+            match handler.on_read(addr, self.mixer_stream, self.irq) {
                 MemRead::Replace(alt) => return alt,
                 MemRead::PassThrough => {}
             }
@@ -93,7 +100,7 @@ impl<'a, 'b> Mmu<'a, 'b> {
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
         if let Some(handler) = get_handler_from_address(&self.inner.handlers, addr) {
-            match handler.on_write(addr, v, self.mixer_stream) {
+            match handler.on_write(addr, v, self.mixer_stream, self.irq) {
                 MemWrite::Replace(alt) => {
                     self.inner.ram[addr as usize] = alt;
                     return;
