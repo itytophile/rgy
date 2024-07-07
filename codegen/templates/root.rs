@@ -2,25 +2,12 @@
 
 use crate::cpu::Cpu;
 use crate::mmu::Mmu;
-use crate::alu;
-use hashbrown::HashMap;
-use lazy_static::lazy_static;
-use log::*;
-
-lazy_static! {
-    static ref MNEMONICS: HashMap<u16, &'static str> = {
-        let mut m = HashMap::new();
-        {%- for i in insts -%}
-        m.insert(0x{{i.code|hex}}, "{{i.operator}} {{i.operands|join(sep=",")}}");
-        {%- endfor -%}
-        m
-    };
-}
+use crate::{alu, Hardware};
 
 {% for i in insts %}
 /// {{i.operator}} {{i.operands | join(sep=",")}}
 #[allow(unused_variables)]
-fn op_{{i.code | hex}}(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
+fn op_{{i.code | hex}}(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu<impl Hardware>) -> (usize, usize) {
     {%- if i.operator == "nop" -%}
 
     {{ macros::nop(i=i) }}
@@ -201,15 +188,8 @@ fn op_{{i.code | hex}}(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize)
 }
 {% endfor %}
 
-/// Return the mnemonic string for the given opcode.
-pub fn mnem(code: u16) -> &'static str {
-    MNEMONICS.get(&code).unwrap_or(&"(unknown opcode)")
-}
-
 /// Decodes the opecode and actually executes one instruction.
-pub fn decode(code: u16, arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
-    trace!("{:04x}: {:04x}: {}", cpu.get_pc(), code, mnem(code));
-
+pub fn decode(code: u16, arg: u16, cpu: &mut Cpu, mmu: &mut Mmu<impl Hardware>) -> (usize, usize) {
     match code {
         {%- for i in insts -%}
         0x{{i.code | hex}} => op_{{i.code | hex}}(arg, cpu, mmu),

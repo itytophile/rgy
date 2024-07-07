@@ -56,21 +56,19 @@ fn main() {
 }
 
 fn run<H: rgy::Hardware + 'static>(
-    hw: H,
+    mut hw: H,
     rom: &[u8],
     vram: Arc<Mutex<Vec<u32>>>,
     mixer_stream: Arc<Mutex<MixerStream>>,
     escape: Arc<AtomicBool>,
 ) {
-    let state0 = rgy::system::get_stack_state0(hw);
-    let state1 = rgy::system::get_stack_state1(&state0);
-    let mut sys = rgy::System::new(state1.hw_handle, rom);
+    let mut sys = rgy::System::new(rom, &mut hw);
 
     let mut lock = None;
     let mut irq = Default::default();
 
     while !escape.load(Ordering::Relaxed) {
-        let poll_state = sys.poll(&mut mixer_stream.lock().unwrap(), &mut irq);
+        let poll_state = sys.poll(&mut mixer_stream.lock().unwrap(), &mut irq, &mut hw);
         if let Some((line, buf)) = poll_state.line_to_draw {
             let mut vram = lock.unwrap_or_else(|| vram.lock().unwrap());
             let base = line as usize * VRAM_WIDTH;

@@ -683,7 +683,13 @@ pub struct Sound {
 }
 
 impl IoHandler for Sound {
-    fn on_read(&mut self, addr: u16, mixer_stream: &MixerStream, _: &Irq) -> MemRead {
+    fn on_read(
+        &mut self,
+        addr: u16,
+        mixer_stream: &MixerStream,
+        _: &Irq,
+        _: &mut impl Hardware,
+    ) -> MemRead {
         if (0xff10..=0xff14).contains(&addr) {
             self.tone1.on_read(0xff10, addr)
         } else if (0xff15..=0xff19).contains(&addr) {
@@ -705,7 +711,7 @@ impl IoHandler for Sound {
         value: u8,
         mixer_stream: &mut MixerStream,
         _: &mut Irq,
-        _: &mut impl Hardware
+        _: &mut impl Hardware,
     ) -> MemWrite {
         if (0xff10..=0xff14).contains(&addr) {
             if self.tone1.on_write(0xff10, addr, value) {

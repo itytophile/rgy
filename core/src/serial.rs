@@ -1,23 +1,20 @@
 use crate::device::IoHandler;
-use crate::hardware::HardwareHandle;
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
 
-pub struct Serial<'a> {
-    hw: HardwareHandle<'a>,
+pub struct Serial {
     data: u8,
     recv: u8,
     ctrl: u8,
     clock: usize,
 }
 
-impl<'a> Serial<'a> {
-    pub fn new(hw: HardwareHandle<'a>) -> Self {
+impl Serial {
+    pub fn new() -> Self {
         Self {
-            hw,
             data: 0,
             recv: 0,
             ctrl: 0,
@@ -25,7 +22,7 @@ impl<'a> Serial<'a> {
         }
     }
 
-    pub fn step(&mut self, time: usize, irq: &mut Irq) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq, hw: &mut impl Hardware) {
         if self.ctrl & 0x80 == 0 {
             // No transfer
             return;
@@ -42,8 +39,8 @@ impl<'a> Serial<'a> {
             } else {
                 self.clock -= time;
             }
-        } else if let Some(data) = self.hw.get().borrow_mut().recv_byte() {
-            self.hw.get().borrow_mut().send_byte(self.data);
+        } else if let Some(data) = hw.recv_byte() {
+            hw.send_byte(self.data);
             self.data = data;
 
             // End of transfer
@@ -53,8 +50,8 @@ impl<'a> Serial<'a> {
     }
 }
 
-impl<'a> IoHandler for Serial<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
+impl IoHandler for Serial {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if addr == 0xff01 {
             MemRead::Replace(self.data)
         } else if addr == 0xff02 {
@@ -64,7 +61,14 @@ impl<'a> IoHandler for Serial<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq, _: &mut impl Hardware) -> MemWrite {
+    fn on_write(
+        &mut self,
+        addr: u16,
+        value: u8,
+        _: &mut MixerStream,
+        _: &mut Irq,
+        hw: &mut impl Hardware,
+    ) -> MemWrite {
         if addr == 0xff01 {
             self.data = value;
             MemWrite::Block
@@ -79,8 +83,8 @@ impl<'a> IoHandler for Serial<'a> {
                     self.clock = 512 * 8;
 
                     // Do transfer one byte at once
-                    self.hw.get().borrow_mut().send_byte(self.data);
-                    self.recv = self.hw.get().borrow_mut().recv_byte().unwrap_or(0xff);
+                    hw.send_byte(self.data);
+                    self.recv = hw.recv_byte().unwrap_or(0xff);
                 } else {
                     debug!("Serial transfer (External): {:02x}", self.data);
                 }

@@ -1,5 +1,3 @@
-use core::cell::RefCell;
-
 /// The width of the VRAM.
 pub const VRAM_WIDTH: usize = 160;
 
@@ -32,19 +30,6 @@ pub trait Stream {
     /// The argument takes the sample rate, and the return value indicates the amplitude,
     /// whose max value is determined by [`Stream::max`][].
     fn next(&mut self, rate: u32) -> u16;
-}
-
-#[derive(Clone)]
-pub struct HardwareHandle<'a>(&'a RefCell<dyn Hardware>);
-
-impl<'a> HardwareHandle<'a> {
-    pub fn new(inner: &'a RefCell<dyn Hardware>) -> Self {
-        Self(inner)
-    }
-
-    pub fn get(&self) -> &'a RefCell<dyn Hardware> {
-        self.0
-    }
 }
 
 /// The interface to abstracts the OS-specific functions.

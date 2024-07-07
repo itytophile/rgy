@@ -97,7 +97,7 @@ impl Ic {
 }
 
 impl IoHandler for Ic {
-    fn on_read(&mut self, addr: u16, _: &MixerStream, irq: &Irq) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, irq: &Irq, _: &mut impl Hardware) -> MemRead {
         if addr == 0xffff {
             let v = self.enable.get();
             info!("Read interrupt enable: {:02x}", v);
@@ -111,7 +111,14 @@ impl IoHandler for Ic {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, irq: &mut Irq, _: &mut impl Hardware) -> MemWrite {
+    fn on_write(
+        &mut self,
+        addr: u16,
+        value: u8,
+        _: &mut MixerStream,
+        irq: &mut Irq,
+        _: &mut impl Hardware,
+    ) -> MemWrite {
         if addr == 0xffff {
             info!("Write interrupt enable: {:02x}", value);
             self.enable.set(value);

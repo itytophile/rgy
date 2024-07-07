@@ -1,7 +1,5 @@
-use core::cell::RefCell;
-
 use crate::cpu::Cpu;
-use crate::hardware::{Hardware, HardwareHandle};
+use crate::hardware::Hardware;
 use crate::ic::Irq;
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
@@ -13,7 +11,6 @@ use log::*;
 
 /// Represents the entire emulator context.
 pub struct System<'a> {
-    pub hw: HardwareHandle<'a>,
     pub cpu: Cpu,
     pub handlers: MemHandlers<'a>,
     pub mmu: MmuWithoutMixerStream,
@@ -21,7 +18,7 @@ pub struct System<'a> {
 
 impl<'a> System<'a> {
     /// Create a new emulator context.
-    pub fn new(hw_handle: HardwareHandle<'a>, rom: &'a [u8]) -> Self {
+    pub fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         info!("Initializing...");
 
         let cpu = Cpu::new();
@@ -30,29 +27,34 @@ impl<'a> System<'a> {
         info!("Starting...");
 
         Self {
-            hw: hw_handle.clone(),
             cpu,
             mmu,
             handlers: MemHandlers {
                 ic: Default::default(),
                 gpu: Default::default(),
-                joypad: Joypad::new(hw_handle.clone()),
+                joypad: Joypad::new(),
                 timer: Default::default(),
-                serial: Serial::new(hw_handle.clone()),
+                serial: Serial::new(),
                 dma: Default::default(),
                 cgb: Default::default(),
-                mbc: Mbc::new(hw_handle, rom),
+                mbc: Mbc::new(rom, hw),
                 sound: Default::default(),
             },
         }
     }
 
-    fn step(&mut self, mixer_stream: &mut MixerStream, irq: &mut Irq) -> PollState {
+    fn step(
+        &mut self,
+        mixer_stream: &mut MixerStream,
+        irq: &mut Irq,
+        hw: &mut impl Hardware,
+    ) -> PollState {
         let mut mmu = Mmu {
             inner: &mut self.mmu,
             mixer_stream,
             irq,
             handlers: &mut self.handlers,
+            hw,
         };
         let mut time = self.cpu.execute(&mut mmu);
 
@@ -62,8 +64,8 @@ impl<'a> System<'a> {
 
         let line_to_draw = mmu.gpu_step(time);
         self.handlers.timer.step(time, irq);
-        self.handlers.serial.step(time, irq);
-        self.handlers.joypad.poll(irq);
+        self.handlers.serial.step(time, irq, hw);
+        self.handlers.joypad.poll(irq, hw);
 
         PollState { line_to_draw }
     }
@@ -71,35 +73,16 @@ impl<'a> System<'a> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self, mixer_stream: &mut MixerStream, irq: &mut Irq) -> PollState {
-        self.step(mixer_stream, irq)
+    pub fn poll(
+        &mut self,
+        mixer_stream: &mut MixerStream,
+        irq: &mut Irq,
+        hw: &mut impl Hardware,
+    ) -> PollState {
+        self.step(mixer_stream, irq, hw)
     }
 }
 
 pub struct PollState {
     pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
-}
-
-pub struct StackState0<H> {
-    pub hw_cell: RefCell<H>,
-}
-
-pub fn get_stack_state0<H: Hardware + 'static>(hw: H) -> StackState0<H> {
-    StackState0 {
-        hw_cell: RefCell::new(hw),
-    }
-}
-
-pub struct StackState1<'a> {
-    pub hw_handle: HardwareHandle<'a>,
-}
-
-pub fn get_stack_state1<H>(state0: &StackState0<H>) -> StackState1<'_>
-where
-    H: Hardware + 'static,
-{
-    let hw_handle = HardwareHandle::new(&state0.hw_cell);
-    StackState1 {
-        hw_handle: hw_handle.clone(),
-    }
 }

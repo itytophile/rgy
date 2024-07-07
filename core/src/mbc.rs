@@ -238,7 +238,6 @@ struct Mbc3<'a> {
     prelatch: bool,
 }
 
-
 impl<'a> Mbc3<'a> {
     fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         let mut s = Self {
@@ -535,17 +534,17 @@ impl<'a> MbcType<'a> {
     fn new(code: u8, rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         match code {
             0x00 => MbcType::None(MbcNone::new(rom)),
-            0x01..=0x03 => MbcType::Mbc1(Mbc1::new( rom)),
-            0x05 | 0x06 => MbcType::Mbc2(Mbc2::new( rom)),
+            0x01..=0x03 => MbcType::Mbc1(Mbc1::new(rom)),
+            0x05 | 0x06 => MbcType::Mbc2(Mbc2::new(rom)),
             0x08 | 0x09 => unimplemented!("ROM+RAM: {:02x}", code),
             0x0b..=0x0d => unimplemented!("MMM01: {:02x}", code),
-            0x0f..=0x13 => MbcType::Mbc3(Mbc3::new( rom, hw)),
+            0x0f..=0x13 => MbcType::Mbc3(Mbc3::new(rom, hw)),
             0x15..=0x17 => unimplemented!("Mbc4: {:02x}", code),
             0x19..=0x1e => {
                 #[cfg(not(feature = "mb5"))]
                 panic!("Provide the mb5 feature at build");
                 #[cfg(feature = "mb5")]
-                MbcType::Mbc5(Mbc5::new( rom))
+                MbcType::Mbc5(Mbc5::new(rom))
             }
             0xfc => unimplemented!("POCKET CAMERA"),
             0xfd => unimplemented!("BANDAI TAMAS"),
@@ -623,7 +622,7 @@ impl<'a> Cartridge<'a> {
             // cgb_only: rom[0x143] == 0xc0,
             // license_old: rom[0x14b],
             // sgb: rom[0x146] == 0x03,
-            mbc: MbcType::new( rom[0x147], rom, hw),
+            mbc: MbcType::new(rom[0x147], rom, hw),
             // rom_size: rom[0x148],
             // ram_size: rom[0x149],
             // dstcode: rom[0x14a],
@@ -636,7 +635,7 @@ impl<'a> Cartridge<'a> {
     }
 
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
-        self.mbc.on_write(addr, value,hw)
+        self.mbc.on_write(addr, value, hw)
     }
 }
 
@@ -647,7 +646,7 @@ pub struct Mbc<'a> {
 
 impl<'a> Mbc<'a> {
     pub fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
-        let cartridge = Cartridge::new( rom, hw);
+        let cartridge = Cartridge::new(rom, hw);
 
         Self {
             cartridge,
@@ -669,7 +668,7 @@ impl<'a> Mbc<'a> {
 }
 
 impl<'a> IoHandler for Mbc<'a> {
-    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if self.use_boot_rom && self.in_boot_rom(addr) {
             MemRead::Replace(BOOT_ROM[addr as usize])
         } else {
@@ -677,7 +676,14 @@ impl<'a> IoHandler for Mbc<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq, hw: &mut impl Hardware) -> MemWrite {
+    fn on_write(
+        &mut self,
+        addr: u16,
+        value: u8,
+        _: &mut MixerStream,
+        _: &mut Irq,
+        hw: &mut impl Hardware,
+    ) -> MemWrite {
         if self.use_boot_rom && addr < 0x100 {
             unreachable!("Writing to boot ROM")
         } else if addr == 0xff50 {

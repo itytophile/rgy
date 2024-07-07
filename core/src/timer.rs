@@ -68,7 +68,7 @@ impl Timer {
 }
 
 impl IoHandler for Timer {
-    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         info!("Timer read: {:04x}", addr);
         match addr {
             0xff04 => MemRead::Replace(self.div),
@@ -79,7 +79,14 @@ impl IoHandler for Timer {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq, _: &mut impl Hardware) -> MemWrite {
+    fn on_write(
+        &mut self,
+        addr: u16,
+        value: u8,
+        _: &mut MixerStream,
+        _: &mut Irq,
+        _: &mut impl Hardware,
+    ) -> MemWrite {
         info!("Timer write: {:04x} {:02x}", addr, value);
         match addr {
             0xff04 => self.div = 0,

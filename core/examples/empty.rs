@@ -35,20 +35,18 @@ fn main() {
     let mut display = vec![vec![0u32; VRAM_HEIGHT]; VRAM_WIDTH];
 
     // Create the hardware instance.
-    let hw = Hardware;
+    let mut hw = Hardware;
 
     // The content of a ROM file, which can be downloaded from the Internet.
     let rom = vec![0u8; 1024];
 
     // Run the emulator.
-    let state0 = rgy::system::get_stack_state0(hw);
-    let state1 = rgy::system::get_stack_state1(&state0);
-    let mut sys = rgy::System::new(state1.hw_handle, &rom);
+    let mut sys = rgy::System::new(&rom, &mut hw);
     let mut mixer_stream = MixerStream::default();
     let mut irq = Default::default();
 
     loop {
-        let poll_state = sys.poll(&mut mixer_stream, &mut irq);
+        let poll_state = sys.poll(&mut mixer_stream, &mut irq, &mut hw);
         if let Some((line, buffer)) = poll_state.line_to_draw {
             let y = line as usize;
 

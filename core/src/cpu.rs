@@ -355,12 +355,10 @@ impl Cpu {
 
 #[cfg(test)]
 mod test {
-    use core::cell::RefCell;
-
     use super::*;
     use crate::{
-        hardware::HardwareHandle, ic::Irq, inst::decode, joypad::Joypad, mbc::Mbc,
-        mmu::MemHandlers, serial::Serial, sound::MixerStream, Hardware, Key,
+        ic::Irq, inst::decode, joypad::Joypad, mbc::Mbc, mmu::MemHandlers, serial::Serial,
+        sound::MixerStream, Hardware, Key,
     };
 
     fn write(mmu: &mut Mmu<impl Hardware>, m: &[u8]) {
@@ -402,17 +400,17 @@ mod test {
         let mut mixer_stream = MixerStream::default();
         let mut mmu = Default::default();
         let mut irq = Irq::default();
-        let mut hw =EmptyHardware;
+        let mut hw = EmptyHardware;
 
         let mut handlers = MemHandlers {
             ic: Default::default(),
             gpu: Default::default(),
-            joypad: Joypad::new(hw_handle.clone()),
+            joypad: Joypad::new(),
             timer: Default::default(),
-            serial: Serial::new(hw_handle.clone()),
+            serial: Serial::new(),
             dma: Default::default(),
             cgb: Default::default(),
-            mbc: Mbc::new( &[], &mut hw),
+            mbc: Mbc::new(&[], &mut hw),
             sound: Default::default(),
         };
         // xor a
@@ -421,6 +419,7 @@ mod test {
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
             handlers: &mut handlers,
+            hw: &mut hw,
         };
         let mut cpu = Cpu::new();
 
@@ -444,12 +443,12 @@ mod test {
         let mut handlers = MemHandlers {
             ic: Default::default(),
             gpu: Default::default(),
-            joypad: Joypad::new(hw_handle.clone()),
+            joypad: Joypad::new(),
             timer: Default::default(),
-            serial: Serial::new(hw_handle.clone()),
+            serial: Serial::new(),
             dma: Default::default(),
             cgb: Default::default(),
-            mbc: Mbc::new( &[], &mut hw),
+            mbc: Mbc::new(&[], &mut hw),
             sound: Default::default(),
         };
 
@@ -458,7 +457,7 @@ mod test {
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
             handlers: &mut handlers,
-            hw: &mut hw
+            hw: &mut hw,
         };
         let mut cpu = Cpu::new();
 

@@ -2,7 +2,8 @@ use crate::{
     device::IoHandler,
     ic::Irq,
     mmu::{MemRead, MemWrite},
-    sound::MixerStream, Hardware,
+    sound::MixerStream,
+    Hardware,
 };
 use log::*;
 
@@ -39,7 +40,7 @@ impl Cgb {
 }
 
 impl IoHandler for Cgb {
-    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             MemRead::Replace(self.wram_bank[0][off])
@@ -61,7 +62,14 @@ impl IoHandler for Cgb {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream, _: &mut Irq, _: &mut impl Hardware) -> MemWrite {
+    fn on_write(
+        &mut self,
+        addr: u16,
+        value: u8,
+        _: &mut MixerStream,
+        _: &mut Irq,
+        _: &mut impl Hardware,
+    ) -> MemWrite {
         if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             self.wram_bank[0][off] = value;
