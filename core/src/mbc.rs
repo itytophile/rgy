@@ -1,9 +1,12 @@
 use crate::device::IoHandler;
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
+use crate::ram::Ram;
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
+
+// https://gbdev.io/pandocs/MBCs.html
 
 const BOOT_ROM: &[u8] = {
     #[cfg(feature = "color")]
@@ -46,7 +49,7 @@ impl<'a> MbcNone<'a> {
 
 struct Mbc1<'a> {
     rom: &'a [u8],
-    ram: [u8; 0x8000],
+    ram: Ram<0x8000>,
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -57,7 +60,7 @@ impl<'a> Mbc1<'a> {
     fn new(rom: &'a [u8]) -> Self {
         Self {
             rom,
-            ram: [0; 0x8000],
+            ram: Default::default(),
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,
@@ -106,7 +109,7 @@ impl<'a> Mbc1<'a> {
             } else {
                 info!("External RAM disabled");
                 self.ram_enable = false;
-                hw.save_ram(&self.ram);
+                hw.save_ram(self.ram.as_slice());
             }
             MemWrite::Block
         } else if (0x2000..=0x3fff).contains(&addr) {
@@ -147,7 +150,7 @@ impl<'a> Mbc1<'a> {
 
 struct Mbc2<'a> {
     rom: &'a [u8],
-    ram: [u8; 0x200],
+    ram: Ram<0x200>,
     rom_bank: usize,
     ram_enable: bool,
 }
@@ -156,7 +159,7 @@ impl<'a> Mbc2<'a> {
     fn new(rom: &'a [u8]) -> Self {
         Self {
             rom,
-            ram: [0; 0x200],
+            ram: Default::default(),
             rom_bank: 1,
             ram_enable: false,
         }
@@ -195,7 +198,7 @@ impl<'a> Mbc2<'a> {
                     value
                 );
                 if !self.ram_enable {
-                    hw.save_ram(&self.ram);
+                    hw.save_ram(self.ram.as_slice());
                 }
             }
             MemWrite::Block
@@ -225,7 +228,7 @@ impl<'a> Mbc2<'a> {
 
 struct Mbc3<'a> {
     rom: &'a [u8],
-    ram: [u8; 0x8000],
+    ram: Ram<0x8000>,
     rom_bank: usize,
     enable: bool,
     select: u8,
@@ -242,7 +245,7 @@ impl<'a> Mbc3<'a> {
     fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         let mut s = Self {
             rom,
-            ram: [0; 0x8000],
+            ram: Default::default(),
             rom_bank: 0,
             enable: false,
             select: 0,
@@ -259,7 +262,7 @@ impl<'a> Mbc3<'a> {
     }
 
     fn save(&mut self, hw: &mut impl Hardware) {
-        hw.save_ram(&self.ram);
+        hw.save_ram(self.ram.as_slice());
     }
 
     fn epoch(&self, hw: &mut impl Hardware) -> u64 {
@@ -424,7 +427,7 @@ impl<'a> Mbc3<'a> {
 #[cfg(feature = "mb5")]
 struct Mbc5<'a> {
     rom: &'a [u8],
-    ram: [u8; 0x20000],
+    ram: Ram<0x20000>,
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -435,7 +438,7 @@ impl<'a> Mbc5<'a> {
     fn new(rom: &'a [u8]) -> Self {
         Self {
             rom,
-            ram: [0; 0x20000],
+            ram: Default::default(),
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,
@@ -471,7 +474,7 @@ impl<'a> Mbc5<'a> {
             } else {
                 info!("External RAM disabled");
                 self.ram_enable = false;
-                hw.save_ram(&self.ram);
+                hw.save_ram(self.ram.as_slice());
             }
             MemWrite::Block
         } else if (0x2000..=0x2fff).contains(&addr) {
@@ -520,6 +523,7 @@ impl<'a> HuC1<'a> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum MbcType<'a> {
     None(MbcNone<'a>),
     Mbc1(Mbc1<'a>),

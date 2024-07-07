@@ -108,6 +108,7 @@ mod gpu;
 mod ic;
 mod joypad;
 mod mbc;
+mod ram;
 mod serial;
 pub mod sound;
 pub mod system;

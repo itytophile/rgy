@@ -6,6 +6,7 @@ use crate::{
     ic::{Ic, Irq},
     joypad::Joypad,
     mbc::Mbc,
+    ram::Ram,
     serial::Serial,
     sound::{MixerStream, Sound},
     timer::Timer,
@@ -43,14 +44,9 @@ pub struct Mmu<'a, 'b, H> {
     pub hw: &'b mut H,
 }
 
+#[derive(Default)]
 pub struct MmuWithoutMixerStream {
-    pub ram: [u8; 0x10000],
-}
-
-impl Default for MmuWithoutMixerStream {
-    fn default() -> Self {
-        Self { ram: [0; 0x10000] }
-    }
+    pub ram: Ram<0x10000>,
 }
 
 pub struct MemHandlers<'a> {

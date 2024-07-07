@@ -69,7 +69,6 @@ impl Timer {
 
 impl IoHandler for Timer {
     fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
-        info!("Timer read: {:04x}", addr);
         match addr {
             0xff04 => MemRead::Replace(self.div),
             0xff05 => MemRead::Replace(self.tim),

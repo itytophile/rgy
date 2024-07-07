@@ -37,7 +37,9 @@ pub fn load_rom<P: AsRef<Path>>(path: P) -> Vec<u8> {
 fn main() {
     let opt = Opt::from_args();
 
-    env_logger::init();
+    let env = env_logger::Env::default().default_filter_or("info");
+
+    env_logger::init_from_env(env);
 
     let mixer_stream = Arc::new(Mutex::new(MixerStream::default()));
     let escape = Arc::new(AtomicBool::new(false));
@@ -46,13 +48,14 @@ fn main() {
 
     let hw1 = hw.clone();
 
-    std::thread::spawn(move || {
+    let handle = std::thread::spawn(move || {
         let (rom, hw) = (load_rom(&opt.rom), hw1);
 
         run(hw, &rom, vram, mixer_stream, escape);
     });
 
     hw.run();
+    handle.join().unwrap();
 }
 
 fn run<H: rgy::Hardware + 'static>(
