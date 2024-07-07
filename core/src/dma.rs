@@ -6,8 +6,8 @@ use log::*;
 
 #[derive(Default)]
 pub struct Dma {
-    on: bool,
-    src: u8,
+    pub on: bool,
+    pub src: u8,
 }
 
 impl Dma {

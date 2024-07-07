@@ -7,7 +7,7 @@ use log::*;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
-enum Mode {
+pub enum Mode {
     OAM,
     VRAM,
     HBlank,
@@ -40,40 +40,40 @@ impl From<u8> for Mode {
 }
 
 pub struct Gpu {
-    clocks: usize,
+    pub clocks: usize,
 
-    lyc_interrupt: bool,
-    oam_interrupt: bool,
-    vblank_interrupt: bool,
-    hblank_interrupt: bool,
-    mode: Mode,
+    pub lyc_interrupt: bool,
+    pub oam_interrupt: bool,
+    pub vblank_interrupt: bool,
+    pub hblank_interrupt: bool,
+    pub mode: Mode,
 
-    ly: u8,
-    lyc: u8,
-    scy: u8,
-    scx: u8,
+    pub ly: u8,
+    pub lyc: u8,
+    pub scy: u8,
+    pub scx: u8,
 
-    wx: u8,
-    wy: u8,
+    pub wx: u8,
+    pub wy: u8,
 
-    enable: bool,
-    winmap: u16,
-    winenable: bool,
-    tiles: u16,
-    bgmap: u16,
-    spsize: u16,
-    spenable: bool,
-    bgenable: bool,
+    pub enable: bool,
+    pub winmap: u16,
+    pub winenable: bool,
+    pub tiles: u16,
+    pub bgmap: u16,
+    pub spsize: u16,
+    pub spenable: bool,
+    pub bgenable: bool,
 
-    bg_palette: [Color; 4],
-    obj_palette0: [Color; 4],
-    obj_palette1: [Color; 4],
-    bg_color_palette: ColorPalette,
-    obj_color_palette: ColorPalette,
-    vram: [[u8; 0x2000]; 2],
-    vram_select: usize,
+    pub bg_palette: [Color; 4],
+    pub obj_palette0: [Color; 4],
+    pub obj_palette1: [Color; 4],
+    pub bg_color_palette: ColorPalette,
+    pub obj_color_palette: ColorPalette,
+    pub vram: [[u8; 0x2000]; 2],
+    pub vram_select: usize,
 
-    hdma: Hdma,
+    pub hdma: Hdma,
 }
 
 fn to_palette(p: u8) -> [Color; 4] {
@@ -100,11 +100,11 @@ struct SpriteAttribute<'a> {
 }
 
 struct MapAttribute<'a> {
-    palette: &'a [Color],
-    vram_bank: usize,
-    xflip: bool,
-    yflip: bool,
-    priority: bool,
+    pub palette: &'a [Color],
+    pub vram_bank: usize,
+    pub xflip: bool,
+    pub yflip: bool,
+    pub priority: bool,
 }
 
 struct ColorPalette {
@@ -304,7 +304,7 @@ impl Hdma {
         }
     }
 
-    fn run(&mut self) -> Option<(u16, u16, u16)> {
+    pub fn run(&mut self) -> Option<(u16, u16, u16)> {
         if self.on {
             let size = if self.hblank {
                 0x10
@@ -384,7 +384,7 @@ impl Default for Gpu {
 }
 
 impl Gpu {
-    fn hdma_run(&mut self, mmu: &mut Mmu) {
+    pub fn hdma_run(&mut self, mmu: &mut Mmu) {
         if let Some((dst, src, size)) = self.hdma.run() {
             for i in 0..size {
                 self.write_vram(dst + i, mmu.get8(src + i), self.vram_select);
@@ -475,7 +475,7 @@ impl Gpu {
         line_to_draw
     }
 
-    fn draw(&mut self, mmu: &mut Mmu) -> Option<(u8, [u32; VRAM_WIDTH])> {
+    pub fn draw(&mut self, mmu: &mut Mmu) -> Option<(u8, [u32; VRAM_WIDTH])> {
         if self.ly >= VRAM_HEIGHT as u8 {
             return None;
         }
@@ -691,12 +691,12 @@ impl Gpu {
         self.vram[bank][off]
     }
 
-    fn write_vram(&mut self, addr: u16, value: u8, bank: usize) {
+    pub fn write_vram(&mut self, addr: u16, value: u8, bank: usize) {
         let off = addr as usize - 0x8000;
         self.vram[bank][off] = value;
     }
 
-    fn get_tile_base(&self, mapbase: u16, tx: u16, ty: u16) -> u16 {
+    pub fn get_tile_base(&self, mapbase: u16, tx: u16, ty: u16) -> u16 {
         let ti = tx + ty * 32;
         let num = self.read_vram(mapbase + ti, 0);
 
@@ -707,7 +707,7 @@ impl Gpu {
         }
     }
 
-    fn get_tile_attr(&self, mapbase: u16, tx: u16, ty: u16) -> MapAttribute {
+    pub fn get_tile_attr(&self, mapbase: u16, tx: u16, ty: u16) -> MapAttribute {
         if cfg!(feature = "color") {
             let ti = tx + ty * 32;
             let attr = self.read_vram(mapbase + ti, 1) as usize;
@@ -730,7 +730,7 @@ impl Gpu {
         }
     }
 
-    fn get_sp_attr(&self, attr: u8) -> MapAttribute {
+    pub fn get_sp_attr(&self, attr: u8) -> MapAttribute {
         if cfg!(feature = "color") {
             let attr = attr as usize;
 
@@ -758,7 +758,7 @@ impl Gpu {
         }
     }
 
-    fn get_tile_byte(&self, tilebase: u16, txoff: u16, tyoff: u16, bank: usize) -> usize {
+    pub fn get_tile_byte(&self, tilebase: u16, txoff: u16, tyoff: u16, bank: usize) -> usize {
         let l = self.read_vram(tilebase + tyoff * 2, bank);
         let h = self.read_vram(tilebase + tyoff * 2 + 1, bank);
 

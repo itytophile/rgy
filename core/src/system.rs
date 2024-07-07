@@ -69,8 +69,9 @@ impl<'a> System<'a> {
 
         time += self.cpu.check_interrupt(&mut mmu);
 
-        self.handlers.dma.step(&mut mmu);
-        let line_to_draw = self.handlers.gpu.step(time, &mut mmu);
+        mmu.dma_step();
+
+        let line_to_draw = mmu.gpu_step(time);
         self.handlers.timer.step(time, irq);
         self.handlers.serial.step(time, irq);
         self.handlers.joypad.poll(irq);
