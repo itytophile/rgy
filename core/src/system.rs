@@ -4,7 +4,6 @@ use crate::cgb::Cgb;
 use crate::cpu::Cpu;
 use crate::device::{Device, IoMemHandler};
 use crate::dma::Dma;
-use crate::fc::FreqControl;
 use crate::gpu::Gpu;
 use crate::hardware::{Hardware, HardwareHandle};
 use crate::ic::{Ic, IcCells};
@@ -17,66 +16,9 @@ use crate::timer::Timer;
 use crate::VRAM_WIDTH;
 use log::*;
 
-/// Configuration of the emulator.
-pub struct Config {
-    /// CPU frequency.
-    pub(crate) freq: u64,
-    /// Cycle sampling count in the CPU frequency controller.
-    pub(crate) sample: u64,
-    /// Delay unit in CPU frequency controller.
-    pub(crate) delay_unit: u64,
-    /// Don't adjust CPU frequency.
-    pub(crate) native_speed: bool,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Config {
-    /// Create the default configuration.
-    pub fn new() -> Self {
-        let freq = 4194300; // 4.1943 MHz
-        Self {
-            freq,
-            sample: freq / 1000,
-            delay_unit: 10,
-            native_speed: false,
-        }
-    }
-
-    /// Set the CPU frequency.
-    pub fn freq(mut self, freq: u64) -> Self {
-        self.freq = freq;
-        self
-    }
-
-    /// Set the sampling count of the CPU frequency controller.
-    pub fn sample(mut self, sample: u64) -> Self {
-        self.sample = sample;
-        self
-    }
-
-    /// Set the delay unit.
-    pub fn delay_unit(mut self, delay: u64) -> Self {
-        self.delay_unit = delay;
-        self
-    }
-
-    /// Set the flag to run at native speed.
-    pub fn native_speed(mut self, native: bool) -> Self {
-        self.native_speed = native;
-        self
-    }
-}
-
 /// Represents the entire emulator context.
 pub struct System<'a, 'b> {
-    cfg: Config,
     hw: HardwareHandle<'a>,
-    fc: FreqControl<'a>,
     cpu: Cpu,
     mmu: MmuWithoutMixerStream<'a>,
     ic: Device<'a, Ic<'b>>,
@@ -186,14 +128,11 @@ impl<'a, 'b> Handlers<'a, 'b> {
 impl<'a, 'b> System<'a, 'b> {
     /// Create a new emulator context.
     pub fn new(
-        cfg: Config,
         hw_handle: HardwareHandle<'a>,
         devices: Devices<'a, 'b>,
         handlers: &'a Handlers,
     ) -> Self {
         info!("Initializing...");
-
-        let mut fc = FreqControl::new(hw_handle.clone(), &cfg);
 
         let cpu = Cpu::new();
         let mut mmu = MmuWithoutMixerStream::default();
@@ -256,12 +195,8 @@ impl<'a, 'b> System<'a, 'b> {
 
         info!("Starting...");
 
-        fc.reset();
-
         Self {
-            cfg,
             hw: hw_handle,
-            fc,
             cpu,
             mmu,
             ic: devices.ic,
@@ -288,18 +223,7 @@ impl<'a, 'b> System<'a, 'b> {
         self.serial.borrow_mut().step(time);
         self.joypad.borrow_mut().poll();
 
-        if !self.cfg.native_speed {
-            self.fc.adjust(time);
-            PollState {
-                delay: self.fc.delay(),
-                line_to_draw,
-            }
-        } else {
-            PollState {
-                delay: 0,
-                line_to_draw,
-            }
-        }
+        PollState { line_to_draw }
     }
 
     /// Run a single step of emulation.
@@ -315,7 +239,6 @@ impl<'a, 'b> System<'a, 'b> {
 }
 
 pub struct PollState {
-    pub delay: u64, // nano seconds
     pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
 }
 

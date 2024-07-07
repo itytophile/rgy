@@ -104,7 +104,6 @@
 mod alu;
 mod cgb;
 mod dma;
-mod fc;
 mod gpu;
 mod ic;
 mod joypad;
@@ -130,4 +129,4 @@ pub mod mmu;
 mod hardware;
 
 pub use crate::hardware::{Hardware, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
-pub use crate::system::{Config, System};
+pub use crate::system::System;

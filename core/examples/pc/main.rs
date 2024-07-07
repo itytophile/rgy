@@ -2,7 +2,7 @@ mod hardware;
 
 use crate::hardware::Hardware;
 
-use rgy::{sound::MixerStream, Config, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{sound::MixerStream, VRAM_HEIGHT, VRAM_WIDTH};
 use std::{
     fs::File,
     io::Read,
@@ -14,32 +14,12 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct Opt {
-    /// Cpu frequency
-    #[structopt(short = "f", long = "freq", default_value = "4194304")]
-    freq: u64,
-    /// Sampling rate for cpu frequency controller
-    #[structopt(short = "s", long = "sample", default_value = "4200")]
-    sample: u64,
-    /// Delay unit for cpu frequency controller
-    #[structopt(short = "u", long = "delayunit", default_value = "1")]
-    delay_unit: u64,
-    /// Don't adjust cpu frequency
-    #[structopt(short = "n", long = "native")]
-    native_speed: bool,
     /// RAM file name
     #[structopt(short = "r", long = "ram")]
     ram: Option<String>,
     /// ROM file name or directory
     #[structopt(name = "ROM")]
     rom: PathBuf,
-}
-
-fn to_cfg(opt: Opt) -> rgy::Config {
-    rgy::Config::new()
-        .freq(opt.freq)
-        .sample(opt.sample)
-        .delay_unit(opt.delay_unit)
-        .native_speed(opt.native_speed)
 }
 
 pub fn load_rom<P: AsRef<Path>>(path: P) -> Vec<u8> {
@@ -65,7 +45,7 @@ fn main() {
     std::thread::spawn(move || {
         let (rom, hw) = (load_rom(&opt.rom), hw1);
 
-        run(hw, &rom, to_cfg(opt), vram, mixer_stream);
+        run(hw, &rom, vram, mixer_stream);
     });
 
     hw.run();
@@ -74,7 +54,6 @@ fn main() {
 fn run<H: rgy::Hardware + 'static>(
     hw: H,
     rom: &[u8],
-    cfg: Config,
     vram: Arc<Mutex<Vec<u32>>>,
     mixer_stream: Arc<Mutex<MixerStream>>,
 ) {
@@ -82,7 +61,7 @@ fn run<H: rgy::Hardware + 'static>(
     let state1 = rgy::system::get_stack_state1(&state0, rom);
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
-    let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
+    let mut sys = rgy::System::new(state1.hw_handle, devices.clone(), &handlers);
 
     let mut lock = None;
 
@@ -93,7 +72,7 @@ fn run<H: rgy::Hardware + 'static>(
             vram[base..base + buf.len()].copy_from_slice(&buf);
             lock = if line == VRAM_HEIGHT as u8 - 1 {
                 drop(vram);
-                std::thread::sleep(Duration::from_millis(17));
+                std::thread::sleep(Duration::from_millis(16));
                 None
             } else {
                 Some(vram)

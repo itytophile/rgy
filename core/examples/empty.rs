@@ -1,4 +1,4 @@
-use rgy::{sound::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{sound::MixerStream, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware;
 
@@ -38,9 +38,6 @@ impl rgy::Hardware for Hardware {
 }
 
 fn main() {
-    // Create the default config.
-    let cfg = Config::new();
-
     let mut display = vec![vec![0u32; VRAM_HEIGHT]; VRAM_WIDTH];
 
     // Create the hardware instance.
@@ -54,7 +51,7 @@ fn main() {
     let state1 = rgy::system::get_stack_state1(&state0, &rom);
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
-    let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
+    let mut sys = rgy::System::new(state1.hw_handle, devices.clone(), &handlers);
     let mut mixer_stream = MixerStream::default();
 
     while let Some(poll_state) = sys.poll(&mut mixer_stream) {
