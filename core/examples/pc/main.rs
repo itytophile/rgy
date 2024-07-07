@@ -2,8 +2,7 @@ mod hardware;
 
 use crate::hardware::Hardware;
 
-use log::*;
-use rgy::{sound::MixerStream, Config, VRAM_WIDTH};
+use rgy::{sound::MixerStream, Config, VRAM_HEIGHT, VRAM_WIDTH};
 use std::{
     fs::File,
     io::Read,
@@ -43,18 +42,6 @@ fn to_cfg(opt: Opt) -> rgy::Config {
         .native_speed(opt.native_speed)
 }
 
-fn set_affinity() {
-    let set = || {
-        let core_ids = core_affinity::get_core_ids()?;
-        core_affinity::set_for_current(*core_ids.first()?);
-        Some(())
-    };
-
-    if set().is_none() {
-        warn!("Couldn't set CPU affinity")
-    }
-}
-
 pub fn load_rom<P: AsRef<Path>>(path: P) -> Vec<u8> {
     let mut f = File::open(path).expect("Couldn't open file");
     let mut buf = Vec::new();
@@ -78,8 +65,6 @@ fn main() {
     std::thread::spawn(move || {
         let (rom, hw) = (load_rom(&opt.rom), hw1);
 
-        set_affinity();
-
         run(hw, &rom, to_cfg(opt), vram, mixer_stream);
     });
 
@@ -98,14 +83,21 @@ fn run<H: rgy::Hardware + 'static>(
     let devices = rgy::system::Devices::new(&state1.raw_devices);
     let handlers = rgy::system::Handlers::new(devices.clone());
     let mut sys = rgy::System::new(cfg, state1.hw_handle, devices.clone(), &handlers);
+
+    let mut lock = None;
+
     while let Some(poll_state) = sys.poll(&mut mixer_stream.lock().unwrap()) {
         if let Some((line, buf)) = poll_state.line_to_draw {
-            let mut vram = vram.lock().unwrap();
+            let mut vram = lock.unwrap_or_else(|| vram.lock().unwrap());
             let base = line as usize * VRAM_WIDTH;
             vram[base..base + buf.len()].copy_from_slice(&buf);
+            lock = if line == VRAM_HEIGHT as u8 - 1 {
+                drop(vram);
+                std::thread::sleep(Duration::from_millis(17));
+                None
+            } else {
+                Some(vram)
+            };
         }
-
-        // println!("{}", poll_state.delay);
-        spin_sleep::sleep(Duration::from_nanos(poll_state.delay));
     }
 }

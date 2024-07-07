@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use rgy::{sound::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware;
@@ -67,6 +65,5 @@ fn main() {
                 display[x][y] = *col;
             }
         }
-        spin_sleep::sleep(Duration::from_nanos(poll_state.delay));
     }
 }
