@@ -43,20 +43,17 @@ impl<'a> MbcNone<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= ROM_BANK_01_NN_END {
-            MemRead::Replace(self.rom[addr as usize])
-        } else {
-            MemRead::PassThrough
+        match addr {
+            ..=ROM_BANK_01_NN_END => MemRead::Replace(self.rom[addr as usize]),
+            _ => MemRead::PassThrough,
         }
     }
 
     fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
-        if addr <= ROM_BANK_01_NN_END {
-            MemWrite::Block
-        } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
-            MemWrite::PassThrough
-        } else {
-            unreachable!("Write to ROM: {:02x} {:02x}", addr, value);
+        match addr {
+            ..=ROM_BANK_01_NN_END => MemWrite::Block,
+            EXTERNAL_RAM_START..=EXTERNAL_RAM_END => MemWrite::PassThrough,
+            _ => unreachable!("Write to ROM: {:02x} {:02x}", addr, value),
         }
     }
 }
