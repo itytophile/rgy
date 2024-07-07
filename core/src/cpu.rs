@@ -393,10 +393,6 @@ mod test {
             None
         }
 
-        fn sched(&mut self) -> bool {
-            true
-        }
-
         fn save_ram(&mut self, _ram: &[u8]) {}
     }
 

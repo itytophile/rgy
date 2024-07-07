@@ -71,12 +71,8 @@ impl<'a> System<'a> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self, mixer_stream: &mut MixerStream, irq: &mut Irq) -> Option<PollState> {
-        if !self.hw.get().borrow_mut().sched() {
-            return None;
-        }
-
-        Some(self.step(mixer_stream, irq))
+    pub fn poll(&mut self, mixer_stream: &mut MixerStream, irq: &mut Irq) -> PollState {
+        self.step(mixer_stream, irq)
     }
 }
 

@@ -112,7 +112,11 @@ impl Gui {
 }
 
 impl Hardware {
-    pub fn new(rampath: Option<String>, mixer_stream: Arc<Mutex<MixerStream>>) -> Self {
+    pub fn new(
+        rampath: Option<String>,
+        mixer_stream: Arc<Mutex<MixerStream>>,
+        escape: Arc<AtomicBool>,
+    ) -> Self {
         let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
 
         let pcm = Pcm;
@@ -128,8 +132,6 @@ impl Hardware {
         keystate.insert(Key::Select, false);
         keystate.insert(Key::Start, false);
         let keystate = Arc::new(Mutex::new(keystate));
-
-        let escape = Arc::new(AtomicBool::new(false));
 
         Self {
             rampath,
@@ -182,10 +184,6 @@ impl rgy::Hardware for Hardware {
             }
             None => {}
         }
-    }
-
-    fn sched(&mut self) -> bool {
-        !self.escape.load(Ordering::Relaxed)
     }
 }
 

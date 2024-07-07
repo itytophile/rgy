@@ -7,7 +7,10 @@ use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use structopt::StructOpt;
@@ -37,7 +40,8 @@ fn main() {
     env_logger::init();
 
     let mixer_stream = Arc::new(Mutex::new(MixerStream::default()));
-    let hw = Hardware::new(opt.ram.clone(), mixer_stream.clone());
+    let escape = Arc::new(AtomicBool::new(false));
+    let hw = Hardware::new(opt.ram.clone(), mixer_stream.clone(), escape.clone());
     let vram = hw.vram.clone();
 
     let hw1 = hw.clone();
@@ -45,7 +49,7 @@ fn main() {
     std::thread::spawn(move || {
         let (rom, hw) = (load_rom(&opt.rom), hw1);
 
-        run(hw, &rom, vram, mixer_stream);
+        run(hw, &rom, vram, mixer_stream, escape);
     });
 
     hw.run();
@@ -56,6 +60,7 @@ fn run<H: rgy::Hardware + 'static>(
     rom: &[u8],
     vram: Arc<Mutex<Vec<u32>>>,
     mixer_stream: Arc<Mutex<MixerStream>>,
+    escape: Arc<AtomicBool>,
 ) {
     let state0 = rgy::system::get_stack_state0(hw);
     let state1 = rgy::system::get_stack_state1(&state0);
@@ -64,7 +69,8 @@ fn run<H: rgy::Hardware + 'static>(
     let mut lock = None;
     let mut irq = Default::default();
 
-    while let Some(poll_state) = sys.poll(&mut mixer_stream.lock().unwrap(), &mut irq) {
+    while !escape.load(Ordering::Relaxed) {
+        let poll_state = sys.poll(&mut mixer_stream.lock().unwrap(), &mut irq);
         if let Some((line, buf)) = poll_state.line_to_draw {
             let mut vram = lock.unwrap_or_else(|| vram.lock().unwrap());
             let base = line as usize * VRAM_WIDTH;

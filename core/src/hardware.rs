@@ -65,12 +65,6 @@ pub trait Hardware {
     /// Try receiving one byte from the serial port.
     fn recv_byte(&mut self) -> Option<u8>;
 
-    /// Called every time the CPU executes one instruction.
-    /// Returning `false` stops the emulator.
-    fn sched(&mut self) -> bool {
-        true
-    }
-
     /// Called when the CPU attempts to read save data from the cartridge battery-backed RAM.
     fn save_ram(&mut self, ram: &[u8]);
 }

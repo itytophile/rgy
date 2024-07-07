@@ -26,12 +26,6 @@ impl rgy::Hardware for Hardware {
         None
     }
 
-    fn sched(&mut self) -> bool {
-        // `true` to continue, `false` to stop the emulator.
-        println!("It's running!");
-        true
-    }
-
     fn save_ram(&mut self, _ram: &[u8]) {
         // Store save data.
     }
@@ -53,7 +47,8 @@ fn main() {
     let mut mixer_stream = MixerStream::default();
     let mut irq = Default::default();
 
-    while let Some(poll_state) = sys.poll(&mut mixer_stream, &mut irq) {
+    loop {
+        let poll_state = sys.poll(&mut mixer_stream, &mut irq);
         if let Some((line, buffer)) = poll_state.line_to_draw {
             let y = line as usize;
 
