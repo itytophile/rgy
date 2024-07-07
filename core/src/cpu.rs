@@ -357,7 +357,7 @@ impl Cpu {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::inst::decode;
+    use crate::{inst::decode, sound::MixerStream};
 
     fn write(mmu: &mut Mmu, m: &[u8]) {
         for (i, m) in m.iter().enumerate() {
@@ -375,8 +375,13 @@ mod test {
 
     #[test]
     fn op_00af() {
+        let mut mixer_stream = MixerStream::default();
+        let mut mmu = Default::default();
         // xor a
-        let mut mmu = Mmu::new();
+        let mut mmu = Mmu {
+            inner: &mut mmu,
+            mixer_stream: &mut mixer_stream,
+        };
         let mut cpu = Cpu::new();
 
         cpu.set_a(0x32);
@@ -390,7 +395,12 @@ mod test {
     #[test]
     fn op_00f1() {
         // pop af
-        let mut mmu = Mmu::new();
+        let mut mixer_stream = MixerStream::default();
+        let mut mmu = Default::default();
+        let mut mmu = Mmu {
+            inner: &mut mmu,
+            mixer_stream: &mut mixer_stream,
+        };
         let mut cpu = Cpu::new();
 
         cpu.set_bc(0x1301);

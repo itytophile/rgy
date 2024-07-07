@@ -1,5 +1,7 @@
 use arrayvec::ArrayVec;
 
+use crate::sound::MixerStream;
+
 /// The variants to control memory read access from the CPU.
 pub enum MemRead {
     /// Replaces the value passed from the memory to the CPU.
@@ -21,10 +23,10 @@ pub enum MemWrite {
 /// The handler to intercept memory access from the CPU.
 pub trait MemHandler {
     /// The function is called when the CPU attempts to read from the memory.
-    fn on_read(&self, addr: u16) -> MemRead;
+    fn on_read(&self, addr: u16, mixer_stream: &MixerStream) -> MemRead;
 
     /// The function is called when the CPU attempts to write to the memory.
-    fn on_write(&self, addr: u16, value: u8) -> MemWrite;
+    fn on_write(&self, addr: u16, value: u8, mixer_stream: &mut MixerStream) -> MemWrite;
 }
 
 /// The memory management unit (MMU)
@@ -32,32 +34,33 @@ pub trait MemHandler {
 /// This unit holds a memory byte array which represents address space of the memory.
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
-pub struct Mmu<'a> {
-    ram: [u8; 0x10000],
-    #[allow(clippy::type_complexity)]
-    handlers: ArrayVec<((u16, u16), &'a dyn MemHandler), 20>,
+pub struct Mmu<'a, 'b> {
+    pub inner: &'b mut MmuWithoutMixerStream<'a>,
+    pub mixer_stream: &'a mut MixerStream,
 }
 
-impl Default for Mmu<'_> {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct MmuWithoutMixerStream<'a> {
+    pub ram: [u8; 0x10000],
+    pub handlers: ArrayVec<((u16, u16), &'a dyn MemHandler), 20>,
 }
 
-impl<'a> Mmu<'a> {
-    /// Create a new MMU instance.
-    pub fn new() -> Mmu<'a> {
-        Mmu {
-            ram: [0u8; 0x10000],
-            handlers: ArrayVec::new(),
-        }
-    }
-
+impl<'a> MmuWithoutMixerStream<'a> {
     /// Add a new memory handler.
     pub fn add_handler(&mut self, range: (u16, u16), handler: &'a dyn MemHandler) {
         self.handlers.push((range, handler));
     }
+}
 
+impl<'a> Default for MmuWithoutMixerStream<'a> {
+    fn default() -> Self {
+        Self {
+            ram: [0; 0x10000],
+            handlers: Default::default(),
+        }
+    }
+}
+
+impl<'a, 'c> Mmu<'a, 'c> {
     fn get_handler_from_address<'b>(
         handlers: &'b [((u16, u16), &dyn MemHandler)],
         addr: u16,
@@ -73,26 +76,26 @@ impl<'a> Mmu<'a> {
 
     /// Reads one byte from the given address in the memory.
     pub fn get8(&self, addr: u16) -> u8 {
-        if let Some(handler) = Self::get_handler_from_address(&self.handlers, addr) {
-            match handler.on_read(addr) {
+        if let Some(handler) = Self::get_handler_from_address(&self.inner.handlers, addr) {
+            match handler.on_read(addr, self.mixer_stream) {
                 MemRead::Replace(alt) => return alt,
                 MemRead::PassThrough => {}
             }
         }
         if (0xe000..=0xfdff).contains(&addr) {
             // echo ram
-            self.ram[addr as usize - 0x2000]
+            self.inner.ram[addr as usize - 0x2000]
         } else {
-            self.ram[addr as usize]
+            self.inner.ram[addr as usize]
         }
     }
 
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
-        if let Some(handler) = Self::get_handler_from_address(&self.handlers, addr) {
-            match handler.on_write(addr, v) {
+        if let Some(handler) = Self::get_handler_from_address(&self.inner.handlers, addr) {
+            match handler.on_write(addr, v, self.mixer_stream) {
                 MemWrite::Replace(alt) => {
-                    self.ram[addr as usize] = alt;
+                    self.inner.ram[addr as usize] = alt;
                     return;
                 }
                 MemWrite::PassThrough => {}
@@ -102,9 +105,9 @@ impl<'a> Mmu<'a> {
 
         if (0xe000..=0xfdff).contains(&addr) {
             // echo ram
-            self.ram[addr as usize - 0x2000] = v
+            self.inner.ram[addr as usize - 0x2000] = v
         } else {
-            self.ram[addr as usize] = v
+            self.inner.ram[addr as usize] = v
         }
     }
 

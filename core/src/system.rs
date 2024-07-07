@@ -10,13 +10,12 @@ use crate::hardware::{Hardware, HardwareHandle};
 use crate::ic::{Ic, IcCells};
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
-use crate::mmu::Mmu;
+use crate::mmu::{Mmu, MmuWithoutMixerStream};
 use crate::serial::Serial;
-use crate::sound::{Mixer, MixerStream, NoiseStream, Sound, ToneStream, Unit, UnitRaw, WaveStream};
+use crate::sound::{MixerStream, Sound};
 use crate::timer::Timer;
 use crate::VRAM_WIDTH;
 use log::*;
-use static_cell::StaticCell;
 
 /// Configuration of the emulator.
 pub struct Config {
@@ -79,7 +78,7 @@ pub struct System<'a, 'b> {
     hw: HardwareHandle<'a>,
     fc: FreqControl<'a>,
     cpu: Cpu,
-    mmu: Mmu<'a>,
+    mmu: MmuWithoutMixerStream<'a>,
     ic: Device<'a, Ic<'b>>,
     gpu: Device<'a, Gpu<'b>>,
     joypad: Device<'a, Joypad<'b>>,
@@ -101,11 +100,11 @@ pub struct RawDevices<'a> {
 }
 
 impl<'a> RawDevices<'a> {
-    pub fn new(rom: &'a [u8], hw: HardwareHandle<'a>, mixer: Mixer, ic_cells: &'a IcCells) -> Self {
+    pub fn new(rom: &'a [u8], hw: HardwareHandle<'a>, ic_cells: &'a IcCells) -> Self {
         let ic = Ic::new(ic_cells);
         let irq = ic.irq();
         Self {
-            sound: RefCell::new(Sound::new(hw.clone(), mixer)),
+            sound: RefCell::new(Sound::default()),
             ic: RefCell::new(ic),
             gpu: RefCell::new(Gpu::new(irq.clone())),
             joypad: RefCell::new(Joypad::new(hw.clone(), irq.clone())),
@@ -197,7 +196,7 @@ impl<'a, 'b> System<'a, 'b> {
         let mut fc = FreqControl::new(hw_handle.clone(), &cfg);
 
         let cpu = Cpu::new();
-        let mut mmu = Mmu::new();
+        let mut mmu = MmuWithoutMixerStream::default();
 
         // let ranges = [
         //     ((0xc000, 0xdfff)),
@@ -274,13 +273,17 @@ impl<'a, 'b> System<'a, 'b> {
         }
     }
 
-    fn step(&mut self) -> PollState {
-        let mut time = self.cpu.execute(&mut self.mmu);
+    fn step(&mut self, mixer_stream: &'a mut MixerStream) -> PollState {
+        let mut mmu = Mmu {
+            inner: &mut self.mmu,
+            mixer_stream,
+        };
+        let mut time = self.cpu.execute(&mut mmu);
 
-        time += self.cpu.check_interrupt(&mut self.mmu, &self.ic);
+        time += self.cpu.check_interrupt(&mut mmu, &self.ic);
 
-        self.dma.borrow_mut().step(&mut self.mmu);
-        let line_to_draw = self.gpu.borrow_mut().step(time, &mut self.mmu);
+        self.dma.borrow_mut().step(&mut mmu);
+        let line_to_draw = self.gpu.borrow_mut().step(time, &mut mmu);
         self.timer.borrow_mut().step(time);
         self.serial.borrow_mut().step(time);
         self.joypad.borrow_mut().poll();
@@ -302,12 +305,12 @@ impl<'a, 'b> System<'a, 'b> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self) -> Option<PollState> {
+    pub fn poll(&mut self, mixer_stream: &'a mut MixerStream) -> Option<PollState> {
         if !self.hw.get().borrow_mut().sched() {
             return None;
         }
 
-        Some(self.step())
+        Some(self.step(mixer_stream))
     }
 }
 
@@ -315,11 +318,6 @@ pub struct PollState {
     pub delay: u64, // nano seconds
     pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
 }
-
-static TONE_UNIT1: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
-static TONE_UNIT2: StaticCell<UnitRaw<ToneStream>> = StaticCell::new();
-static WAVE_UNIT: StaticCell<UnitRaw<WaveStream>> = StaticCell::new();
-static NOISE_UNIT: StaticCell<UnitRaw<NoiseStream>> = StaticCell::new();
 
 pub struct StackState0<H> {
     pub hw_cell: RefCell<H>,
@@ -345,16 +343,6 @@ where
     let hw_handle = HardwareHandle::new(&state0.hw_cell);
     StackState1 {
         hw_handle: hw_handle.clone(),
-        raw_devices: RawDevices::new(
-            rom,
-            hw_handle,
-            Mixer::new(MixerStream::new(
-                Unit::new(TONE_UNIT1.init(UnitRaw::default())),
-                Unit::new(TONE_UNIT2.init(UnitRaw::default())),
-                Unit::new(WAVE_UNIT.init(UnitRaw::default())),
-                Unit::new(NOISE_UNIT.init(UnitRaw::default())),
-            )),
-            &state0.ic_cells,
-        ),
+        raw_devices: RawDevices::new(rom, hw_handle, &state0.ic_cells),
     }
 }

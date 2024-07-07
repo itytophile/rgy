@@ -1,5 +1,6 @@
 use crate::device::IoHandler;
 use crate::mmu::{MemRead, MemWrite};
+use crate::sound::MixerStream;
 use core::cell::RefCell;
 use log::*;
 
@@ -128,7 +129,7 @@ impl<'a> Ic<'a> {
 }
 
 impl<'a> IoHandler for Ic<'a> {
-    fn on_read(&mut self, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
         if addr == 0xffff {
             let v = self.enable.borrow().get();
             info!("Read interrupt enable: {:02x}", v);
@@ -142,7 +143,7 @@ impl<'a> IoHandler for Ic<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
         if addr == 0xffff {
             info!("Write interrupt enable: {:02x}", value);
             self.enable.borrow_mut().set(value);

@@ -1,41 +1,8 @@
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use log::*;
-use spin::Mutex;
 
 use crate::device::IoHandler;
-use crate::hardware::{HardwareHandle, Stream};
+use crate::hardware::Stream;
 use crate::mmu::{MemRead, MemWrite};
-
-trait AtomicHelper {
-    type Item;
-
-    fn get(&self) -> Self::Item;
-    fn set(&self, v: Self::Item);
-}
-
-impl AtomicHelper for AtomicUsize {
-    type Item = usize;
-
-    fn get(&self) -> Self::Item {
-        self.load(Ordering::SeqCst)
-    }
-
-    fn set(&self, v: Self::Item) {
-        self.store(v, Ordering::SeqCst)
-    }
-}
-
-impl AtomicHelper for AtomicBool {
-    type Item = bool;
-
-    fn get(&self) -> Self::Item {
-        self.load(Ordering::SeqCst)
-    }
-
-    fn set(&self, v: Self::Item) {
-        self.store(v, Ordering::SeqCst)
-    }
-}
 
 struct Sweep {
     enable: bool,
@@ -246,7 +213,7 @@ impl RandomWave {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Tone {
     sweep_time: usize,
     sweep_sub: bool,
@@ -261,21 +228,6 @@ struct Tone {
 }
 
 impl Tone {
-    fn new() -> Self {
-        Self {
-            sweep_time: 0,
-            sweep_sub: false,
-            sweep_shift: 0,
-            sound_len: 0,
-            wave_duty: 0,
-            env_init: 0,
-            env_inc: false,
-            env_count: 0,
-            counter: false,
-            freq: 0,
-        }
-    }
-
     fn on_read(&mut self, base: u16, addr: u16) -> MemRead {
         if addr == base + 3 {
             MemRead::Replace(0xff)
@@ -476,7 +428,7 @@ impl Stream for WaveStream {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Noise {
     sound_len: usize,
 
@@ -492,22 +444,6 @@ struct Noise {
 }
 
 impl Noise {
-    fn new() -> Self {
-        Self {
-            sound_len: 0,
-
-            env_init: 0,
-            env_inc: false,
-            env_count: 0,
-
-            shift_freq: 0,
-            step: false,
-            div_freq: 0,
-
-            counter: false,
-        }
-    }
-
     fn on_read(&mut self, _addr: u16) -> MemRead {
         MemRead::PassThrough
     }
@@ -586,51 +522,37 @@ impl Stream for NoiseStream {
     }
 }
 
+#[derive(Default)]
 pub struct Mixer {
     so1_volume: usize,
     so2_volume: usize,
     so_mask: usize,
     enable: bool,
-    stream: MixerStream,
 }
 
 impl Mixer {
-    pub fn new(stream: MixerStream) -> Self {
-        Self {
-            so1_volume: 0,
-            so2_volume: 0,
-            so_mask: 0,
-            enable: false,
-            stream,
-        }
-    }
-
-    fn setup_stream(&self, hw: &HardwareHandle) {
-        hw.get().borrow_mut().sound_play(self.stream.clone())
-    }
-
-    fn on_read(&mut self, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16, stream: &MixerStream) -> MemRead {
         if addr == 0xff26 {
             let mut v = 0;
             v |= if self.enable { 0x80 } else { 0x00 };
-            v |= if self.stream.tone1.on() { 0x08 } else { 0x00 };
-            v |= if self.stream.tone2.on() { 0x04 } else { 0x00 };
-            v |= if self.stream.wave.on() { 0x02 } else { 0x00 };
-            v |= if self.stream.noise.on() { 0x01 } else { 0x00 };
+            v |= if stream.tone1.on() { 0x08 } else { 0x00 };
+            v |= if stream.tone2.on() { 0x04 } else { 0x00 };
+            v |= if stream.wave.on() { 0x02 } else { 0x00 };
+            v |= if stream.noise.on() { 0x01 } else { 0x00 };
             MemRead::Replace(v)
         } else {
             MemRead::PassThrough
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) {
+    fn on_write(&mut self, addr: u16, value: u8, stream: &mut MixerStream) {
         if addr == 0xff24 {
             self.so1_volume = (value as usize & 0x70) >> 4;
             self.so2_volume = value as usize & 0x07;
-            self.update_volume();
+            self.update_volume(stream);
         } else if addr == 0xff25 {
             self.so_mask = value as usize;
-            self.update_volume();
+            self.update_volume(stream);
         } else if addr == 0xff26 {
             self.enable = value & 0x80 != 0;
             if self.enable {
@@ -638,33 +560,33 @@ impl Mixer {
             } else {
                 info!("Sound master disabled");
             }
-            self.update_volume();
+            self.update_volume(stream);
         } else {
             unreachable!()
         }
     }
 
-    fn restart_tone1(&self, t: Tone) {
-        self.stream.tone1.update(Some(ToneStream::new(t, true)));
+    fn restart_tone1(&mut self, t: Tone, stream: &mut MixerStream) {
+        stream.tone1.update(Some(ToneStream::new(t, true)));
     }
 
-    fn restart_tone2(&self, t: Tone) {
-        self.stream.tone2.update(Some(ToneStream::new(t, false)));
+    fn restart_tone2(&mut self, t: Tone, stream: &mut MixerStream) {
+        stream.tone2.update(Some(ToneStream::new(t, false)));
     }
 
-    fn restart_wave(&self, w: Wave) {
-        self.stream.wave.update(Some(WaveStream::new(w)));
+    fn restart_wave(&mut self, w: Wave, stream: &mut MixerStream) {
+        stream.wave.update(Some(WaveStream::new(w)));
     }
 
-    fn restart_noise(&self, n: Noise) {
-        self.stream.noise.update(Some(NoiseStream::new(n)));
+    fn restart_noise(&mut self, n: Noise, stream: &mut MixerStream) {
+        stream.noise.update(Some(NoiseStream::new(n)));
     }
 
-    fn update_volume(&self) {
-        self.stream.tone1.volume.set(self.get_volume(0));
-        self.stream.tone2.volume.set(self.get_volume(1));
-        self.stream.wave.volume.set(self.get_volume(2));
-        self.stream.noise.volume.set(self.get_volume(3));
+    fn update_volume(&mut self, stream: &mut MixerStream) {
+        stream.tone1.volume = self.get_volume(0);
+        stream.tone2.volume = self.get_volume(1);
+        stream.wave.volume = self.get_volume(2);
+        stream.noise.volume = self.get_volume(3);
     }
 
     fn get_volume(&self, id: u8) -> usize {
@@ -683,64 +605,38 @@ impl Mixer {
     }
 }
 
-pub struct Unit<T: 'static> {
-    stream: &'static Mutex<Option<T>>,
-    volume: &'static AtomicUsize,
+pub struct Unit<T> {
+    stream: Option<T>,
+    volume: usize,
 }
 
-impl<T> Clone for Unit<T> {
-    fn clone(&self) -> Self {
-        Self {
-            stream: self.stream,
-            volume: self.volume,
-        }
-    }
-}
-
-pub struct UnitRaw<T> {
-    stream: Mutex<Option<T>>,
-    volume: AtomicUsize,
-}
-
-impl<T> Default for UnitRaw<T> {
+impl<T> Default for Unit<T> {
     fn default() -> Self {
         Self {
-            stream: Mutex::new(None),
-            volume: AtomicUsize::new(0),
+            stream: Default::default(),
+            volume: Default::default(),
         }
     }
 }
 
 impl<T: Stream> Unit<T> {
-    // None, 0
-    pub fn new(raw: &'static UnitRaw<T>) -> Self {
-        Self {
-            stream: &raw.stream,
-            volume: &raw.volume,
-        }
-    }
-
     fn on(&self) -> bool {
-        self.stream.lock().is_some()
+        self.stream.is_some()
     }
 
-    fn update(&self, s: Option<T>) {
-        *self.stream.lock() = s;
+    fn update(&mut self, s: Option<T>) {
+        self.stream = s;
     }
 
-    fn next(&self, rate: u32) -> (u16, u16) {
+    fn next(&mut self, rate: u32) -> (u16, u16) {
         (
-            self.stream
-                .lock()
-                .as_mut()
-                .map(|s| s.next(rate))
-                .unwrap_or(0),
-            self.volume.get() as u16,
+            self.stream.as_mut().map(|s| s.next(rate)).unwrap_or(0),
+            self.volume as u16,
         )
     }
 }
 
-#[derive(Clone)]
+#[derive(Default)]
 pub struct MixerStream {
     tone1: Unit<ToneStream>,
     tone2: Unit<ToneStream>,
@@ -749,20 +645,6 @@ pub struct MixerStream {
 }
 
 impl MixerStream {
-    pub fn new(
-        tone1: Unit<ToneStream>,
-        tone2: Unit<ToneStream>,
-        wave: Unit<WaveStream>,
-        noise: Unit<NoiseStream>,
-    ) -> Self {
-        Self {
-            tone1,
-            tone2,
-            wave,
-            noise,
-        }
-    }
-
     fn volume(&self, amp: u16, vol: u16) -> u16 {
         amp * vol
     }
@@ -789,6 +671,7 @@ impl Stream for MixerStream {
     }
 }
 
+#[derive(Default)]
 pub struct Sound {
     tone1: Tone,
     tone2: Tone,
@@ -797,22 +680,8 @@ pub struct Sound {
     mixer: Mixer,
 }
 
-impl Sound {
-    pub fn new(hw: HardwareHandle, mixer: Mixer) -> Self {
-        mixer.setup_stream(&hw);
-
-        Self {
-            tone1: Tone::new(),
-            tone2: Tone::new(),
-            wave: Wave::default(),
-            noise: Noise::new(),
-            mixer,
-        }
-    }
-}
-
 impl IoHandler for Sound {
-    fn on_read(&mut self, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16, mixer_stream: &MixerStream) -> MemRead {
         if (0xff10..=0xff14).contains(&addr) {
             self.tone1.on_read(0xff10, addr)
         } else if (0xff15..=0xff19).contains(&addr) {
@@ -822,33 +691,33 @@ impl IoHandler for Sound {
         } else if (0xff20..=0xff23).contains(&addr) {
             self.noise.on_read(addr)
         } else if (0xff24..=0xff26).contains(&addr) {
-            self.mixer.on_read(addr)
+            self.mixer.on_read(addr, mixer_stream)
         } else {
             MemRead::PassThrough
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, mixer_stream: &mut MixerStream) -> MemWrite {
         if (0xff10..=0xff14).contains(&addr) {
             if self.tone1.on_write(0xff10, addr, value) {
-                self.mixer.restart_tone1(self.tone1.clone());
+                self.mixer.restart_tone1(self.tone1.clone(), mixer_stream);
             }
         } else if (0xff15..=0xff19).contains(&addr) {
             if self.tone2.on_write(0xff15, addr, value) {
-                self.mixer.restart_tone2(self.tone2.clone());
+                self.mixer.restart_tone2(self.tone2.clone(), mixer_stream);
             }
         } else if (0xff1a..=0xff1e).contains(&addr) {
             if self.wave.on_write(addr, value) {
-                self.mixer.restart_wave(self.wave.clone());
+                self.mixer.restart_wave(self.wave.clone(), mixer_stream);
             }
         } else if (0xff30..=0xff3f).contains(&addr) {
             let _ = self.wave.on_write(addr, value);
         } else if (0xff20..=0xff23).contains(&addr) {
             if self.noise.on_write(addr, value) {
-                self.mixer.restart_noise(self.noise.clone());
+                self.mixer.restart_noise(self.noise.clone(), mixer_stream);
             }
         } else if (0xff24..=0xff26).contains(&addr) {
-            self.mixer.on_write(addr, value);
+            self.mixer.on_write(addr, value, mixer_stream);
         } else {
             info!("Write sound: {:04x} {:02x}", addr, value);
         }

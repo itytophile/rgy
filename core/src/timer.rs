@@ -1,6 +1,7 @@
 use crate::device::IoHandler;
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite};
+use crate::sound::MixerStream;
 use log::*;
 
 pub struct Timer<'a> {
@@ -78,7 +79,7 @@ impl<'a> Timer<'a> {
 }
 
 impl<'a> IoHandler for Timer<'a> {
-    fn on_read(&mut self, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
         info!("Timer read: {:04x}", addr);
         match addr {
             0xff04 => MemRead::Replace(self.div),
@@ -89,7 +90,7 @@ impl<'a> IoHandler for Timer<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
         info!("Timer write: {:04x} {:02x}", addr, value);
         match addr {
             0xff04 => self.div = 0,

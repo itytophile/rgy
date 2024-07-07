@@ -1,6 +1,9 @@
 use core::cell::{Ref, RefCell, RefMut};
 
-use crate::mmu::{MemHandler, MemRead, MemWrite};
+use crate::{
+    mmu::{MemHandler, MemRead, MemWrite},
+    sound::MixerStream,
+};
 
 /// The wrapper type for I/O handlers to register to MMU.
 pub struct Device<'a, T>(&'a RefCell<T>);
@@ -38,10 +41,10 @@ impl<'a, T: IoHandler> Device<'a, T> {
 /// The trait which allows to hook I/O access from the CPU.
 pub trait IoHandler {
     /// The function is called when the CPU attempts to read the memory-mapped I/O.
-    fn on_read(&mut self, addr: u16) -> MemRead;
+    fn on_read(&mut self, addr: u16, mixer_stream: &MixerStream) -> MemRead;
 
     /// The function is called when the CPU attempts to write the memory-mapped I/O.
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite;
+    fn on_write(&mut self, addr: u16, value: u8, mixer_stream: &mut MixerStream) -> MemWrite;
 }
 
 /// The handler to intercept memory-mapped I/O.
@@ -51,20 +54,20 @@ impl<'a, T: IoHandler> MemHandler for IoMemHandler<'a, T>
 where
     T: IoHandler,
 {
-    fn on_read(&self, addr: u16) -> MemRead {
+    fn on_read(&self, addr: u16, mixer_stream: &MixerStream) -> MemRead {
         // Don't hook if it's already hooked
         match self.0.try_borrow_mut() {
-            Ok(mut inner) => inner.on_read(addr),
+            Ok(mut inner) => inner.on_read(addr, mixer_stream),
             Err(e) => {
                 panic!("Recursive read from {:04x}: {}", addr, e)
             }
         }
     }
 
-    fn on_write(&self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&self, addr: u16, value: u8, mixer_stream: &mut MixerStream) -> MemWrite {
         // Don't hook if it's already hooked
         match self.0.try_borrow_mut() {
-            Ok(mut inner) => inner.on_write(addr, value),
+            Ok(mut inner) => inner.on_write(addr, value, mixer_stream),
             Err(e) => {
                 panic!("Recursive write to {:04x}: {}", addr, e)
             }

@@ -2,6 +2,7 @@ use crate::device::IoHandler;
 use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
 use crate::mmu::{MemRead, MemWrite, Mmu};
+use crate::sound::MixerStream;
 use log::*;
 
 #[derive(Debug, Clone)]
@@ -770,7 +771,7 @@ impl<'a> Gpu<'a> {
 }
 
 impl<'a> IoHandler for Gpu<'a> {
-    fn on_read(&mut self, addr: u16) -> MemRead {
+    fn on_read(&mut self, addr: u16, _: &MixerStream) -> MemRead {
         if (0x8000..=0x9fff).contains(&addr) {
             MemRead::Replace(self.read_vram(addr, self.vram_select))
         } else if addr == 0xff40 {
@@ -829,7 +830,7 @@ impl<'a> IoHandler for Gpu<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
+    fn on_write(&mut self, addr: u16, value: u8, _: &mut MixerStream) -> MemWrite {
         trace!("Write GPU register: {:04x} {:02x}", addr, value);
         if (0x8000..=0x9fff).contains(&addr) {
             self.write_vram(addr, value, self.vram_select);
