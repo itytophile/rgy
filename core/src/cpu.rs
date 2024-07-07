@@ -357,8 +357,7 @@ impl Cpu {
 mod test {
     use super::*;
     use crate::{
-        ic::Irq, inst::decode, joypad::Joypad, mbc::Mbc, mmu::MemHandlers, serial::Serial,
-        sound::MixerStream, Hardware, Key,
+        ic::Irq, inst::decode, mbc::Mbc, mmu::MemHandlers, sound::MixerStream, Hardware, Key,
     };
 
     fn write(mmu: &mut Mmu<impl Hardware>, m: &[u8]) {
@@ -405,9 +404,9 @@ mod test {
         let mut handlers = MemHandlers {
             ic: Default::default(),
             gpu: Default::default(),
-            joypad: Joypad::new(),
+            joypad: Default::default(),
             timer: Default::default(),
-            serial: Serial::new(),
+            serial: Default::default(),
             dma: Default::default(),
             cgb: Default::default(),
             mbc: Mbc::new(&[], &mut hw),
@@ -443,9 +442,9 @@ mod test {
         let mut handlers = MemHandlers {
             ic: Default::default(),
             gpu: Default::default(),
-            joypad: Joypad::new(),
+            joypad: Default::default(),
             timer: Default::default(),
-            serial: Serial::new(),
+            serial: Default::default(),
             dma: Default::default(),
             cgb: Default::default(),
             mbc: Mbc::new(&[], &mut hw),

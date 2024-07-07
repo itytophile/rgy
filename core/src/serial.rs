@@ -5,6 +5,7 @@ use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
 
+#[derive(Default)]
 pub struct Serial {
     data: u8,
     recv: u8,
@@ -13,15 +14,6 @@ pub struct Serial {
 }
 
 impl Serial {
-    pub fn new() -> Self {
-        Self {
-            data: 0,
-            recv: 0,
-            ctrl: 0,
-            clock: 0,
-        }
-    }
-
     pub fn step(&mut self, time: usize, irq: &mut Irq, hw: &mut impl Hardware) {
         if self.ctrl & 0x80 == 0 {
             // No transfer

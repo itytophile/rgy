@@ -1,10 +1,8 @@
 use crate::cpu::Cpu;
 use crate::hardware::Hardware;
 use crate::ic::Irq;
-use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::mmu::{MemHandlers, Mmu, MmuWithoutMixerStream};
-use crate::serial::Serial;
 use crate::sound::MixerStream;
 use crate::VRAM_WIDTH;
 use log::*;
@@ -32,9 +30,9 @@ impl<'a> System<'a> {
             handlers: MemHandlers {
                 ic: Default::default(),
                 gpu: Default::default(),
-                joypad: Joypad::new(),
+                joypad: Default::default(),
                 timer: Default::default(),
-                serial: Serial::new(),
+                serial: Default::default(),
                 dma: Default::default(),
                 cgb: Default::default(),
                 mbc: Mbc::new(rom, hw),

@@ -11,14 +11,16 @@ pub struct Joypad {
     pressed: u8,
 }
 
-impl Joypad {
-    pub fn new() -> Self {
+impl Default for Joypad {
+    fn default() -> Self {
         Self {
             select: 0xff,
             pressed: 0x0f,
         }
     }
+}
 
+impl Joypad {
     pub fn poll(&mut self, irq: &mut Irq, hw: &mut impl Hardware) {
         let pressed = self.check(hw);
 
