@@ -19,6 +19,8 @@ const ROM_BANK_00_END: u16 = 0x3fff;
 const ROM_BANK_01_NN_START: u16 = 0x4000;
 const ROM_BANK_01_NN_END: u16 = 0x7fff;
 
+const ROM_BANK_LENGTH: u16 = 0x4000;
+
 const BOOT_ROM: &[u8] = {
     #[cfg(feature = "color")]
     {
@@ -94,7 +96,7 @@ impl<'a> Mbc1<'a> {
                 rom_bank
             };
 
-            let base = rom_bank * usize::from(ROM_BANK_01_NN_START);
+            let base = rom_bank * usize::from(ROM_BANK_LENGTH);
             let offset = usize::from(addr) - usize::from(ROM_BANK_01_NN_START);
             let addr = (base + offset) & (self.rom.len() - 1);
             MemRead::Replace(self.rom[addr])
@@ -182,7 +184,7 @@ impl<'a> Mbc2<'a> {
         if addr <= ROM_BANK_00_END {
             MemRead::Replace(self.rom[addr as usize])
         } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
-            let base = self.rom_bank.max(1) * usize::from(ROM_BANK_01_NN_START);
+            let base = self.rom_bank.max(1) * usize::from(ROM_BANK_LENGTH);
             let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=0xa1ff).contains(&addr) {
@@ -290,7 +292,7 @@ impl<'a> Mbc3<'a> {
             MemRead::Replace(self.rom[addr as usize])
         } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
             let rom_bank = self.rom_bank.max(1);
-            let base = rom_bank * usize::from(ROM_BANK_01_NN_START);
+            let base = rom_bank * usize::from(ROM_BANK_LENGTH);
             let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
@@ -466,7 +468,7 @@ impl<'a> Mbc5<'a> {
         if addr <= ROM_BANK_00_END {
             MemRead::Replace(self.rom[addr as usize])
         } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
-            let base = self.rom_bank * usize::from(ROM_BANK_01_NN_START);
+            let base = self.rom_bank * usize::from(ROM_BANK_LENGTH);
             let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
