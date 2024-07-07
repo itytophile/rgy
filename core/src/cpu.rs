@@ -1,4 +1,3 @@
-use crate::device::Device;
 use crate::ic::Ic;
 use crate::inst::decode;
 use crate::mmu::Mmu;
@@ -95,12 +94,12 @@ impl Cpu {
 
     /// Check if pending interrupts in the interrupt controller,
     /// and process them if any.
-    pub fn check_interrupt(&mut self, mmu: &mut Mmu, ic: &Device<Ic>) -> usize {
+    pub fn check_interrupt(&mut self, mmu: &mut Mmu, ic: &Ic) -> usize {
         if !self.ime {
             if self.halt {
                 // If HALT is executed while interrupt is disabled,
                 // the interrupt wakes up CPU without being consumed.
-                if let Some(value) = ic.borrow_mut().peek(mmu.irq) {
+                if let Some(value) = ic.peek(mmu.irq) {
                     debug!("Interrupted on halt + ime=0: {:02x}", value);
                     self.halt = false;
                 }
@@ -108,7 +107,7 @@ impl Cpu {
 
             0
         } else {
-            let value = match ic.borrow_mut().poll(mmu.irq) {
+            let value = match ic.poll(mmu.irq) {
                 Some(value) => value,
                 None => return 0,
             };
@@ -340,7 +339,7 @@ impl Cpu {
     }
 
     /// Fetches an opcode from the memory and returns it with its length.
-    pub fn fetch(&self, mmu: &Mmu) -> (u16, u16) {
+    pub fn fetch(&self, mmu: &mut Mmu) -> (u16, u16) {
         let pc = self.get_pc();
 
         let fb = mmu.get8(pc);

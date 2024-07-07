@@ -4,16 +4,13 @@ use crate::mmu::{MemRead, MemWrite, Mmu};
 use crate::sound::MixerStream;
 use log::*;
 
+#[derive(Default)]
 pub struct Dma {
     on: bool,
     src: u8,
 }
 
 impl Dma {
-    pub fn new() -> Self {
-        Self { on: false, src: 0 }
-    }
-
     pub fn step(&mut self, mmu: &mut Mmu) {
         if self.on {
             assert!(self.src <= 0x80 || self.src >= 0x9f);
@@ -21,7 +18,8 @@ impl Dma {
 
             let src = (self.src as u16) << 8;
             for i in 0..0xa0 {
-                mmu.set8(0xfe00 + i, mmu.get8(src + i));
+                let get = mmu.get8(src + i);
+                mmu.set8(0xfe00 + i, get);
             }
 
             self.on = false;

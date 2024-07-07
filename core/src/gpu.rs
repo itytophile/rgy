@@ -384,7 +384,7 @@ impl Default for Gpu {
 }
 
 impl Gpu {
-    fn hdma_run(&mut self, mmu: &Mmu) {
+    fn hdma_run(&mut self, mmu: &mut Mmu) {
         if let Some((dst, src, size)) = self.hdma.run() {
             for i in 0..size {
                 self.write_vram(dst + i, mmu.get8(src + i), self.vram_select);
@@ -475,7 +475,7 @@ impl Gpu {
         line_to_draw
     }
 
-    fn draw(&mut self, mmu: &Mmu) -> Option<(u8, [u32; VRAM_WIDTH])> {
+    fn draw(&mut self, mmu: &mut Mmu) -> Option<(u8, [u32; VRAM_WIDTH])> {
         if self.ly >= VRAM_HEIGHT as u8 {
             return None;
         }

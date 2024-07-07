@@ -13,9 +13,8 @@ pub struct Cgb {
     wram_bank: [[u8; 0x1000]; 8],
 }
 
-#[allow(unused)]
-impl Cgb {
-    pub fn new() -> Self {
+impl Default for Cgb {
+    fn default() -> Self {
         Self {
             double_speed: false,
             speed_switch: false,
@@ -23,7 +22,10 @@ impl Cgb {
             wram_bank: [[0; 0x1000]; 8],
         }
     }
+}
 
+#[allow(unused)]
+impl Cgb {
     pub fn try_switch_speed(&mut self) {
         if self.speed_switch {
             self.double_speed = !self.double_speed;
