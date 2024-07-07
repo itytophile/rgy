@@ -67,6 +67,19 @@ struct Mbc1<'a> {
     ram_select: bool,
 }
 
+// https://gbdev.io/pandocs/MBC1.html#registers
+// RAM Enable (Write Only)
+const MBC1_RAM_ENABLE_END: u16 = 0x1fff;
+// ROM Bank Number (Write Only)
+const MBC1_ROM_BANK_NUMBER_START: u16 = 0x2000;
+const MBC1_ROM_BANK_NUMBER_END: u16 = 0x3fff;
+// RAM Bank Number (Write Only)
+const MBC1_RAM_BANK_NUMBER_START: u16 = 0x4000;
+const MBC1_RAM_BANK_NUMBER_END: u16 = 0x5fff;
+// Banking Mode Select (Write Only)
+const MBC1_BANKING_MODE_SELECT_START: u16 = 0x6000;
+const MBC1_BANKING_MODE_SELECT_END: u16 = 0x7fff;
+
 impl<'a> Mbc1<'a> {
     fn new(rom: &'a [u8]) -> Self {
         info!("MBC1");
@@ -81,40 +94,41 @@ impl<'a> Mbc1<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= ROM_BANK_00_END {
-            MemRead::Replace(self.rom[addr as usize])
-        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
-            let rom_bank = self.rom_bank.max(1);
+        match addr {
+            ..=ROM_BANK_00_END => MemRead::Replace(self.rom[addr as usize]),
+            ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
+                let rom_bank = self.rom_bank.max(1);
 
-            // ROM bank 0x20, 0x40, 0x60 are somehow not available
-            let rom_bank = if rom_bank == 0x20 || rom_bank == 0x40 || rom_bank == 0x60 {
-                warn!("Odd ROM bank selection: {:02x}", rom_bank);
-                rom_bank + 1
-            } else {
-                rom_bank
-            };
+                // ROM bank 0x20, 0x40, 0x60 are somehow not available
+                let rom_bank = if rom_bank == 0x20 || rom_bank == 0x40 || rom_bank == 0x60 {
+                    warn!("Odd ROM bank selection: {:02x}", rom_bank);
+                    rom_bank + 1
+                } else {
+                    rom_bank
+                };
 
-            let base = rom_bank * usize::from(ROM_BANK_LENGTH);
-            let offset = usize::from(addr) - usize::from(ROM_BANK_01_NN_START);
-            let addr = (base + offset) & (self.rom.len() - 1);
-            MemRead::Replace(self.rom[addr])
-        } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
-            if self.ram_enable {
-                let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
-                let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
+                let base = rom_bank * usize::from(ROM_BANK_LENGTH);
+                let offset = usize::from(addr) - usize::from(ROM_BANK_01_NN_START);
                 let addr = (base + offset) & (self.rom.len() - 1);
-                MemRead::Replace(self.ram[addr])
-            } else {
-                warn!("Read from disabled external RAM: {:04x}", addr);
-                MemRead::Replace(0)
+                MemRead::Replace(self.rom[addr])
             }
-        } else {
-            MemRead::PassThrough
+            EXTERNAL_RAM_START..=EXTERNAL_RAM_END => {
+                if self.ram_enable {
+                    let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
+                    let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
+                    let addr = (base + offset) & (self.rom.len() - 1);
+                    MemRead::Replace(self.ram[addr])
+                } else {
+                    warn!("Read from disabled external RAM: {:04x}", addr);
+                    MemRead::Replace(0)
+                }
+            }
+            _ => MemRead::PassThrough,
         }
     }
 
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
-        if addr <= 0x1fff {
+        if addr <= MBC1_RAM_ENABLE_END {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
                 self.ram_enable = true;
@@ -124,18 +138,18 @@ impl<'a> Mbc1<'a> {
                 hw.save_ram(self.ram.as_slice());
             }
             MemWrite::Block
-        } else if (0x2000..=ROM_BANK_00_END).contains(&addr) {
+        } else if (MBC1_ROM_BANK_NUMBER_START..=MBC1_ROM_BANK_NUMBER_END).contains(&addr) {
             self.rom_bank = (self.rom_bank & !0x1f) | (value as usize & 0x1f);
             debug!("Switch ROM bank to {:02x}", self.rom_bank);
             MemWrite::Block
-        } else if (ROM_BANK_01_NN_START..=0x5fff).contains(&addr) {
+        } else if (MBC1_RAM_BANK_NUMBER_START..=MBC1_RAM_BANK_NUMBER_END).contains(&addr) {
             if self.ram_select {
                 self.ram_bank = value as usize & 0x3;
             } else {
                 self.rom_bank = (self.rom_bank & !0x60) | ((value as usize & 0x3) << 5);
             }
             MemWrite::Block
-        } else if (0x6000..=ROM_BANK_01_NN_END).contains(&addr) {
+        } else if (MBC1_BANKING_MODE_SELECT_START..=MBC1_BANKING_MODE_SELECT_END).contains(&addr) {
             if value == 0x00 {
                 self.ram_select = false;
             } else if value == 0x01 {
