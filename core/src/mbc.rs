@@ -19,7 +19,8 @@ const ROM_BANK_00_END: u16 = 0x3fff;
 const ROM_BANK_01_NN_START: u16 = 0x4000;
 const ROM_BANK_01_NN_END: u16 = 0x7fff;
 
-const ROM_BANK_LENGTH: u16 = 0x4000;
+const ROM_BANK_LENGTH: u16 = 0x4000; // 16 KiB
+const RAM_BANK_LENGTH: u16 = 0x2000; // 8 KiB
 
 const BOOT_ROM: &[u8] = {
     #[cfg(feature = "color")]
@@ -62,7 +63,7 @@ impl<'a> MbcNone<'a> {
 
 struct Mbc1<'a> {
     rom: &'a [u8],
-    ram: Ram<0x8000>, // + 1 because range is inclusive
+    ram: Ram<0x8000>,
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -102,7 +103,7 @@ impl<'a> Mbc1<'a> {
             MemRead::Replace(self.rom[addr])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             if self.ram_enable {
-                let base = self.ram_bank * 0x2000;
+                let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
                 let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                 let addr = (base + offset) & (self.rom.len() - 1);
                 MemRead::Replace(self.ram[addr])
@@ -148,7 +149,7 @@ impl<'a> Mbc1<'a> {
             MemWrite::Block
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             if self.ram_enable {
-                let base = self.ram_bank * 0x2000;
+                let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
                 let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                 self.ram[base + offset] = value;
                 MemWrite::Block
@@ -298,7 +299,7 @@ impl<'a> Mbc3<'a> {
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             match self.select {
                 x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
-                    let base = x as usize * 0x2000;
+                    let base = x as usize * usize::from(RAM_BANK_LENGTH);
                     let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                     MemRead::Replace(self.ram[base + offset])
                 }
@@ -346,7 +347,7 @@ impl<'a> Mbc3<'a> {
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             match self.select {
                 x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
-                    let base = x as usize * 0x2000;
+                    let base = x as usize * usize::from(RAM_BANK_LENGTH);
                     let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                     self.ram[base + offset] = value;
                     MemWrite::Block
@@ -473,7 +474,7 @@ impl<'a> Mbc5<'a> {
             MemRead::Replace(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             if self.ram_enable {
-                let base = self.ram_bank * 0x2000;
+                let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
                 let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                 MemRead::Replace(self.ram[base + offset])
             } else {
@@ -509,7 +510,7 @@ impl<'a> Mbc5<'a> {
             MemWrite::Block
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             if self.ram_enable {
-                let base = self.ram_bank * 0x2000;
+                let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
                 let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                 self.ram[base + offset] = value;
                 MemWrite::Block
