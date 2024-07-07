@@ -60,23 +60,23 @@ impl<'a> Default for MmuWithoutMixerStream<'a> {
     }
 }
 
-impl<'a, 'c> Mmu<'a, 'c> {
-    fn get_handler_from_address<'b>(
-        handlers: &'b [((u16, u16), &dyn MemHandler)],
-        addr: u16,
-    ) -> Option<&'b dyn MemHandler> {
-        handlers.iter().find_map(move |(range, handler)| {
-            if (range.0..=range.1).contains(&addr) {
-                Some(*handler)
-            } else {
-                None
-            }
-        })
-    }
+fn get_handler_from_address<'a>(
+    handlers: &[((u16, u16), &'a dyn MemHandler)],
+    addr: u16,
+) -> Option<&'a dyn MemHandler> {
+    handlers.iter().find_map(move |(range, handler)| {
+        if (range.0..=range.1).contains(&addr) {
+            Some(*handler)
+        } else {
+            None
+        }
+    })
+}
 
+impl<'a, 'b> Mmu<'a, 'b> {
     /// Reads one byte from the given address in the memory.
     pub fn get8(&self, addr: u16) -> u8 {
-        if let Some(handler) = Self::get_handler_from_address(&self.inner.handlers, addr) {
+        if let Some(handler) = get_handler_from_address(&self.inner.handlers, addr) {
             match handler.on_read(addr, self.mixer_stream) {
                 MemRead::Replace(alt) => return alt,
                 MemRead::PassThrough => {}
@@ -92,7 +92,7 @@ impl<'a, 'c> Mmu<'a, 'c> {
 
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
-        if let Some(handler) = Self::get_handler_from_address(&self.inner.handlers, addr) {
+        if let Some(handler) = get_handler_from_address(&self.inner.handlers, addr) {
             match handler.on_write(addr, v, self.mixer_stream) {
                 MemWrite::Replace(alt) => {
                     self.inner.ram[addr as usize] = alt;
