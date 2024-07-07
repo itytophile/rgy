@@ -47,9 +47,12 @@ impl<'a> MbcNone<'a> {
     }
 }
 
+const MBC1_RAM_START: u16 = 0xa000;
+const MBC1_RAM_END: u16 = 0xbfff;
+
 struct Mbc1<'a> {
     rom: &'a [u8],
-    ram: Ram<0x8000>,
+    ram: Ram<0x8000>, // + 1 because range is inclusive
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -58,6 +61,7 @@ struct Mbc1<'a> {
 
 impl<'a> Mbc1<'a> {
     fn new(rom: &'a [u8]) -> Self {
+        info!("MBC1");
         Self {
             rom,
             ram: Default::default(),
@@ -86,10 +90,10 @@ impl<'a> Mbc1<'a> {
             let offset = addr as usize - 0x4000;
             let addr = (base + offset) & (self.rom.len() - 1);
             MemRead::Replace(self.rom[addr])
-        } else if (0xa000..=0xbfff).contains(&addr) {
+        } else if (MBC1_RAM_START..=MBC1_RAM_END).contains(&addr) {
             if self.ram_enable {
                 let base = self.ram_bank * 0x2000;
-                let offset = addr as usize - 0xa000;
+                let offset = usize::from(addr) - usize::from(MBC1_RAM_START);
                 let addr = (base + offset) & (self.rom.len() - 1);
                 MemRead::Replace(self.ram[addr])
             } else {
@@ -132,10 +136,10 @@ impl<'a> Mbc1<'a> {
                 unimplemented!("Invalid ROM/RAM select mode");
             }
             MemWrite::Block
-        } else if (0xa000..=0xbfff).contains(&addr) {
+        } else if (MBC1_RAM_START..=MBC1_RAM_END).contains(&addr) {
             if self.ram_enable {
                 let base = self.ram_bank * 0x2000;
-                let offset = addr as usize - 0xa000;
+                let offset = usize::from(addr) - usize::from(MBC1_RAM_START);
                 self.ram[base + offset] = value;
                 MemWrite::Block
             } else {
@@ -157,6 +161,7 @@ struct Mbc2<'a> {
 
 impl<'a> Mbc2<'a> {
     fn new(rom: &'a [u8]) -> Self {
+        info!("MBC2");
         Self {
             rom,
             ram: Default::default(),
@@ -243,6 +248,7 @@ struct Mbc3<'a> {
 
 impl<'a> Mbc3<'a> {
     fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
+        info!("MBC3");
         let mut s = Self {
             rom,
             ram: Default::default(),
@@ -436,6 +442,7 @@ struct Mbc5<'a> {
 #[cfg(feature = "mb5")]
 impl<'a> Mbc5<'a> {
     fn new(rom: &'a [u8]) -> Self {
+        info!("MBC5");
         Self {
             rom,
             ram: Default::default(),
@@ -511,6 +518,7 @@ struct HuC1<'a> {
 
 impl<'a> HuC1<'a> {
     fn new(rom: &'a [u8]) -> Self {
+        info!("HuC1");
         Self { rom }
     }
 
