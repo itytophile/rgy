@@ -90,7 +90,8 @@ fn op_0007(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
 #[allow(unused_variables)]
 fn op_0008(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
     let v = cpu.get_sp();
-    mmu.set16(mmu.get16(cpu.get_pc().wrapping_add(arg)), v);
+    let addr = mmu.get16(cpu.get_pc().wrapping_add(arg));
+    mmu.set16(addr, v);
 
     (20, 3)
 }
@@ -2561,7 +2562,8 @@ fn op_00df(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
 #[allow(unused_variables)]
 fn op_00e0(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
     let v = cpu.get_a();
-    mmu.set8(0xff00 + mmu.get8(cpu.get_pc().wrapping_add(arg)) as u16, v);
+    let offset = mmu.get8(cpu.get_pc().wrapping_add(arg));
+    mmu.set8(0xff00 + offset as u16, v);
 
     (12, 2)
 }
@@ -2642,7 +2644,8 @@ fn op_00e9(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
 #[allow(unused_variables)]
 fn op_00ea(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
     let v = cpu.get_a();
-    mmu.set8(mmu.get16(cpu.get_pc().wrapping_add(arg)), v);
+    let addr = mmu.get16(cpu.get_pc().wrapping_add(arg));
+    mmu.set8(addr, v);
 
     (16, 3)
 }
@@ -2672,7 +2675,8 @@ fn op_00ef(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
 /// ld a,(0xff00+a8)
 #[allow(unused_variables)]
 fn op_00f0(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
-    let v = mmu.get8(0xff00 + mmu.get8(cpu.get_pc().wrapping_add(arg)) as u16);
+    let offset = mmu.get8(cpu.get_pc().wrapping_add(arg));
+    let v = mmu.get8(0xff00 + offset as u16);
     cpu.set_a(v);
 
     (12, 2)
@@ -2761,7 +2765,8 @@ fn op_00f9(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
 /// ld a,(a16)
 #[allow(unused_variables)]
 fn op_00fa(arg: u16, cpu: &mut Cpu, mmu: &mut Mmu) -> (usize, usize) {
-    let v = mmu.get8(mmu.get16(cpu.get_pc().wrapping_add(arg)));
+    let addr = mmu.get16(cpu.get_pc().wrapping_add(arg));
+    let v = mmu.get8(addr);
     cpu.set_a(v);
 
     (16, 3)
