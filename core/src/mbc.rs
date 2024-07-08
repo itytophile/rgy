@@ -201,23 +201,24 @@ impl<'a> Mbc2<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= ROM_BANK_00_END {
-            MemRead::Replace(self.rom[addr as usize])
-        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
-            let base = self.rom_bank.max(1) * usize::from(ROM_BANK_LENGTH);
-            let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
-            MemRead::Replace(self.rom[base + offset])
-        } else if (EXTERNAL_RAM_START..=MBC2_RAM_END).contains(&addr) {
-            if self.ram_enable {
-                MemRead::Replace(
-                    self.ram[usize::from(addr) - usize::from(EXTERNAL_RAM_START)] & 0xf,
-                )
-            } else {
-                warn!("Read from disabled cart RAM: {:04x}", addr);
-                MemRead::Replace(0)
+        match addr {
+            0..=ROM_BANK_00_END => MemRead::Replace(self.rom[addr as usize]),
+            ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
+                let base = self.rom_bank.max(1) * usize::from(ROM_BANK_LENGTH);
+                let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
+                MemRead::Replace(self.rom[base + offset])
             }
-        } else {
-            MemRead::PassThrough
+            EXTERNAL_RAM_START..=MBC2_RAM_END => {
+                if self.ram_enable {
+                    MemRead::Replace(
+                        self.ram[usize::from(addr) - usize::from(EXTERNAL_RAM_START)] & 0xf,
+                    )
+                } else {
+                    warn!("Read from disabled cart RAM: {:04x}", addr);
+                    MemRead::Replace(0)
+                }
+            }
+            _ => MemRead::PassThrough,
         }
     }
 
