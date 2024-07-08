@@ -285,6 +285,22 @@ struct Mbc3<'a> {
     prelatch: bool,
 }
 
+// https://gbdev.io/pandocs/MBC3.html
+// RAM and Timer Enable (Write Only)
+const MBC3_RAM_AND_TIMER_ENABLE_END: u16 = 0x1fff;
+// ROM Bank Number (Write Only)
+const MBC3_ROM_BANK_NUMBER_START: u16 = 0x2000;
+const MBC3_ROM_BANK_NUMBER_END: u16 = 0x3fff;
+// RAM Bank Number - or - RTC Register Select (Write Only)
+const MBC3_RAM_BANK_NUMBER_OR_RTC_REGISTER_SELECT_START: u16 = 0x4000;
+const MBC3_RAM_BANK_NUMBER_OR_RTC_REGISTER_SELECT_END: u16 = 0x5fff;
+// Latch Clock Data (Write Only)
+const MBC3_LATCH_CLOCK_DATA_START: u16 = 0x6000;
+const MBC3_LATCH_CLOCK_DATA_END: u16 = 0x7fff;
+// RTC Register 08-0C (Read/Write)
+const MBC3_RTC_REGISTER_START: u16 = 0xa000;
+const MBC3_RTC_REGISTER_END: u16 = 0xbfff;
+
 impl<'a> Mbc3<'a> {
     fn new(rom: &'a [u8], hw: &mut impl Hardware) -> Self {
         info!("MBC3");
@@ -341,7 +357,7 @@ impl<'a> Mbc3<'a> {
     }
 
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
-        if addr <= 0x1fff {
+        if addr <= MBC3_RAM_AND_TIMER_ENABLE_END {
             if value == 0x00 {
                 info!("External RAM/RTC disabled");
                 self.enable = false;
@@ -350,16 +366,19 @@ impl<'a> Mbc3<'a> {
                 self.enable = true;
             }
             MemWrite::Block
-        } else if (0x2000..=ROM_BANK_00_END).contains(&addr) {
+        } else if (MBC3_ROM_BANK_NUMBER_START..=MBC3_ROM_BANK_NUMBER_END).contains(&addr) {
             self.rom_bank = value as usize & 0x7f;
             trace!("Switch ROM bank to {}", self.rom_bank);
             MemWrite::Block
-        } else if (ROM_BANK_01_NN_START..=0x5fff).contains(&addr) {
+        } else if (MBC3_RAM_BANK_NUMBER_OR_RTC_REGISTER_SELECT_START
+            ..=MBC3_RAM_BANK_NUMBER_OR_RTC_REGISTER_SELECT_END)
+            .contains(&addr)
+        {
             self.select = value;
             self.save(hw);
             debug!("Select RAM bank/RTC: {:02x}", self.select);
             MemWrite::Block
-        } else if (0x6000..=ROM_BANK_01_NN_END).contains(&addr) {
+        } else if (MBC3_LATCH_CLOCK_DATA_START..=MBC3_LATCH_CLOCK_DATA_END).contains(&addr) {
             if self.prelatch {
                 if value == 0x01 {
                     self.latch(hw);
@@ -369,7 +388,7 @@ impl<'a> Mbc3<'a> {
                 self.prelatch = true;
             }
             MemWrite::Block
-        } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
+        } else if (MBC3_RTC_REGISTER_START..=MBC3_RTC_REGISTER_END).contains(&addr) {
             match self.select {
                 x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
                     let base = x as usize * usize::from(RAM_BANK_LENGTH);
