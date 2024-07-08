@@ -315,15 +315,15 @@ impl<'a> Mbc3<'a> {
     }
 
     fn on_read(&mut self, addr: u16) -> MemRead {
-        if addr <= ROM_BANK_00_END {
-            MemRead::Replace(self.rom[addr as usize])
-        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
-            let rom_bank = self.rom_bank.max(1);
-            let base = rom_bank * usize::from(ROM_BANK_LENGTH);
-            let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
-            MemRead::Replace(self.rom[base + offset])
-        } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
-            match self.select {
+        match addr {
+            ..=ROM_BANK_00_END => MemRead::Replace(self.rom[addr as usize]),
+            ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
+                let rom_bank = self.rom_bank.max(1);
+                let base = rom_bank * usize::from(ROM_BANK_LENGTH);
+                let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
+                MemRead::Replace(self.rom[base + offset])
+            }
+            EXTERNAL_RAM_START..=EXTERNAL_RAM_END => match self.select {
                 x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
                     let base = x as usize * usize::from(RAM_BANK_LENGTH);
                     let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
@@ -335,9 +335,8 @@ impl<'a> Mbc3<'a> {
                 0x0b => MemRead::Replace(self.rtc_day_low),
                 0x0c => MemRead::Replace(self.rtc_day_high),
                 s => unimplemented!("Unknown selector: {:02x}", s),
-            }
-        } else {
-            unreachable!("Invalid read from ROM: {:02x}", addr);
+            },
+            _ => unreachable!("Invalid read from ROM: {:02x}", addr),
         }
     }
 
