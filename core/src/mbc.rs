@@ -223,43 +223,49 @@ impl<'a> Mbc2<'a> {
     }
 
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
-        if addr <= 0x1fff {
-            if addr & 0x100 == 0 {
-                self.ram_enable = (value & 0x0f) == 0x0a;
-                info!(
-                    "Cart RAM {} {:02x}",
-                    if self.ram_enable {
-                        "enabled"
-                    } else {
-                        "disabled"
-                    },
-                    value
-                );
-                if !self.ram_enable {
-                    hw.save_ram(self.ram.as_slice());
+        match addr {
+            ..=0x1fff => {
+                if addr & 0x100 == 0 {
+                    self.ram_enable = (value & 0x0f) == 0x0a;
+                    info!(
+                        "Cart RAM {} {:02x}",
+                        if self.ram_enable {
+                            "enabled"
+                        } else {
+                            "disabled"
+                        },
+                        value
+                    );
+                    if !self.ram_enable {
+                        hw.save_ram(self.ram.as_slice());
+                    }
+                }
+                MemWrite::Block
+            }
+            0x2000..=ROM_BANK_00_END => {
+                if addr & 0x100 != 0 {
+                    self.rom_bank = (value as usize & 0xf).max(1);
+                    debug!("Switch ROM bank to {:02x}", self.rom_bank);
+                }
+                MemWrite::Block
+            }
+            ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
+                warn!("Writing to read-only range: {:04x} {:02x}", addr, value);
+                MemWrite::Block
+            }
+            EXTERNAL_RAM_START..=0xa1ff => {
+                if self.ram_enable {
+                    self.ram[usize::from(addr) - usize::from(EXTERNAL_RAM_START)] = value & 0xf;
+                    MemWrite::Block
+                } else {
+                    warn!("Write to disabled cart RAM: {:04x} {:02x}", addr, value);
+                    MemWrite::Block
                 }
             }
-            MemWrite::Block
-        } else if (0x2000..=ROM_BANK_00_END).contains(&addr) {
-            if addr & 0x100 != 0 {
-                self.rom_bank = (value as usize & 0xf).max(1);
-                debug!("Switch ROM bank to {:02x}", self.rom_bank);
+            _ => {
+                warn!("write to rom {:04x} {:02x}", addr, value);
+                MemWrite::PassThrough
             }
-            MemWrite::Block
-        } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
-            warn!("Writing to read-only range: {:04x} {:02x}", addr, value);
-            MemWrite::Block
-        } else if (EXTERNAL_RAM_START..=0xa1ff).contains(&addr) {
-            if self.ram_enable {
-                self.ram[usize::from(addr) - usize::from(EXTERNAL_RAM_START)] = value & 0xf;
-                MemWrite::Block
-            } else {
-                warn!("Write to disabled cart RAM: {:04x} {:02x}", addr, value);
-                MemWrite::Block
-            }
-        } else {
-            warn!("write to rom {:04x} {:02x}", addr, value);
-            MemWrite::PassThrough
         }
     }
 }
