@@ -28,6 +28,6 @@ impl IoHandler for Dma {
     }
 
     fn on_read(&mut self, _addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
-        MemRead::Replace(0)
+        MemRead(0)
     }
 }

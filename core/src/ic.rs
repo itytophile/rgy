@@ -101,13 +101,13 @@ impl IoHandler for Ic {
         if addr == 0xffff {
             let v = self.enable.get();
             info!("Read interrupt enable: {:02x}", v);
-            MemRead::Replace(v)
+            MemRead(v)
         } else if addr == 0xff0f {
             let v = irq.request.get();
             info!("Read interrupt: {:02x}", v);
-            MemRead::Replace(v)
+            MemRead(v)
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 

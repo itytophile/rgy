@@ -43,22 +43,24 @@ impl IoHandler for Cgb {
     fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
-            MemRead::Replace(self.wram_bank[0][off])
+            MemRead(self.wram_bank[0][off])
         } else if (0xd000..=0xdfff).contains(&addr) {
             let off = addr as usize - 0xd000;
-            MemRead::Replace(self.wram_bank[self.wram_select][off])
+            MemRead(self.wram_bank[self.wram_select][off])
         } else if addr == 0xff4d {
             let mut v = 0;
             v |= if self.double_speed { 0x80 } else { 0x00 };
             v |= if self.speed_switch { 0x01 } else { 0x00 };
-            MemRead::Replace(v)
-        } else if addr == 0xff56 {
-            warn!("Infrared read");
-            MemRead::PassThrough
-        } else if addr == 0xff70 {
-            MemRead::Replace(self.wram_select as u8)
+            MemRead(v)
+        }
+        // else if addr == 0xff56 {
+        //     warn!("Infrared read");
+        //     MemRead::PassThrough
+        // }
+        else if addr == 0xff70 {
+            MemRead(self.wram_select as u8)
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 

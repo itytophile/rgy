@@ -44,8 +44,8 @@ impl<'a> MbcNone<'a> {
 
     fn on_read(&mut self, addr: u16) -> MemRead {
         match addr {
-            ..=ROM_BANK_01_NN_END => MemRead::Replace(self.rom[addr as usize]),
-            _ => MemRead::PassThrough,
+            ..=ROM_BANK_01_NN_END => MemRead(self.rom[addr as usize]),
+            _ => unreachable!(),
         }
     }
 
@@ -95,7 +95,7 @@ impl<'a> Mbc1<'a> {
 
     fn on_read(&mut self, addr: u16) -> MemRead {
         match addr {
-            ..=ROM_BANK_00_END => MemRead::Replace(self.rom[addr as usize]),
+            ..=ROM_BANK_00_END => MemRead(self.rom[addr as usize]),
             ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
                 let rom_bank = self.rom_bank.max(1);
 
@@ -110,20 +110,20 @@ impl<'a> Mbc1<'a> {
                 let base = rom_bank * usize::from(ROM_BANK_LENGTH);
                 let offset = usize::from(addr) - usize::from(ROM_BANK_01_NN_START);
                 let addr = (base + offset) & (self.rom.len() - 1);
-                MemRead::Replace(self.rom[addr])
+                MemRead(self.rom[addr])
             }
             EXTERNAL_RAM_START..=EXTERNAL_RAM_END => {
                 if self.ram_enable {
                     let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
                     let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
                     let addr = (base + offset) & (self.rom.len() - 1);
-                    MemRead::Replace(self.ram[addr])
+                    MemRead(self.ram[addr])
                 } else {
                     warn!("Read from disabled external RAM: {:04x}", addr);
-                    MemRead::Replace(0)
+                    MemRead(0)
                 }
             }
-            _ => MemRead::PassThrough,
+            _ => unreachable!(),
         }
     }
 
@@ -202,23 +202,23 @@ impl<'a> Mbc2<'a> {
 
     fn on_read(&mut self, addr: u16) -> MemRead {
         match addr {
-            0..=ROM_BANK_00_END => MemRead::Replace(self.rom[addr as usize]),
+            0..=ROM_BANK_00_END => MemRead(self.rom[addr as usize]),
             ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
                 let base = self.rom_bank.max(1) * usize::from(ROM_BANK_LENGTH);
                 let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
-                MemRead::Replace(self.rom[base + offset])
+                MemRead(self.rom[base + offset])
             }
             EXTERNAL_RAM_START..=MBC2_RAM_END => {
                 if self.ram_enable {
-                    MemRead::Replace(
+                    MemRead(
                         self.ram[usize::from(addr) - usize::from(EXTERNAL_RAM_START)] & 0xf,
                     )
                 } else {
                     warn!("Read from disabled cart RAM: {:04x}", addr);
-                    MemRead::Replace(0)
+                    MemRead(0)
                 }
             }
-            _ => MemRead::PassThrough,
+            _ => unreachable!(),
         }
     }
 
@@ -332,24 +332,24 @@ impl<'a> Mbc3<'a> {
 
     fn on_read(&mut self, addr: u16) -> MemRead {
         match addr {
-            ..=ROM_BANK_00_END => MemRead::Replace(self.rom[addr as usize]),
+            ..=ROM_BANK_00_END => MemRead(self.rom[addr as usize]),
             ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END => {
                 let rom_bank = self.rom_bank.max(1);
                 let base = rom_bank * usize::from(ROM_BANK_LENGTH);
                 let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
-                MemRead::Replace(self.rom[base + offset])
+                MemRead(self.rom[base + offset])
             }
             EXTERNAL_RAM_START..=EXTERNAL_RAM_END => match self.select {
                 x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
                     let base = x as usize * usize::from(RAM_BANK_LENGTH);
                     let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
-                    MemRead::Replace(self.ram[base + offset])
+                    MemRead(self.ram[base + offset])
                 }
-                0x08 => MemRead::Replace(self.rtc_secs),
-                0x09 => MemRead::Replace(self.rtc_mins),
-                0x0a => MemRead::Replace(self.rtc_hours),
-                0x0b => MemRead::Replace(self.rtc_day_low),
-                0x0c => MemRead::Replace(self.rtc_day_high),
+                0x08 => MemRead(self.rtc_secs),
+                0x09 => MemRead(self.rtc_mins),
+                0x0a => MemRead(self.rtc_hours),
+                0x0b => MemRead(self.rtc_day_low),
+                0x0c => MemRead(self.rtc_day_high),
                 s => unimplemented!("Unknown selector: {:02x}", s),
             },
             _ => unreachable!("Invalid read from ROM: {:02x}", addr),
@@ -511,22 +511,22 @@ impl<'a> Mbc5<'a> {
 
     fn on_read(&mut self, addr: u16) -> MemRead {
         if addr <= ROM_BANK_00_END {
-            MemRead::Replace(self.rom[addr as usize])
+            MemRead(self.rom[addr as usize])
         } else if (ROM_BANK_01_NN_START..=ROM_BANK_01_NN_END).contains(&addr) {
             let base = self.rom_bank * usize::from(ROM_BANK_LENGTH);
             let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
-            MemRead::Replace(self.rom[base + offset])
+            MemRead(self.rom[base + offset])
         } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
             if self.ram_enable {
                 let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
                 let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
-                MemRead::Replace(self.ram[base + offset])
+                MemRead(self.ram[base + offset])
             } else {
                 warn!("Read from disabled external RAM: {:04x}", addr);
-                MemRead::Replace(0)
+                MemRead(0)
             }
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 
@@ -739,7 +739,7 @@ impl<'a> Mbc<'a> {
 impl<'a> IoHandler for Mbc<'a> {
     fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if self.use_boot_rom && self.in_boot_rom(addr) {
-            MemRead::Replace(BOOT_ROM[addr as usize])
+            MemRead(BOOT_ROM[addr as usize])
         } else {
             self.cartridge.on_read(addr)
         }

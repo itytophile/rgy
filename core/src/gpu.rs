@@ -543,60 +543,63 @@ impl Gpu {
 impl IoHandler for Gpu {
     fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if (0x8000..=0x9fff).contains(&addr) {
-            MemRead::Replace(self.read_vram(addr, self.vram_select))
+            MemRead(self.read_vram(addr, self.vram_select))
         } else if addr == 0xff40 {
-            MemRead::Replace(self.on_read_ctrl())
+            MemRead(self.on_read_ctrl())
         } else if addr == 0xff41 {
-            MemRead::Replace(self.on_read_status())
+            MemRead(self.on_read_status())
         } else if addr == 0xff42 {
-            MemRead::Replace(self.scy)
+            MemRead(self.scy)
         } else if addr == 0xff43 {
-            MemRead::Replace(self.scx)
+            MemRead(self.scx)
         } else if addr == 0xff44 {
-            MemRead::Replace(self.ly)
+            MemRead(self.ly)
         } else if addr == 0xff45 {
-            MemRead::Replace(self.lyc)
+            MemRead(self.lyc)
         } else if addr == 0xff46 {
             unreachable!("DMA request")
         } else if addr == 0xff47 {
             debug!("Read Bg palette");
-            MemRead::Replace(from_palette(&self.bg_palette))
+            MemRead(from_palette(&self.bg_palette))
         } else if addr == 0xff48 {
             debug!("Read Object palette 0");
-            MemRead::Replace(from_palette(&self.obj_palette0))
+            MemRead(from_palette(&self.obj_palette0))
         } else if addr == 0xff49 {
             debug!("Read Object palette 1");
-            MemRead::Replace(from_palette(&self.obj_palette1))
+            MemRead(from_palette(&self.obj_palette1))
         } else if addr == 0xff4a {
-            MemRead::Replace(self.wy)
+            MemRead(self.wy)
         } else if addr == 0xff4b {
-            MemRead::Replace(self.wx)
+            MemRead(self.wx)
         } else if addr == 0xff4f {
-            MemRead::Replace(self.vram_select as u8 & 0xfe)
+            MemRead(self.vram_select as u8 & 0xfe)
         } else if addr == 0xff51 {
-            MemRead::Replace(self.hdma.src_high)
+            MemRead(self.hdma.src_high)
         } else if addr == 0xff52 {
-            MemRead::Replace(self.hdma.src_low)
+            MemRead(self.hdma.src_low)
         } else if addr == 0xff53 {
-            MemRead::Replace(self.hdma.dst_high)
+            MemRead(self.hdma.dst_high)
         } else if addr == 0xff54 {
-            MemRead::Replace(self.hdma.dst_low)
+            MemRead(self.hdma.dst_low)
         } else if addr == 0xff55 {
             let mut v = 0;
             v |= self.hdma.len & 0x7f;
             v |= if self.hdma.on { 0x00 } else { 0x80 };
-            MemRead::Replace(v)
-        } else if addr == 0xff68 {
-            MemRead::PassThrough
-        } else if addr == 0xff69 {
-            MemRead::Replace(self.bg_color_palette.read())
-        } else if addr == 0xff6a {
-            MemRead::PassThrough
-        } else if addr == 0xff6b {
-            MemRead::Replace(self.obj_color_palette.read())
+            MemRead(v)
+        }
+        // else if addr == 0xff68 {
+        //     MemRead::PassThrough
+        // }
+        else if addr == 0xff69 {
+            MemRead(self.bg_color_palette.read())
+        }
+        // else if addr == 0xff6a {
+        //     MemRead::PassThrough
+        // }
+        else if addr == 0xff6b {
+            MemRead(self.obj_color_palette.read())
         } else {
-            warn!("Unsupported GPU register read: {:04x}", addr);
-            MemRead::Replace(0)
+            unreachable!()
         }
     }
 

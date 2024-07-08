@@ -45,9 +45,9 @@ impl Serial {
 impl IoHandler for Serial {
     fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         if addr == 0xff01 {
-            MemRead::Replace(self.data)
+            MemRead(self.data)
         } else if addr == 0xff02 {
-            MemRead::Replace(self.ctrl)
+            MemRead(self.ctrl)
         } else {
             unreachable!("Read from serial: {:04x}", addr)
         }

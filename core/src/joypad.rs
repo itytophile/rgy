@@ -93,9 +93,9 @@ impl IoHandler for Joypad {
         if addr == 0xff00 {
             debug!("Joypad read: dir: {:02x}", self.select);
 
-            MemRead::Replace(self.check(hw))
+            MemRead(self.check(hw))
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 

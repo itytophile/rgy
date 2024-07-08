@@ -232,9 +232,9 @@ struct Tone {
 impl Tone {
     fn on_read(&mut self, base: u16, addr: u16) -> MemRead {
         if addr == base + 3 {
-            MemRead::Replace(0xff)
+            MemRead(0xff)
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 
@@ -341,9 +341,9 @@ pub struct Wave {
 impl Wave {
     fn on_read(&mut self, addr: u16) -> MemRead {
         if addr == 0xff1d {
-            MemRead::Replace(0xff)
+            MemRead(0xff)
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 
@@ -447,7 +447,7 @@ struct Noise {
 
 impl Noise {
     fn on_read(&mut self, _addr: u16) -> MemRead {
-        MemRead::PassThrough
+        unreachable!()
     }
 
     fn on_write(&mut self, addr: u16, value: u8) -> bool {
@@ -541,9 +541,9 @@ impl Mixer {
             v |= if stream.tone2.on() { 0x04 } else { 0x00 };
             v |= if stream.wave.on() { 0x02 } else { 0x00 };
             v |= if stream.noise.on() { 0x01 } else { 0x00 };
-            MemRead::Replace(v)
+            MemRead(v)
         } else {
-            MemRead::PassThrough
+            unreachable!("{:x}", addr)
         }
     }
 
@@ -701,7 +701,7 @@ impl IoHandler for Sound {
         } else if (0xff24..=0xff26).contains(&addr) {
             self.mixer.on_read(addr, mixer_stream)
         } else {
-            MemRead::PassThrough
+            unreachable!()
         }
     }
 

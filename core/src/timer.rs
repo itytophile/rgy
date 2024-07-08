@@ -70,11 +70,11 @@ impl Timer {
 impl IoHandler for Timer {
     fn on_read(&mut self, addr: u16, _: &MixerStream, _: &Irq, _: &mut impl Hardware) -> MemRead {
         match addr {
-            0xff04 => MemRead::Replace(self.div),
-            0xff05 => MemRead::Replace(self.tim),
-            0xff06 => MemRead::Replace(self.tim_load),
-            0xff07 => MemRead::Replace(self.ctrl),
-            _ => MemRead::PassThrough,
+            0xff04 => MemRead(self.div),
+            0xff05 => MemRead(self.tim),
+            0xff06 => MemRead(self.tim_load),
+            0xff07 => MemRead(self.ctrl),
+            _ => unreachable!(),
         }
     }
 

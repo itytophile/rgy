@@ -14,12 +14,7 @@ use crate::{
 };
 
 /// The variants to control memory read access from the CPU.
-pub enum MemRead {
-    /// Replaces the value passed from the memory to the CPU.
-    Replace(u8),
-    /// Shows the actual value passed from the memory to the CPU.
-    PassThrough,
-}
+pub struct MemRead(pub u8);
 
 /// The variants to control memory write access from the CPU.
 pub enum MemWrite {
@@ -201,7 +196,7 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
     }
     /// Reads one byte from the given address in the memory.
     pub fn get8(&mut self, addr: u16) -> u8 {
-        if let Some(MemRead::Replace(alt)) = self.on_read(addr) {
+        if let Some(MemRead(alt)) = self.on_read(addr) {
             return alt;
         }
         if (0xe000..=0xfdff).contains(&addr) {
