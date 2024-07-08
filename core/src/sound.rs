@@ -528,22 +528,25 @@ impl Stream for NoiseStream {
 pub struct Mixer {
     so1_volume: usize,
     so2_volume: usize,
-    so_mask: usize,
+    so_mask: u8,
     enable: bool,
 }
 
 impl Mixer {
     fn on_read(&mut self, addr: u16, stream: &MixerStream) -> MemRead {
-        if addr == 0xff26 {
-            let mut v = 0;
-            v |= if self.enable { 0x80 } else { 0x00 };
-            v |= if stream.tone1.on() { 0x08 } else { 0x00 };
-            v |= if stream.tone2.on() { 0x04 } else { 0x00 };
-            v |= if stream.wave.on() { 0x02 } else { 0x00 };
-            v |= if stream.noise.on() { 0x01 } else { 0x00 };
-            MemRead(v)
-        } else {
-            unreachable!("{:x}", addr)
+        // https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Register_Reading
+        match addr {
+            0xff25 => MemRead(self.so_mask),
+            0xff26 => {
+                let mut v = 0;
+                v |= if self.enable { 0x80 } else { 0x00 };
+                v |= if stream.tone1.on() { 0x08 } else { 0x00 };
+                v |= if stream.tone2.on() { 0x04 } else { 0x00 };
+                v |= if stream.wave.on() { 0x02 } else { 0x00 };
+                v |= if stream.noise.on() { 0x01 } else { 0x00 };
+                MemRead(v)
+            }
+            _ => unreachable!("{:x}", addr),
         }
     }
 
@@ -553,7 +556,7 @@ impl Mixer {
             self.so2_volume = value as usize & 0x07;
             self.update_volume(stream);
         } else if addr == 0xff25 {
-            self.so_mask = value as usize;
+            self.so_mask = value;
             self.update_volume(stream);
         } else if addr == 0xff26 {
             self.enable = value & 0x80 != 0;
@@ -592,13 +595,13 @@ impl Mixer {
     }
 
     fn get_volume(&self, id: u8) -> usize {
-        let mask = 1 << id;
-        let v1 = if self.so_mask & mask != 0 {
+        let mask: usize = 1 << id;
+        let v1 = if usize::from(self.so_mask) & mask != 0 {
             self.so1_volume
         } else {
             0
         };
-        let v2 = if self.so_mask & (mask << 4) != 0 {
+        let v2 = if usize::from(self.so_mask) & (mask << 4) != 0 {
             self.so2_volume
         } else {
             0
