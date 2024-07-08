@@ -109,6 +109,7 @@ mod high_ram;
 mod ic;
 mod joypad;
 mod mbc;
+mod oam;
 mod ram;
 mod serial;
 pub mod sound;

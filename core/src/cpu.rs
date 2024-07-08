@@ -397,7 +397,6 @@ mod test {
     #[test]
     fn op_00af() {
         let mut mixer_stream = MixerStream::default();
-        let mut mmu = Default::default();
         let mut irq = Irq::default();
         let mut hw = EmptyHardware;
 
@@ -412,10 +411,10 @@ mod test {
             mbc: Mbc::new(&[], &mut hw),
             sound: Default::default(),
             high_ram: Default::default(),
+            oam: Default::default(),
         };
         // xor a
         let mut mmu = Mmu {
-            inner: &mut mmu,
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
             handlers: &mut handlers,
@@ -435,7 +434,6 @@ mod test {
     fn op_00f1() {
         // pop af
         let mut mixer_stream = MixerStream::default();
-        let mut mmu = Default::default();
         let mut irq = Irq::default();
 
         let mut hw = EmptyHardware;
@@ -451,10 +449,10 @@ mod test {
             mbc: Mbc::new(&[], &mut hw),
             sound: Default::default(),
             high_ram: Default::default(),
+            oam: Default::default(),
         };
 
         let mut mmu = Mmu {
-            inner: &mut mmu,
             mixer_stream: &mut mixer_stream,
             irq: &mut irq,
             handlers: &mut handlers,

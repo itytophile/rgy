@@ -2,7 +2,7 @@ use crate::cpu::Cpu;
 use crate::hardware::Hardware;
 use crate::ic::Irq;
 use crate::mbc::Mbc;
-use crate::mmu::{MemHandlers, Mmu, MmuWithoutMixerStream};
+use crate::mmu::{MemHandlers, Mmu};
 use crate::sound::MixerStream;
 use crate::VRAM_WIDTH;
 use log::*;
@@ -11,7 +11,6 @@ use log::*;
 pub struct System<'a> {
     pub cpu: Cpu,
     pub handlers: MemHandlers<'a>,
-    pub mmu: MmuWithoutMixerStream,
 }
 
 impl<'a> System<'a> {
@@ -20,13 +19,11 @@ impl<'a> System<'a> {
         info!("Initializing...");
 
         let cpu = Cpu::new();
-        let mmu = MmuWithoutMixerStream::default();
 
         info!("Starting...");
 
         Self {
             cpu,
-            mmu,
             handlers: MemHandlers {
                 ic: Default::default(),
                 gpu: Default::default(),
@@ -38,6 +35,7 @@ impl<'a> System<'a> {
                 mbc: Mbc::new(rom, hw),
                 sound: Default::default(),
                 high_ram: Default::default(),
+                oam: Default::default(),
             },
         }
     }
@@ -49,7 +47,6 @@ impl<'a> System<'a> {
         hw: &mut impl Hardware,
     ) -> PollState {
         let mut mmu = Mmu {
-            inner: &mut self.mmu,
             mixer_stream,
             irq,
             handlers: &mut self.handlers,

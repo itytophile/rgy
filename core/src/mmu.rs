@@ -7,7 +7,7 @@ use crate::{
     ic::{Ic, Irq},
     joypad::Joypad,
     mbc::Mbc,
-    ram::Ram,
+    oam::{self, Oam},
     serial::Serial,
     sound::{MixerStream, Sound},
     timer::Timer,
@@ -23,16 +23,10 @@ pub struct MemRead(pub u8);
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
 pub struct Mmu<'a, 'b, H> {
-    pub inner: &'b mut MmuWithoutMixerStream,
     pub mixer_stream: &'b mut MixerStream,
     pub irq: &'b mut Irq,
     pub handlers: &'b mut MemHandlers<'a>,
     pub hw: &'b mut H,
-}
-
-#[derive(Default)]
-pub struct MmuWithoutMixerStream {
-    pub ram: Ram<0x10000>,
 }
 
 pub struct MemHandlers<'a> {
@@ -46,6 +40,7 @@ pub struct MemHandlers<'a> {
     pub timer: Timer,
     pub serial: Serial,
     pub high_ram: HighRam,
+    pub oam: Oam,
 }
 
 impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
@@ -96,6 +91,11 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
             0xff01..=0xff02 => {
                 self.handlers
                     .serial
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
+            }
+            oam::START..=oam::END => {
+                self.handlers
+                    .oam
                     .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
             high_ram::START..=high_ram::END => {
@@ -156,6 +156,11 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
                 self.handlers
                     .serial
                     .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            oam::START..=oam::END => {
+                self.handlers
+                    .oam
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw);
             }
             high_ram::START..=high_ram::END => {
                 self.handlers
