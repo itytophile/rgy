@@ -1,9 +1,4 @@
-use crate::{
-    ic::Irq,
-    mmu::{MemRead, MemWrite},
-    sound::MixerStream,
-    Hardware,
-};
+use crate::{ic::Irq, mmu::MemRead, sound::MixerStream, Hardware};
 
 /// The trait which allows to hook I/O access from the CPU.
 pub trait IoHandler {
@@ -24,5 +19,5 @@ pub trait IoHandler {
         mixer_stream: &mut MixerStream,
         irq: &mut Irq,
         hw: &mut impl Hardware,
-    ) -> MemWrite;
+    );
 }

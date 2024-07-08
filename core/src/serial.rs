@@ -1,6 +1,6 @@
 use crate::device::IoHandler;
 use crate::ic::Irq;
-use crate::mmu::{MemRead, MemWrite};
+use crate::mmu::MemRead;
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
@@ -60,10 +60,9 @@ impl IoHandler for Serial {
         _: &mut MixerStream,
         _: &mut Irq,
         hw: &mut impl Hardware,
-    ) -> MemWrite {
+    ) {
         if addr == 0xff01 {
             self.data = value;
-            MemWrite::Block
         } else if addr == 0xff02 {
             self.ctrl = value;
 
@@ -81,7 +80,6 @@ impl IoHandler for Serial {
                     debug!("Serial transfer (External): {:02x}", self.data);
                 }
             }
-            MemWrite::Block
         } else {
             unreachable!("Write to serial: {:04x} {:02x}", addr, value)
         }

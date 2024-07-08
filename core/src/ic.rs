@@ -1,5 +1,5 @@
 use crate::device::IoHandler;
-use crate::mmu::{MemRead, MemWrite};
+use crate::mmu::MemRead;
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
@@ -118,15 +118,13 @@ impl IoHandler for Ic {
         _: &mut MixerStream,
         irq: &mut Irq,
         _: &mut impl Hardware,
-    ) -> MemWrite {
+    ) {
         if addr == 0xffff {
             info!("Write interrupt enable: {:02x}", value);
             self.enable.set(value);
-            MemWrite::Block
         } else if addr == 0xff0f {
             info!("Write interrupt: {:02x}", value);
             irq.request.set(value);
-            MemWrite::Block
         } else {
             info!("Writing to IC register: {:04x}", addr);
             unreachable!("{:x}", addr)

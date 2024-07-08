@@ -1,10 +1,4 @@
-use crate::{
-    device::IoHandler,
-    ic::Irq,
-    mmu::{MemRead, MemWrite},
-    sound::MixerStream,
-    Hardware,
-};
+use crate::{device::IoHandler, ic::Irq, mmu::MemRead, sound::MixerStream, Hardware};
 use log::*;
 
 pub struct Cgb {
@@ -71,7 +65,7 @@ impl IoHandler for Cgb {
         _: &mut MixerStream,
         _: &mut Irq,
         _: &mut impl Hardware,
-    ) -> MemWrite {
+    ) {
         if (0xc000..=0xcfff).contains(&addr) {
             let off = addr as usize - 0xc000;
             self.wram_bank[0][off] = value;
@@ -84,8 +78,8 @@ impl IoHandler for Cgb {
             warn!("Infrared read");
         } else if addr == 0xff70 {
             self.wram_select = (value as usize & 0xf).max(1);
+        } else {
+            unreachable!("{:x}", addr)
         }
-
-        MemWrite::Replace(value)
     }
 }

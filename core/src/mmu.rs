@@ -16,14 +16,6 @@ use crate::{
 /// The variants to control memory read access from the CPU.
 pub struct MemRead(pub u8);
 
-/// The variants to control memory write access from the CPU.
-pub enum MemWrite {
-    /// Replaces the value to be written by the CPU to the memory.
-    Replace(u8),
-    /// Discard the write access from the CPU.
-    Block,
-}
-
 /// The memory management unit (MMU)
 ///
 /// This unit holds a memory byte array which represents address space of the memory.
@@ -55,173 +47,120 @@ pub struct MemHandlers<'a> {
 }
 
 impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
-    fn on_read(&mut self, addr: u16) -> Option<MemRead> {
-        match addr {
-            0xc000..=0xdfff | 0xff4d | 0xff56 | 0xff70 => Some(self.handlers.cgb.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0x0000..=0x7fff | 0xff50 | 0xa000..=0xbfff => Some(self.handlers.mbc.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0xff10..=0xff3f => Some(self.handlers.sound.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0xff46 => Some(
-                self.handlers
-                    .dma
-                    .on_read(addr, self.mixer_stream, self.irq, self.hw),
-            ),
-            0x8000..=0x9fff
-            | 0xff40..=0xff45
-            | 0xff47..=0xff4b
-            | 0xff4f
-            | 0xff51..=0xff55
-            | 0xff68..=0xff6b => Some(self.handlers.gpu.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0xff0f | 0xffff => Some(self.handlers.ic.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0xff00 => Some(self.handlers.joypad.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0xff04..=0xff07 => Some(self.handlers.timer.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            0xff01..=0xff02 => Some(self.handlers.serial.on_read(
-                addr,
-                self.mixer_stream,
-                self.irq,
-                self.hw,
-            )),
-            _ => None,
-        }
-    }
-
-    fn on_write(&mut self, addr: u16, v: u8) -> Option<MemWrite> {
+    fn on_read(&mut self, addr: u16) -> MemRead {
         match addr {
             0xc000..=0xdfff | 0xff4d | 0xff56 | 0xff70 => {
-                Some(
-                    self.handlers
-                        .cgb
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
+                self.handlers
+                    .cgb
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
             0x0000..=0x7fff | 0xff50 | 0xa000..=0xbfff => {
-                Some(
-                    self.handlers
-                        .mbc
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
+                self.handlers
+                    .mbc
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
             0xff10..=0xff3f => {
-                Some(
-                    self.handlers
-                        .sound
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
+                self.handlers
+                    .sound
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
-            0xff46 => {
-                Some(
-                    self.handlers
-                        .dma
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
-            }
+            0xff46 => self
+                .handlers
+                .dma
+                .on_read(addr, self.mixer_stream, self.irq, self.hw),
             0x8000..=0x9fff
             | 0xff40..=0xff45
             | 0xff47..=0xff4b
             | 0xff4f
             | 0xff51..=0xff55
             | 0xff68..=0xff6b => {
-                Some(
-                    self.handlers
-                        .gpu
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
+                self.handlers
+                    .gpu
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
-            0xff0f | 0xffff => {
-                Some(
-                    self.handlers
-                        .ic
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
-            }
-            0xff00 => {
-                Some(
-                    self.handlers
-                        .joypad
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
-            }
+            0xff0f | 0xffff => self
+                .handlers
+                .ic
+                .on_read(addr, self.mixer_stream, self.irq, self.hw),
+            0xff00 => self
+                .handlers
+                .joypad
+                .on_read(addr, self.mixer_stream, self.irq, self.hw),
             0xff04..=0xff07 => {
-                Some(
-                    self.handlers
-                        .timer
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
+                self.handlers
+                    .timer
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
             0xff01..=0xff02 => {
-                Some(
-                    self.handlers
-                        .serial
-                        .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
-                )
+                self.handlers
+                    .serial
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
-            _ => None,
+            _ => unreachable!("{:x}", addr),
+        }
+    }
+
+    fn on_write(&mut self, addr: u16, v: u8) {
+        match addr {
+            0xc000..=0xdfff | 0xff4d | 0xff56 | 0xff70 => {
+                self.handlers
+                    .cgb
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            0x0000..=0x7fff | 0xff50 | 0xa000..=0xbfff => {
+                self.handlers
+                    .mbc
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            0xff10..=0xff3f => {
+                self.handlers
+                    .sound
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            0xff46 => self
+                .handlers
+                .dma
+                .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
+            0x8000..=0x9fff
+            | 0xff40..=0xff45
+            | 0xff47..=0xff4b
+            | 0xff4f
+            | 0xff51..=0xff55
+            | 0xff68..=0xff6b => {
+                self.handlers
+                    .gpu
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            0xff0f | 0xffff => {
+                self.handlers
+                    .ic
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            0xff00 => self
+                .handlers
+                .joypad
+                .on_write(addr, v, self.mixer_stream, self.irq, self.hw),
+            0xff04..=0xff07 => {
+                self.handlers
+                    .timer
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            0xff01..=0xff02 => {
+                self.handlers
+                    .serial
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            _ => unreachable!("{:x}", addr),
         }
     }
     /// Reads one byte from the given address in the memory.
     pub fn get8(&mut self, addr: u16) -> u8 {
-        if let Some(MemRead(alt)) = self.on_read(addr) {
-            return alt;
-        }
-        if (0xe000..=0xfdff).contains(&addr) {
-            // echo ram
-            self.inner.ram[addr as usize - 0x2000]
-        } else {
-            self.inner.ram[addr as usize]
-        }
+        self.on_read(addr).0
     }
 
     /// Writes one byte at the given address in the memory.
     pub fn set8(&mut self, addr: u16, v: u8) {
-        match self.on_write(addr, v) {
-            Some(MemWrite::Replace(alt)) => {
-                self.inner.ram[addr as usize] = alt;
-                return;
-            }
-            Some(MemWrite::Block) => return,
-            _ => {}
-        }
-
-        if (0xe000..=0xfdff).contains(&addr) {
-            // echo ram
-            self.inner.ram[addr as usize - 0x2000] = v
-        } else {
-            self.inner.ram[addr as usize] = v
-        }
+        self.on_write(addr, v)
     }
 
     /// Reads two bytes from the given addresss in the memory.

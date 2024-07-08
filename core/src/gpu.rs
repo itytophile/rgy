@@ -1,6 +1,6 @@
 use crate::device::IoHandler;
 use crate::ic::Irq;
-use crate::mmu::{MemRead, MemWrite};
+use crate::mmu::MemRead;
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
@@ -610,7 +610,7 @@ impl IoHandler for Gpu {
         _: &mut MixerStream,
         irq: &mut Irq,
         _: &mut impl Hardware,
-    ) -> MemWrite {
+    ) {
         trace!("Write GPU register: {:04x} {:02x}", addr, value);
         if (0x8000..=0x9fff).contains(&addr) {
             self.write_vram(addr, value, self.vram_select);
@@ -669,8 +669,7 @@ impl IoHandler for Gpu {
                 "Unsupported GPU register is written: {:04x} {:02x}",
                 addr, value
             );
+            unreachable!("{:x}", addr);
         }
-
-        MemWrite::Replace(value)
     }
 }

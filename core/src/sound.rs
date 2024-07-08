@@ -3,7 +3,7 @@ use log::*;
 use crate::device::IoHandler;
 use crate::hardware::Stream;
 use crate::ic::Irq;
-use crate::mmu::{MemRead, MemWrite};
+use crate::mmu::MemRead;
 use crate::Hardware;
 
 struct Sweep {
@@ -729,7 +729,7 @@ impl IoHandler for Sound {
         mixer_stream: &mut MixerStream,
         _: &mut Irq,
         _: &mut impl Hardware,
-    ) -> MemWrite {
+    ) {
         if (0xff10..=0xff14).contains(&addr) {
             if self.tone1.on_write(0xff10, addr, value) {
                 self.mixer.restart_tone1(self.tone1.clone(), mixer_stream);
@@ -752,8 +752,7 @@ impl IoHandler for Sound {
             self.mixer.on_write(addr, value, mixer_stream);
         } else {
             info!("Write sound: {:04x} {:02x}", addr, value);
+            unreachable!("{:x}", addr);
         }
-
-        MemWrite::Replace(value)
     }
 }

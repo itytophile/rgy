@@ -1,7 +1,7 @@
 use crate::device::IoHandler;
 use crate::hardware::Key;
 use crate::ic::Irq;
-use crate::mmu::{MemRead, MemWrite};
+use crate::mmu::MemRead;
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
@@ -106,10 +106,11 @@ impl IoHandler for Joypad {
         _: &mut MixerStream,
         _: &mut Irq,
         _: &mut impl Hardware,
-    ) -> MemWrite {
+    ) {
         if addr == 0xff00 {
             self.select = value & 0xf0;
+        } else {
+            unreachable!("{:x}", addr)
         }
-        MemWrite::Replace(value)
     }
 }
