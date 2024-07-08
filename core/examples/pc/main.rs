@@ -67,6 +67,11 @@ fn run<H: rgy::Hardware + 'static>(
 ) {
     let mut sys = rgy::System::new(rom, &mut hw);
 
+    println!(
+        "rgy::System size on stack: {}",
+        std::mem::size_of::<rgy::System>()
+    );
+
     let mut lock = None;
     let mut irq = Default::default();
 

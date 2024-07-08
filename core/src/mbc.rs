@@ -1,7 +1,6 @@
 use crate::device::IoHandler;
 use crate::ic::Irq;
 use crate::mmu::MemRead;
-use crate::ram::Ram;
 use crate::sound::MixerStream;
 use crate::Hardware;
 use log::*;
@@ -60,7 +59,7 @@ impl<'a> MbcNone<'a> {
 
 struct Mbc1<'a> {
     rom: &'a [u8],
-    ram: Ram<0x8000>,
+    ram: [u8; 0x8000],
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -85,7 +84,7 @@ impl<'a> Mbc1<'a> {
         info!("MBC1");
         Self {
             rom,
-            ram: Default::default(),
+            ram: [0; 0x8000],
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,
@@ -178,7 +177,7 @@ const MBC2_RAM_END: u16 = 0xa1ff;
 
 struct Mbc2<'a> {
     rom: &'a [u8],
-    ram: Ram<0x200>,
+    ram: [u8; 0x200],
     rom_bank: usize,
     ram_enable: bool,
 }
@@ -188,7 +187,7 @@ impl<'a> Mbc2<'a> {
         info!("MBC2");
         Self {
             rom,
-            ram: Default::default(),
+            ram: [0; 0x200],
             rom_bank: 1,
             ram_enable: false,
         }
@@ -259,7 +258,7 @@ impl<'a> Mbc2<'a> {
 
 struct Mbc3<'a> {
     rom: &'a [u8],
-    ram: Ram<0x8000>,
+    ram: [u8; 0x8000],
     rom_bank: usize,
     enable: bool,
     select: u8,
@@ -293,7 +292,7 @@ impl<'a> Mbc3<'a> {
         info!("MBC3");
         let mut s = Self {
             rom,
-            ram: Default::default(),
+            ram: [0; 0x8000],
             rom_bank: 0,
             enable: false,
             select: 0,
@@ -467,7 +466,7 @@ impl<'a> Mbc3<'a> {
 #[cfg(feature = "mb5")]
 struct Mbc5<'a> {
     rom: &'a [u8],
-    ram: Ram<0x20000>,
+    ram: [u8; 0x20000],
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -479,7 +478,7 @@ impl<'a> Mbc5<'a> {
         info!("MBC5");
         Self {
             rom,
-            ram: Default::default(),
+            ram: [0; 0x20000],
             rom_bank: 0,
             ram_bank: 0,
             ram_enable: false,

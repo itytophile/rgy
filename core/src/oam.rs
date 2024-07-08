@@ -1,12 +1,17 @@
 // https://gbdev.io/pandocs/Memory_Map.html#memory-map
 
-use crate::{device::IoHandler, mmu::MemRead, ram::Ram};
+use crate::{device::IoHandler, mmu::MemRead};
 
 pub const START: u16 = 0xfe00;
 pub const END: u16 = 0xfe9f;
 
-#[derive(Default)]
-pub struct Oam(Ram<{ END as usize - START as usize + 1 }>);
+pub struct Oam([u8; END as usize - START as usize + 1]);
+
+impl Default for Oam {
+    fn default() -> Self {
+        Self([0; END as usize - START as usize + 1])
+    }
+}
 
 impl IoHandler for Oam {
     fn on_read(

@@ -1,12 +1,17 @@
 // https://gbdev.io/pandocs/Memory_Map.html#memory-map
 
-use crate::{device::IoHandler, mmu::MemRead, ram::Ram};
+use crate::{device::IoHandler, mmu::MemRead};
 
 pub const START: u16 = 0xff80;
 pub const END: u16 = 0xfffe;
 
-#[derive(Default)]
-pub struct HighRam(Ram<{ END as usize - START as usize + 1 }>);
+pub struct HighRam([u8; END as usize - START as usize + 1]);
+
+impl Default for HighRam {
+    fn default() -> Self {
+        Self([0; END as usize - START as usize + 1])
+    }
+}
 
 impl IoHandler for HighRam {
     fn on_read(
