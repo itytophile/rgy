@@ -128,48 +128,53 @@ impl<'a> Mbc1<'a> {
     }
 
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) -> MemWrite {
-        if addr <= MBC1_RAM_ENABLE_END {
-            if value & 0xf == 0x0a {
-                info!("External RAM enabled");
-                self.ram_enable = true;
-            } else {
-                info!("External RAM disabled");
-                self.ram_enable = false;
-                hw.save_ram(self.ram.as_slice());
-            }
-            MemWrite::Block
-        } else if (MBC1_ROM_BANK_NUMBER_START..=MBC1_ROM_BANK_NUMBER_END).contains(&addr) {
-            self.rom_bank = (self.rom_bank & !0x1f) | (value as usize & 0x1f);
-            debug!("Switch ROM bank to {:02x}", self.rom_bank);
-            MemWrite::Block
-        } else if (MBC1_RAM_BANK_NUMBER_START..=MBC1_RAM_BANK_NUMBER_END).contains(&addr) {
-            if self.ram_select {
-                self.ram_bank = value as usize & 0x3;
-            } else {
-                self.rom_bank = (self.rom_bank & !0x60) | ((value as usize & 0x3) << 5);
-            }
-            MemWrite::Block
-        } else if (MBC1_BANKING_MODE_SELECT_START..=MBC1_BANKING_MODE_SELECT_END).contains(&addr) {
-            if value == 0x00 {
-                self.ram_select = false;
-            } else if value == 0x01 {
-                self.ram_select = true;
-            } else {
-                unimplemented!("Invalid ROM/RAM select mode");
-            }
-            MemWrite::Block
-        } else if (EXTERNAL_RAM_START..=EXTERNAL_RAM_END).contains(&addr) {
-            if self.ram_enable {
-                let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
-                let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
-                self.ram[base + offset] = value;
-                MemWrite::Block
-            } else {
-                warn!("Write to disabled external RAM: {:04x} {:02x}", addr, value);
+        match addr {
+            ..=MBC1_RAM_ENABLE_END => {
+                if value & 0xf == 0x0a {
+                    info!("External RAM enabled");
+                    self.ram_enable = true;
+                } else {
+                    info!("External RAM disabled");
+                    self.ram_enable = false;
+                    hw.save_ram(self.ram.as_slice());
+                }
                 MemWrite::Block
             }
-        } else {
-            unimplemented!("write to rom {:04x} {:02x}", addr, value)
+            MBC1_ROM_BANK_NUMBER_START..=MBC1_ROM_BANK_NUMBER_END => {
+                self.rom_bank = (self.rom_bank & !0x1f) | (value as usize & 0x1f);
+                debug!("Switch ROM bank to {:02x}", self.rom_bank);
+                MemWrite::Block
+            }
+            MBC1_RAM_BANK_NUMBER_START..=MBC1_RAM_BANK_NUMBER_END => {
+                if self.ram_select {
+                    self.ram_bank = value as usize & 0x3;
+                } else {
+                    self.rom_bank = (self.rom_bank & !0x60) | ((value as usize & 0x3) << 5);
+                }
+                MemWrite::Block
+            }
+            MBC1_BANKING_MODE_SELECT_START..=MBC1_BANKING_MODE_SELECT_END => {
+                if value == 0x00 {
+                    self.ram_select = false;
+                } else if value == 0x01 {
+                    self.ram_select = true;
+                } else {
+                    unimplemented!("Invalid ROM/RAM select mode");
+                }
+                MemWrite::Block
+            }
+            EXTERNAL_RAM_START..=EXTERNAL_RAM_END => {
+                if self.ram_enable {
+                    let base = self.ram_bank * usize::from(RAM_BANK_LENGTH);
+                    let offset = usize::from(addr) - usize::from(EXTERNAL_RAM_START);
+                    self.ram[base + offset] = value;
+                    MemWrite::Block
+                } else {
+                    warn!("Write to disabled external RAM: {:04x} {:02x}", addr, value);
+                    MemWrite::Block
+                }
+            }
+            _ => unimplemented!("write to rom {:04x} {:02x}", addr, value),
         }
     }
 }
