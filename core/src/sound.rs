@@ -532,8 +532,8 @@ impl Stream for NoiseStream {
 
 #[derive(Default)]
 pub struct Mixer {
-    so1_volume: usize,
-    so2_volume: usize,
+    // https://gbdev.io/pandocs/Audio_Registers.html#ff24--nr50-master-volume--vin-panning
+    master_volume_and_vin_panning: u8, // ALLL BRRR Vin L enable, Left vol, Vin R enable, Right vol
     so_mask: u8,
     enable: bool,
 }
@@ -542,6 +542,7 @@ impl Mixer {
     fn on_read(&mut self, addr: u16, stream: &MixerStream) -> MemRead {
         // https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Register_Reading
         match addr {
+            0xff24 => MemRead(self.master_volume_and_vin_panning),
             0xff25 => MemRead(self.so_mask),
             0xff26 => {
                 let mut v = 0;
@@ -558,8 +559,7 @@ impl Mixer {
 
     fn on_write(&mut self, addr: u16, value: u8, stream: &mut MixerStream) {
         if addr == 0xff24 {
-            self.so1_volume = (value as usize & 0x70) >> 4;
-            self.so2_volume = value as usize & 0x07;
+            self.master_volume_and_vin_panning = value;
             self.update_volume(stream);
         } else if addr == 0xff25 {
             self.so_mask = value;
@@ -603,16 +603,24 @@ impl Mixer {
     fn get_volume(&self, id: u8) -> usize {
         let mask: usize = 1 << id;
         let v1 = if usize::from(self.so_mask) & mask != 0 {
-            self.so1_volume
+            self.left_volume()
         } else {
             0
         };
         let v2 = if usize::from(self.so_mask) & (mask << 4) != 0 {
-            self.so2_volume
+            self.right_volume()
         } else {
             0
         };
-        v1 + v2
+        usize::from(v1) + usize::from(v2)
+    }
+
+    fn left_volume(&self) -> u8 {
+        (self.master_volume_and_vin_panning >> 4) & 0b111
+    }
+
+    fn right_volume(&self) -> u8 {
+        self.master_volume_and_vin_panning & 0b111
     }
 }
 
