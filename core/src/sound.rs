@@ -710,7 +710,7 @@ impl Stream for MixerStream {
         let (t, v) = self.wave.next(rate);
         vol += self.volume(t, v);
         let (t, v) = self.noise.next(rate);
-        vol += self.volume(t, v) / 2; // Soften the noise
+        vol += self.volume(t, v);
 
         assert!(vol <= 840, "vol = {}", vol);
 
