@@ -100,7 +100,7 @@ impl IoHandler for Timer {
                     self.tim_clock_reset();
                 }
             }
-            _ => unreachable!("{:x}", addr)
+            _ => unreachable!("{:x}", addr),
         }
     }
 }

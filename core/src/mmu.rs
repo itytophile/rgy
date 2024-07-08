@@ -3,6 +3,7 @@ use crate::{
     device::IoHandler,
     dma::Dma,
     gpu::{Gpu, Mode},
+    high_ram::{self, HighRam},
     ic::{Ic, Irq},
     joypad::Joypad,
     mbc::Mbc,
@@ -44,6 +45,7 @@ pub struct MemHandlers<'a> {
     pub joypad: Joypad,
     pub timer: Timer,
     pub serial: Serial,
+    pub high_ram: HighRam,
 }
 
 impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
@@ -94,6 +96,11 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
             0xff01..=0xff02 => {
                 self.handlers
                     .serial
+                    .on_read(addr, self.mixer_stream, self.irq, self.hw)
+            }
+            high_ram::START..=high_ram::END => {
+                self.handlers
+                    .high_ram
                     .on_read(addr, self.mixer_stream, self.irq, self.hw)
             }
             _ => unreachable!("{:x}", addr),
@@ -149,6 +156,11 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
                 self.handlers
                     .serial
                     .on_write(addr, v, self.mixer_stream, self.irq, self.hw)
+            }
+            high_ram::START..=high_ram::END => {
+                self.handlers
+                    .high_ram
+                    .on_write(addr, v, self.mixer_stream, self.irq, self.hw);
             }
             _ => unreachable!("{:x}", addr),
         }

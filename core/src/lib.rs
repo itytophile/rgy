@@ -105,6 +105,7 @@ mod alu;
 mod cgb;
 mod dma;
 mod gpu;
+mod high_ram;
 mod ic;
 mod joypad;
 mod mbc;

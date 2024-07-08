@@ -37,6 +37,7 @@ impl<'a> System<'a> {
                 cgb: Default::default(),
                 mbc: Mbc::new(rom, hw),
                 sound: Default::default(),
+                high_ram: Default::default(),
             },
         }
     }

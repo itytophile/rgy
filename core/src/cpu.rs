@@ -411,6 +411,7 @@ mod test {
             cgb: Default::default(),
             mbc: Mbc::new(&[], &mut hw),
             sound: Default::default(),
+            high_ram: Default::default(),
         };
         // xor a
         let mut mmu = Mmu {
@@ -449,6 +450,7 @@ mod test {
             cgb: Default::default(),
             mbc: Mbc::new(&[], &mut hw),
             sound: Default::default(),
+            high_ram: Default::default(),
         };
 
         let mut mmu = Mmu {
