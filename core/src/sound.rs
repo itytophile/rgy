@@ -754,6 +754,6 @@ impl IoHandler for Sound {
             info!("Write sound: {:04x} {:02x}", addr, value);
         }
 
-        MemWrite::PassThrough
+        MemWrite::Replace(value)
     }
 }

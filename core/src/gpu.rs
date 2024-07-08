@@ -671,6 +671,6 @@ impl IoHandler for Gpu {
             );
         }
 
-        MemWrite::PassThrough
+        MemWrite::Replace(value)
     }
 }

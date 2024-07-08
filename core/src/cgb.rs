@@ -86,6 +86,6 @@ impl IoHandler for Cgb {
             self.wram_select = (value as usize & 0xf).max(1);
         }
 
-        MemWrite::PassThrough
+        MemWrite::Replace(value)
     }
 }

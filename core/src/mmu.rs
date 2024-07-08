@@ -20,8 +20,6 @@ pub struct MemRead(pub u8);
 pub enum MemWrite {
     /// Replaces the value to be written by the CPU to the memory.
     Replace(u8),
-    /// Allows to write the original value from the CPU to the memory.
-    PassThrough,
     /// Discard the write access from the CPU.
     Block,
 }

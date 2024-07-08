@@ -52,7 +52,7 @@ impl<'a> MbcNone<'a> {
     fn on_write(&mut self, addr: u16, value: u8) -> MemWrite {
         match addr {
             ..=ROM_BANK_01_NN_END => MemWrite::Block,
-            EXTERNAL_RAM_START..=EXTERNAL_RAM_END => MemWrite::PassThrough,
+            EXTERNAL_RAM_START..=EXTERNAL_RAM_END => unreachable!("{:x}", addr),
             _ => unreachable!("Write to ROM: {:02x} {:02x}", addr, value),
         }
     }
@@ -264,7 +264,7 @@ impl<'a> Mbc2<'a> {
             }
             _ => {
                 warn!("write to rom {:04x} {:02x}", addr, value);
-                MemWrite::PassThrough
+                unreachable!("{:x}", addr)
             }
         }
     }

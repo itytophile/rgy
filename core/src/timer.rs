@@ -102,6 +102,6 @@ impl IoHandler for Timer {
             }
             _ => {}
         }
-        MemWrite::PassThrough
+        MemWrite::Replace(value)
     }
 }

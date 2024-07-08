@@ -110,6 +110,6 @@ impl IoHandler for Joypad {
         if addr == 0xff00 {
             self.select = value & 0xf0;
         }
-        MemWrite::PassThrough
+        MemWrite::Replace(value)
     }
 }

@@ -129,7 +129,7 @@ impl IoHandler for Ic {
             MemWrite::Block
         } else {
             info!("Writing to IC register: {:04x}", addr);
-            MemWrite::PassThrough
+            unreachable!("{:x}", addr)
         }
     }
 }
