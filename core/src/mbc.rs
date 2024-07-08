@@ -179,6 +179,9 @@ impl<'a> Mbc1<'a> {
     }
 }
 
+// https://gbdev.io/pandocs/MBC2.html#a000a1ff--built-in-ram
+const MBC2_RAM_END: u16 = 0xa1ff;
+
 struct Mbc2<'a> {
     rom: &'a [u8],
     ram: Ram<0x200>,
@@ -204,7 +207,7 @@ impl<'a> Mbc2<'a> {
             let base = self.rom_bank.max(1) * usize::from(ROM_BANK_LENGTH);
             let offset = addr as usize - usize::from(ROM_BANK_01_NN_START);
             MemRead::Replace(self.rom[base + offset])
-        } else if (EXTERNAL_RAM_START..=0xa1ff).contains(&addr) {
+        } else if (EXTERNAL_RAM_START..=MBC2_RAM_END).contains(&addr) {
             if self.ram_enable {
                 MemRead::Replace(
                     self.ram[usize::from(addr) - usize::from(EXTERNAL_RAM_START)] & 0xf,
