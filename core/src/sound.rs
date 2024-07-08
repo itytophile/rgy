@@ -217,9 +217,7 @@ impl RandomWave {
 
 #[derive(Debug, Clone, Default)]
 struct Tone {
-    sweep_time: usize,
-    sweep_sub: bool,
-    sweep_shift: usize,
+    sweep: u8,                // -PPP NSSS Sweep period, negate, shift
     duty_and_length_load: u8, // DDLL LLLL Duty, Length load
     env_init: usize,
     env_inc: bool,
@@ -229,6 +227,15 @@ struct Tone {
 }
 
 impl Tone {
+    fn sweep_time(&self) -> u8 {
+        (self.sweep >> 4) & 0x7
+    }
+    fn sweep_sub(&self) -> bool {
+        self.sweep & 0x08 != 0
+    }
+    fn sweep_shift(&self) -> u8 {
+        self.sweep & 0x07
+    }
     fn sound_len(&self) -> u8 {
         self.duty_and_length_load & 0b11_1111
     }
@@ -237,8 +244,10 @@ impl Tone {
     }
     fn on_read(&mut self, base: u16, addr: u16) -> MemRead {
         // https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Register_Reading
+        // NR10 (0xff10) must OR with 0x80
         // NR11 (0xff11) / NR21 (0xff16) must OR with 0x3f
         match addr.checked_sub(base).unwrap() {
+            0 => MemRead(self.sweep ^ 0x80),
             1 => MemRead(self.duty_and_length_load ^ 0x3f),
             3 => MemRead(0xff),
             _ => unreachable!("{:x}", addr),
@@ -247,9 +256,7 @@ impl Tone {
 
     fn on_write(&mut self, base: u16, addr: u16, value: u8) -> bool {
         if addr == base {
-            self.sweep_time = ((value >> 4) & 0x7) as usize;
-            self.sweep_sub = value & 0x08 != 0;
-            self.sweep_shift = (value & 0x07) as usize;
+            self.sweep = value;
         } else if addr == base + 1 {
             self.duty_and_length_load = value;
         } else if addr == base + 2 {
@@ -284,9 +291,9 @@ impl ToneStream {
         let sweep = Sweep::new(
             sweep,
             freq,
-            tone.sweep_time,
-            tone.sweep_sub,
-            tone.sweep_shift,
+            usize::from(tone.sweep_time()),
+            tone.sweep_sub(),
+            usize::from(tone.sweep_shift()),
         );
         let env = Envelop::new(tone.env_init, tone.env_count, tone.env_inc);
         let counter = Counter::new(tone.counter, usize::from(tone.sound_len()), 64);
