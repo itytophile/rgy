@@ -220,8 +220,7 @@ struct Tone {
     sweep_time: usize,
     sweep_sub: bool,
     sweep_shift: usize,
-    sound_len: usize,
-    wave_duty: usize,
+    duty_and_length_load: u8, // DDLL LLLL Duty, Length load
     env_init: usize,
     env_inc: bool,
     env_count: usize,
@@ -230,11 +229,19 @@ struct Tone {
 }
 
 impl Tone {
+    fn sound_len(&self) -> u8 {
+        self.duty_and_length_load & 0b11_1111
+    }
+    fn wave_duty(&self) -> u8 {
+        self.duty_and_length_load >> 6
+    }
     fn on_read(&mut self, base: u16, addr: u16) -> MemRead {
-        if addr == base + 3 {
-            MemRead(0xff)
-        } else {
-            unreachable!()
+        // https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Register_Reading
+        // NR11 (0xff11) / NR21 (0xff16) must OR with 0x3f
+        match addr.checked_sub(base).unwrap() {
+            1 => MemRead(self.duty_and_length_load ^ 0x3f),
+            3 => MemRead(0xff),
+            _ => unreachable!("{:x}", addr),
         }
     }
 
@@ -244,8 +251,7 @@ impl Tone {
             self.sweep_sub = value & 0x08 != 0;
             self.sweep_shift = (value & 0x07) as usize;
         } else if addr == base + 1 {
-            self.wave_duty = (value >> 6).into();
-            self.sound_len = (value & 0x1f) as usize;
+            self.duty_and_length_load = value;
         } else if addr == base + 2 {
             self.env_init = (value >> 4) as usize;
             self.env_inc = value & 0x08 != 0;
@@ -283,7 +289,7 @@ impl ToneStream {
             tone.sweep_shift,
         );
         let env = Envelop::new(tone.env_init, tone.env_count, tone.env_inc);
-        let counter = Counter::new(tone.counter, tone.sound_len, 64);
+        let counter = Counter::new(tone.counter, usize::from(tone.sound_len()), 64);
 
         Self {
             tone,
@@ -311,7 +317,7 @@ impl Stream for ToneStream {
         let freq = self.sweep.freq(rate);
 
         // Square wave generation
-        let duty = match self.tone.wave_duty {
+        let duty = match self.tone.wave_duty() {
             0 => 0,
             1 => 1,
             2 => 3,
