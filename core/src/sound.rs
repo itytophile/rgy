@@ -225,6 +225,7 @@ struct Tone {
     volume_and_envelope: u8,  // VVVV APPP Starting volume, Envelope add mode, period
     counter: bool,
     freq: usize,
+    period_high_and_control: u8, // TL-- -FFF Trigger, Length enable, Frequency MSB
 }
 
 impl Tone {
@@ -257,11 +258,15 @@ impl Tone {
         // https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Register_Reading
         // NR10 (0xff10) must OR with 0x80
         // NR11 (0xff11) / NR21 (0xff16) must OR with 0x3f
+        // NR12 OR with 0x00
+        // NR13 OR with 0xff
+        // NR14 OR with 0xbf
         match addr.checked_sub(base).unwrap() {
             0 => MemRead(self.sweep ^ 0x80),
             1 => MemRead(self.duty_and_length_load ^ 0x3f),
             2 => MemRead(self.volume_and_envelope),
             3 => MemRead(0xff),
+            4 => MemRead(self.period_high_and_control ^ 0xbf),
             _ => unreachable!("{:x}", addr),
         }
     }
@@ -276,6 +281,8 @@ impl Tone {
         } else if addr == base + 3 {
             self.freq = (self.freq & !0xff) | value as usize;
         } else if addr == base + 4 {
+            self.period_high_and_control = value;
+            // need more time to understand these calculations with counter/freq
             self.counter = value & 0x40 != 0;
             self.freq = (self.freq & !0x700) | (((value & 0x7) as usize) << 8);
             return value & 0x80 != 0;
