@@ -6,6 +6,9 @@ use crate::ic::Irq;
 use crate::mmu::MemRead;
 use crate::Hardware;
 
+// https://gbdev.io/pandocs/Audio_Registers.html
+// https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
+
 struct Sweep {
     enable: bool,
     freq: usize,
@@ -219,9 +222,7 @@ impl RandomWave {
 struct Tone {
     sweep: u8,                // -PPP NSSS Sweep period, negate, shift
     duty_and_length_load: u8, // DDLL LLLL Duty, Length load
-    env_init: usize,
-    env_inc: bool,
-    env_count: usize,
+    volume_and_envelope: u8,  // VVVV APPP Starting volume, Envelope add mode, period
     counter: bool,
     freq: usize,
 }
@@ -242,6 +243,16 @@ impl Tone {
     fn wave_duty(&self) -> u8 {
         self.duty_and_length_load >> 6
     }
+    fn initial_volume(&self) -> u8 {
+        self.volume_and_envelope >> 4
+    }
+    fn envelope_direction(&self) -> bool {
+        self.volume_and_envelope & 0x08 != 0
+    }
+    fn sweep_pace(&self) -> u8 {
+        self.volume_and_envelope & 0x7
+    }
+
     fn on_read(&mut self, base: u16, addr: u16) -> MemRead {
         // https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Register_Reading
         // NR10 (0xff10) must OR with 0x80
@@ -249,6 +260,7 @@ impl Tone {
         match addr.checked_sub(base).unwrap() {
             0 => MemRead(self.sweep ^ 0x80),
             1 => MemRead(self.duty_and_length_load ^ 0x3f),
+            2 => MemRead(self.volume_and_envelope),
             3 => MemRead(0xff),
             _ => unreachable!("{:x}", addr),
         }
@@ -260,9 +272,7 @@ impl Tone {
         } else if addr == base + 1 {
             self.duty_and_length_load = value;
         } else if addr == base + 2 {
-            self.env_init = (value >> 4) as usize;
-            self.env_inc = value & 0x08 != 0;
-            self.env_count = (value & 0x7) as usize;
+            self.volume_and_envelope = value;
         } else if addr == base + 3 {
             self.freq = (self.freq & !0xff) | value as usize;
         } else if addr == base + 4 {
@@ -295,7 +305,11 @@ impl ToneStream {
             tone.sweep_sub(),
             usize::from(tone.sweep_shift()),
         );
-        let env = Envelop::new(tone.env_init, tone.env_count, tone.env_inc);
+        let env = Envelop::new(
+            usize::from(tone.initial_volume()),
+            usize::from(tone.sweep_pace()),
+            tone.envelope_direction(),
+        );
         let counter = Counter::new(tone.counter, usize::from(tone.sound_len()), 64);
 
         Self {
