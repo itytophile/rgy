@@ -1,9 +1,9 @@
 use log::*;
 use minifb::{Scale, Window, WindowOptions};
+use rgy::apu::mixer::MixerStream;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -16,7 +16,6 @@ use rgy::{Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 pub struct Hardware {
     rampath: Option<String>,
     vram: Arc<Mutex<Vec<u32>>>,
-    pcm: SpeakerHandle,
     keystate: Arc<Mutex<HashMap<Key, bool>>>,
     escape: Arc<AtomicBool>,
     color: bool,
@@ -111,12 +110,15 @@ impl Gui {
 }
 
 impl Hardware {
-    pub fn new(rampath: Option<String>, color: bool) -> Self {
+    pub fn new(
+        rampath: Option<String>,
+        color: bool,
+        mixer_stream: Arc<Mutex<MixerStream>>,
+    ) -> Self {
         let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
 
-        let pcm = Pcm::new();
-        let handle = pcm.handle();
-        pcm.run_forever();
+        let pcm = Pcm;
+        pcm.run_forever(mixer_stream);
 
         let mut keystate = HashMap::new();
         keystate.insert(Key::Right, false);
@@ -135,7 +137,6 @@ impl Hardware {
             color,
             rampath,
             vram,
-            pcm: handle,
             keystate,
             escape,
         }
@@ -168,10 +169,6 @@ impl rgy::Hardware for Hardware {
             .unwrap()
             .get(&key)
             .expect("Logic error in keystate map")
-    }
-
-    fn sound_play(&mut self, stream: Box<dyn Stream>) {
-        self.pcm.play(stream)
     }
 
     fn send_byte(&mut self, b: u8) {
@@ -223,31 +220,16 @@ impl rgy::Hardware for Hardware {
     }
 }
 
-pub struct Pcm {
-    tx: Sender<SpeakerCmd>,
-    rx: Receiver<SpeakerCmd>,
-}
+pub struct Pcm;
 
 impl Pcm {
-    pub fn new() -> Pcm {
-        let (tx, rx) = mpsc::channel();
-
-        Pcm { tx, rx }
-    }
-
-    pub fn handle(&self) -> SpeakerHandle {
-        SpeakerHandle {
-            tx: self.tx.clone(),
-        }
-    }
-
-    pub fn run_forever(self) {
+    pub fn run_forever(self, mixer_stream: Arc<Mutex<MixerStream>>) {
         std::thread::spawn(move || {
-            self.run();
+            self.run(mixer_stream);
         });
     }
 
-    pub fn run(self) {
+    pub fn run(self, mixer_stream: Arc<Mutex<MixerStream>>) {
         let device = cpal::default_output_device().expect("Failed to get default output device");
         let format = device
             .default_output_format()
@@ -257,66 +239,22 @@ impl Pcm {
         let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
         event_loop.play_stream(stream_id.clone());
 
-        let mut stream = None;
-
-        event_loop.run(move |_, data| {
-            match self.rx.try_recv() {
-                Ok(SpeakerCmd::Play(s)) => {
-                    stream = Some(s);
+        event_loop.run(move |_, data| match data {
+            cpal::StreamData::Output {
+                buffer: cpal::UnknownTypeOutputBuffer::U16(_buffer),
+            } => unimplemented!(),
+            cpal::StreamData::Output {
+                buffer: cpal::UnknownTypeOutputBuffer::I16(_buffer),
+            } => unimplemented!(),
+            cpal::StreamData::Output {
+                buffer: cpal::UnknownTypeOutputBuffer::F32(mut buffer),
+            } => {
+                let mut s = mixer_stream.lock().unwrap();
+                for sample in buffer.chunks_mut(format.channels as usize) {
+                    sample.fill((s.next(sample_rate) as u64 * 100 / s.max() as u64) as f32 / 100.0);
                 }
-                Ok(SpeakerCmd::Stop) => {
-                    stream = None;
-                }
-                Err(_) => {}
             }
-
-            match data {
-                cpal::StreamData::Output {
-                    buffer: cpal::UnknownTypeOutputBuffer::U16(_buffer),
-                } => unimplemented!(),
-                cpal::StreamData::Output {
-                    buffer: cpal::UnknownTypeOutputBuffer::I16(_buffer),
-                } => unimplemented!(),
-                cpal::StreamData::Output {
-                    buffer: cpal::UnknownTypeOutputBuffer::F32(mut buffer),
-                } => {
-                    for sample in buffer.chunks_mut(format.channels as usize) {
-                        let value = match &mut stream {
-                            Some(s) => {
-                                (s.next(sample_rate) as u64 * 100 / s.max() as u64) as f32 / 100.0
-                            }
-                            None => 0.0,
-                        };
-
-                        for out in sample.iter_mut() {
-                            *out = value;
-                        }
-                    }
-                }
-                _ => (),
-            }
+            _ => (),
         });
-    }
-}
-
-#[allow(unused)]
-enum SpeakerCmd {
-    Play(Box<dyn Stream>),
-    Stop,
-}
-
-#[derive(Clone)]
-pub struct SpeakerHandle {
-    tx: Sender<SpeakerCmd>,
-}
-
-impl SpeakerHandle {
-    fn play(&self, stream: Box<dyn Stream>) {
-        let _ = self.tx.send(SpeakerCmd::Play(stream));
-    }
-
-    #[allow(unused)]
-    fn stop(&self) {
-        let _ = self.tx.send(SpeakerCmd::Stop);
     }
 }

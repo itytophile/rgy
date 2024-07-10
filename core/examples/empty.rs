@@ -1,4 +1,4 @@
-use rgy::{Config, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, Config, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
     display: Vec<Vec<u32>>,
@@ -27,10 +27,6 @@ impl rgy::Hardware for Hardware {
         // Read a keyboard device and check if the `key` is pressed or not.
         println!("Check if {:?} is pressed", key);
         false
-    }
-
-    fn sound_play(&mut self, _stream: Box<dyn Stream>) {
-        // Play the wave provided `Stream`.
     }
 
     fn clock(&mut self) -> u64 {
@@ -76,6 +72,9 @@ fn main() {
     // The content of a ROM file, which can be downloaded from the Internet.
     let rom = vec![0u8; 1024];
 
-    // Run the emulator.
-    rgy::run(cfg, &rom, hw);
+    let mut sys = rgy::System::new(cfg, &rom, hw);
+
+    let mut mixer_stream = MixerStream::new();
+
+    while sys.poll(&mut mixer_stream) {}
 }

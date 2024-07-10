@@ -146,7 +146,7 @@ pub struct MixerStream {
 }
 
 impl MixerStream {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             tones: [Unit::new(), Unit::new()],
             wave: Unit::new(),

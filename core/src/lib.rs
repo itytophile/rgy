@@ -108,7 +108,7 @@
 extern crate alloc;
 
 mod alu;
-mod apu;
+pub mod apu;
 mod cgb;
 mod dma;
 mod fc;

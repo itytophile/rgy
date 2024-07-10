@@ -9,7 +9,11 @@ use crate::{
 };
 
 use log::*;
-use std::path::PathBuf;
+use rgy::apu::mixer::MixerStream;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -74,7 +78,9 @@ fn main() {
         .init();
     // env_logger::init();
 
-    let hw = Hardware::new(opt.ram.clone(), opt.color);
+    let mixer_stream = Arc::new(Mutex::new(MixerStream::new()));
+
+    let hw = Hardware::new(opt.ram.clone(), opt.color, mixer_stream.clone());
     let hw1 = hw.clone();
 
     std::thread::spawn(move || {
@@ -88,7 +94,9 @@ fn main() {
 
         set_affinity();
 
-        rgy::run(to_cfg(opt), &rom, hw1);
+        let mut sys = rgy::System::new(to_cfg(opt), &rom, hw1);
+
+        while sys.poll(&mut mixer_stream.lock().unwrap()) {}
     });
 
     hw.run();

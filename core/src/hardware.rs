@@ -52,10 +52,6 @@ pub trait Hardware {
     /// Called when the emulator checks if the key is pressed.
     fn joypad_pressed(&mut self, key: Key) -> bool;
 
-    /// Called when the emulator plays a sound.
-    /// The stream in the argument is the stream which keeps returning wave patterns.
-    fn sound_play(&mut self, stream: Box<dyn Stream>);
-
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.
     fn clock(&mut self) -> u64;

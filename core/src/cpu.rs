@@ -520,8 +520,13 @@ mod test {
 
     #[test]
     fn op_00af() {
+        let mut cpu_state = CpuState::new();
+        let mut ram = Ram::new();
         // xor a
-        let mut cpu = Cpu::new(Ram::new());
+        let mut cpu = Cpu {
+            state: &mut cpu_state,
+            sys: &mut ram,
+        };
 
         cpu.set_a(0x32);
 
@@ -534,7 +539,12 @@ mod test {
     #[test]
     fn op_00f1() {
         // pop af
-        let mut cpu = Cpu::new(Ram::new());
+        let mut cpu_state = CpuState::new();
+        let mut ram = Ram::new();
+        let mut cpu = Cpu {
+            state: &mut cpu_state,
+            sys: &mut ram,
+        };
 
         cpu.set_bc(0x1301);
         cpu.sys
