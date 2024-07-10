@@ -12,14 +12,13 @@ use crate::serial::Serial;
 use crate::timer::Timer;
 use crate::wram::Wram;
 use crate::Hardware;
-use arrayvec::ArrayVec;
 use log::*;
 
-pub struct Peripherals<H> {
+pub struct Peripherals<'a, H> {
     wram: Wram,
     hram: Hram,
     gpu: Gpu,
-    mbc: Mbc,
+    mbc: Mbc<'a>,
     timer: Timer,
     ic: Ic,
     serial: Serial,
@@ -31,9 +30,9 @@ pub struct Peripherals<H> {
     pub hw: H,
 }
 
-impl<H: Hardware> Peripherals<H> {
+impl<'a, H: Hardware> Peripherals<'a, H> {
     /// Create a new MMU instance.
-    pub fn new(mut hw: H, rom: ArrayVec<u8, 0x8000>, color: bool) -> Self {
+    pub fn new(mut hw: H, rom: &'a [u8], color: bool) -> Self {
         Self {
             wram: Wram::new(color),
             hram: Hram::new(),
@@ -57,12 +56,12 @@ impl<H: Hardware> Peripherals<H> {
 /// This unit holds a memory byte array which represents address space of the memory.
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
-pub struct Mmu<'a, H> {
-    pub peripherals: &'a mut Peripherals<H>,
+pub struct Mmu<'a, 'b, H> {
+    pub peripherals: &'a mut Peripherals<'b, H>,
     pub mixer_stream: &'a mut MixerStream,
 }
 
-impl<'a, H: Hardware> Mmu<'a, H> {
+impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
     fn io_read(&mut self, addr: u16) -> u8 {
         match addr {
             0xff00 => self.peripherals.joypad.read(&mut self.peripherals.hw),
@@ -227,7 +226,7 @@ impl<'a, H: Hardware> Mmu<'a, H> {
     }
 }
 
-impl<'a, T: Hardware> Sys for Mmu<'a, T> {
+impl<'a, 'b, T: Hardware> Sys for Mmu<'a, 'b, T> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.peripherals.ic.peek(&mut self.peripherals.irq)

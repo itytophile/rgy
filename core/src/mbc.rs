@@ -7,21 +7,17 @@ const BOOT_ROM: &[u8] = include_bytes!("dmg.bin");
 const BOOT_ROM_COLOR: &[u8] = include_bytes!("cgb.bin");
 
 struct MbcNone {
-    rom: ArrayVec<u8, 0x8000>,
     ram: [u8; 0x2000],
 }
 
 impl MbcNone {
-    fn new(rom: ArrayVec<u8, 0x8000>) -> Self {
-        Self {
-            rom,
-            ram: [0; 0x2000],
-        }
+    fn new() -> Self {
+        Self { ram: [0; 0x2000] }
     }
 
-    fn on_read(&self, addr: u16) -> u8 {
+    fn on_read(&self, addr: u16, rom: &[u8]) -> u8 {
         match addr {
-            0x0000..=0x7fff => self.rom[addr as usize],
+            0x0000..=0x7fff => rom[addr as usize],
             0xa000..=0xbfff => self.ram[addr as usize - 0xa000],
             _ => unreachable!("read attempt to mbc0 addr={:04x}", addr),
         }
@@ -29,7 +25,7 @@ impl MbcNone {
 
     fn on_write(&mut self, addr: u16, value: u8) {
         match addr {
-            0x0000..=0x7fff => self.rom[addr as usize] = value,
+            0x0000..=0x7fff => panic!("trying to write to rom"),
             0xa000..=0xbfff => self.ram[addr as usize - 0xa000] = value,
             _ => unreachable!("write attempt to mbc0 addr={:04x}, v={:02x}", addr, value),
         }
@@ -37,7 +33,6 @@ impl MbcNone {
 }
 
 struct Mbc1 {
-    rom: ArrayVec<u8, 0x8000>,
     ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     ram_bank: usize,
@@ -46,11 +41,10 @@ struct Mbc1 {
 }
 
 impl Mbc1 {
-    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
+    fn new(hw: &mut impl Hardware) -> Self {
         let ram = hw.load_ram(0x8000);
 
         Self {
-            rom,
             ram,
             rom_bank: 0,
             ram_bank: 0,
@@ -59,9 +53,9 @@ impl Mbc1 {
         }
     }
 
-    fn on_read(&self, addr: u16) -> u8 {
+    fn on_read(&self, addr: u16, rom: &[u8]) -> u8 {
         if addr <= 0x3fff {
-            self.rom[addr as usize]
+            rom[addr as usize]
         } else if (0x4000..=0x7fff).contains(&addr) {
             let rom_bank = self.rom_bank.max(1);
 
@@ -75,13 +69,13 @@ impl Mbc1 {
 
             let base = rom_bank * 0x4000;
             let offset = addr as usize - 0x4000;
-            let addr = (base + offset) & (self.rom.len() - 1);
-            self.rom[addr]
+            let addr = (base + offset) & (rom.len() - 1);
+            rom[addr]
         } else if (0xa000..=0xbfff).contains(&addr) {
             if self.ram_enable {
                 let base = self.ram_bank * 0x2000;
                 let offset = addr as usize - 0xa000;
-                let addr = (base + offset) & (self.rom.len() - 1);
+                let addr = (base + offset) & (rom.len() - 1);
                 self.ram[addr]
             } else {
                 warn!("Read from disabled external RAM: {:04x}", addr);
@@ -134,31 +128,29 @@ impl Mbc1 {
 }
 
 struct Mbc2 {
-    rom: ArrayVec<u8, 0x8000>,
     ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     ram_enable: bool,
 }
 
 impl Mbc2 {
-    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
+    fn new(hw: &mut impl Hardware) -> Self {
         let ram = hw.load_ram(0x200);
 
         Self {
-            rom,
             ram,
             rom_bank: 1,
             ram_enable: false,
         }
     }
 
-    fn on_read(&self, addr: u16) -> u8 {
+    fn on_read(&self, addr: u16, rom: &[u8]) -> u8 {
         if addr <= 0x3fff {
-            self.rom[addr as usize]
+            rom[addr as usize]
         } else if (0x4000..=0x7fff).contains(&addr) {
             let base = self.rom_bank.max(1) * 0x4000;
             let offset = addr as usize - 0x4000;
-            self.rom[base + offset]
+            rom[base + offset]
         } else if (0xa000..=0xa1ff).contains(&addr) {
             if self.ram_enable {
                 self.ram[addr as usize - 0xa000] & 0xf
@@ -208,7 +200,6 @@ impl Mbc2 {
 }
 
 struct Mbc3 {
-    rom: ArrayVec<u8, 0x8000>,
     ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     enable: bool,
@@ -223,11 +214,10 @@ struct Mbc3 {
 }
 
 impl Mbc3 {
-    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
+    fn new(hw: &mut impl Hardware) -> Self {
         let ram = hw.load_ram(0x8000);
 
         let mut s = Self {
-            rom,
             ram,
             rom_bank: 0,
             enable: false,
@@ -252,14 +242,14 @@ impl Mbc3 {
         hw.clock() / 1_000_000
     }
 
-    fn on_read(&self, addr: u16) -> u8 {
+    fn on_read(&self, addr: u16, rom: &[u8]) -> u8 {
         if addr <= 0x3fff {
-            self.rom[addr as usize]
+            rom[addr as usize]
         } else if (0x4000..=0x7fff).contains(&addr) {
             let rom_bank = self.rom_bank.max(1);
             let base = rom_bank * 0x4000;
             let offset = addr as usize - 0x4000;
-            self.rom[base + offset]
+            rom[base + offset]
         } else if (0xa000..=0xbfff).contains(&addr) {
             match self.select {
                 x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
@@ -398,7 +388,6 @@ impl Mbc3 {
 }
 
 struct Mbc5 {
-    rom: ArrayVec<u8, 0x8000>,
     ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     ram_bank: usize,
@@ -406,11 +395,10 @@ struct Mbc5 {
 }
 
 impl Mbc5 {
-    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
+    fn new(hw: &mut impl Hardware) -> Self {
         let ram = hw.load_ram(0x20000);
 
         Self {
-            rom,
             ram,
             rom_bank: 0,
             ram_bank: 0,
@@ -418,13 +406,13 @@ impl Mbc5 {
         }
     }
 
-    fn on_read(&self, addr: u16) -> u8 {
+    fn on_read(&self, addr: u16, rom: &[u8]) -> u8 {
         if addr <= 0x3fff {
-            self.rom[addr as usize]
+            rom[addr as usize]
         } else if (0x4000..=0x7fff).contains(&addr) {
             let base = self.rom_bank * 0x4000;
             let offset = addr as usize - 0x4000;
-            self.rom[base + offset]
+            rom[base + offset]
         } else if (0xa000..=0xbfff).contains(&addr) {
             if self.ram_enable {
                 let base = self.ram_bank * 0x2000;
@@ -472,13 +460,10 @@ impl Mbc5 {
 }
 
 #[allow(unused)]
-struct HuC1 {
-    rom: ArrayVec<u8, 0x8000>,
-}
-
+struct HuC1;
 impl HuC1 {
-    fn new(rom: ArrayVec<u8, 0x8000>) -> Self {
-        Self { rom }
+    fn new() -> Self {
+        Self
     }
 
     fn on_read(&self, _addr: u16) -> u8 {
@@ -489,8 +474,12 @@ impl HuC1 {
         unimplemented!()
     }
 }
+struct MbcType<'a> {
+    mbc_type: MbcTypeInner,
+    rom: &'a [u8],
+}
 
-enum MbcType {
+enum MbcTypeInner {
     None(MbcNone),
     Mbc1(Mbc1),
     Mbc2(Mbc2),
@@ -499,53 +488,55 @@ enum MbcType {
     HuC1(HuC1),
 }
 
-impl MbcType {
-    fn new(hw: &mut impl Hardware, code: u8, rom: ArrayVec<u8, 0x8000>) -> Self {
-        match code {
-            0x00 => MbcType::None(MbcNone::new(rom)),
-            0x01..=0x03 => MbcType::Mbc1(Mbc1::new(hw, rom)),
-            0x05 | 0x06 => MbcType::Mbc2(Mbc2::new(hw, rom)),
+impl<'a> MbcType<'a> {
+    fn new(hw: &mut impl Hardware, code: u8, rom: &'a [u8]) -> Self {
+        let mbc_type = match code {
+            0x00 => MbcTypeInner::None(MbcNone::new()),
+            0x01..=0x03 => MbcTypeInner::Mbc1(Mbc1::new(hw)),
+            0x05 | 0x06 => MbcTypeInner::Mbc2(Mbc2::new(hw)),
             0x08 | 0x09 => unimplemented!("ROM+RAM: {:02x}", code),
             0x0b..=0x0d => unimplemented!("MMM01: {:02x}", code),
-            0x0f..=0x13 => MbcType::Mbc3(Mbc3::new(hw, rom)),
+            0x0f..=0x13 => MbcTypeInner::Mbc3(Mbc3::new(hw)),
             0x15..=0x17 => unimplemented!("Mbc4: {:02x}", code),
-            0x19..=0x1e => MbcType::Mbc5(Mbc5::new(hw, rom)),
+            0x19..=0x1e => MbcTypeInner::Mbc5(Mbc5::new(hw)),
             0xfc => unimplemented!("POCKET CAMERA"),
             0xfd => unimplemented!("BANDAI TAMAS"),
             0xfe => unimplemented!("HuC3"),
-            0xff => MbcType::HuC1(HuC1::new(rom)),
+            0xff => MbcTypeInner::HuC1(HuC1::new()),
             _ => unreachable!("Invalid cartridge type: {:02x}", code),
-        }
+        };
+
+        Self { mbc_type, rom }
     }
 
     fn on_read(&self, addr: u16) -> u8 {
-        match self {
-            MbcType::None(c) => c.on_read(addr),
-            MbcType::Mbc1(c) => c.on_read(addr),
-            MbcType::Mbc2(c) => c.on_read(addr),
-            MbcType::Mbc3(c) => c.on_read(addr),
-            MbcType::Mbc5(c) => c.on_read(addr),
-            MbcType::HuC1(c) => c.on_read(addr),
+        match &self.mbc_type {
+            MbcTypeInner::None(c) => c.on_read(addr, self.rom),
+            MbcTypeInner::Mbc1(c) => c.on_read(addr, self.rom),
+            MbcTypeInner::Mbc2(c) => c.on_read(addr, self.rom),
+            MbcTypeInner::Mbc3(c) => c.on_read(addr, self.rom),
+            MbcTypeInner::Mbc5(c) => c.on_read(addr, self.rom),
+            MbcTypeInner::HuC1(c) => c.on_read(addr),
         }
     }
 
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
-        match self {
-            MbcType::None(c) => c.on_write(addr, value),
-            MbcType::Mbc1(c) => c.on_write(addr, value, hw),
-            MbcType::Mbc2(c) => c.on_write(addr, value, hw),
-            MbcType::Mbc3(c) => c.on_write(addr, value, hw),
-            MbcType::Mbc5(c) => c.on_write(addr, value, hw),
-            MbcType::HuC1(c) => c.on_write(addr, value),
+        match &mut self.mbc_type {
+            MbcTypeInner::None(c) => c.on_write(addr, value),
+            MbcTypeInner::Mbc1(c) => c.on_write(addr, value, hw),
+            MbcTypeInner::Mbc2(c) => c.on_write(addr, value, hw),
+            MbcTypeInner::Mbc3(c) => c.on_write(addr, value, hw),
+            MbcTypeInner::Mbc5(c) => c.on_write(addr, value, hw),
+            MbcTypeInner::HuC1(c) => c.on_write(addr, value),
         }
     }
 }
 
-struct Cartridge {
+struct Cartridge<'a> {
     cgb: bool,
     cgb_only: bool,
     sgb: bool,
-    mbc: MbcType,
+    mbc: MbcType<'a>,
     rom_size: u8,
     ram_size: u8,
     dstcode: u8,
@@ -571,17 +562,17 @@ fn verify(rom: &[u8], checksum: u16) {
     }
 }
 
-impl Cartridge {
-    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
+impl<'a> Cartridge<'a> {
+    fn new(hw: &mut impl Hardware, rom: &'a [u8]) -> Self {
         let checksum = (rom[0x14e] as u16) << 8 | (rom[0x14f] as u16);
 
-        verify(&rom, checksum);
+        verify(rom, checksum);
 
         Self {
             cgb: rom[0x143] & 0x80 != 0,
             cgb_only: rom[0x143] == 0xc0,
             sgb: rom[0x146] == 0x03,
-            mbc: MbcType::new(hw, rom[0x147], rom.clone()),
+            mbc: MbcType::new(hw, rom[0x147], rom),
             rom_size: rom[0x148],
             ram_size: rom[0x149],
             dstcode: rom[0x14a],
@@ -635,14 +626,14 @@ impl Cartridge {
     }
 }
 
-pub struct Mbc {
+pub struct Mbc<'a> {
     color: bool,
-    cartridge: Cartridge,
+    cartridge: Cartridge<'a>,
     use_boot_rom: bool,
 }
 
-impl Mbc {
-    pub fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>, color: bool) -> Self {
+impl<'a> Mbc<'a> {
+    pub fn new(hw: &mut impl Hardware, rom: &'a [u8], color: bool) -> Self {
         let cartridge = Cartridge::new(hw, rom);
 
         cartridge.show_info();

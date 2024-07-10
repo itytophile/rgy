@@ -70,16 +70,16 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<H: Hardware> {
+pub struct System<'a, H: Hardware> {
     cfg: Config,
     fc: FreqControl,
     cpu_state: CpuState,
-    peripherals: Peripherals<H>,
+    peripherals: Peripherals<'a, H>,
 }
 
-impl<H: Hardware + 'static> System<H> {
+impl<'a, H: Hardware + 'static> System<'a, H> {
     /// Create a new emulator context.
-    pub fn new(cfg: Config, rom: &[u8], mut hw: H) -> Self {
+    pub fn new(cfg: Config, rom: &'a [u8], mut hw: H) -> Self {
         info!("Initializing...");
 
         let mut fc = FreqControl::new(&cfg);
@@ -87,7 +87,7 @@ impl<H: Hardware + 'static> System<H> {
         fc.reset(&mut hw);
 
         info!("Starting...");
-        let peripherals = Peripherals::new(hw, rom.iter().copied().collect(), cfg.color);
+        let peripherals = Peripherals::new(hw, rom, cfg.color);
 
         Self {
             cfg,
