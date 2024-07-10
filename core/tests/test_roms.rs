@@ -122,12 +122,7 @@ impl rgy::Hardware for TestHardware {
 fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
     let hw = TestHardware::new(expected);
-    let mut sys = rgy::System::new(
-        rgy::Config::new().native_speed(true),
-        &rom,
-        hw,
-        rgy::debug::NullDebugger,
-    );
+    let mut sys = rgy::System::new(rgy::Config::new().native_speed(true), &rom, hw);
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     while sys.poll() {

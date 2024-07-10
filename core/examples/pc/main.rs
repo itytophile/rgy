@@ -29,9 +29,6 @@ pub struct Opt {
     /// Don't adjust cpu frequency
     #[structopt(short = "n", long = "native")]
     native_speed: bool,
-    /// Enable debug mode
-    #[structopt(short = "d", long = "debug")]
-    debug: bool,
     /// RAM file name
     #[structopt(short = "r", long = "ram")]
     ram: Option<String>,
@@ -91,11 +88,7 @@ fn main() {
 
         set_affinity();
 
-        if opt.debug {
-            // rgy::run_debug(to_cfg(opt), &rom, hw1, Debugger::new());
-        } else {
-            rgy::run(to_cfg(opt), &rom, hw1);
-        }
+        rgy::run(to_cfg(opt), &rom, hw1);
     });
 
     hw.run();

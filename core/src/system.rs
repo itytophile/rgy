@@ -1,5 +1,4 @@
 use crate::cpu::Cpu;
-use crate::debug::Debugger;
 use crate::fc::FreqControl;
 use crate::hardware::{Hardware, HardwareHandle};
 use crate::mmu::Mmu;
@@ -70,20 +69,16 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<D> {
+pub struct System {
     cfg: Config,
     hw: HardwareHandle,
     fc: FreqControl,
     cpu: Cpu,
-    _dbg: D,
 }
 
-impl<D> System<D>
-where
-    D: Debugger + 'static,
-{
+impl System {
     /// Create a new emulator context.
-    pub fn new<T>(cfg: Config, rom: &[u8], hw: T, dbg: D) -> Self
+    pub fn new<T>(cfg: Config, rom: &[u8], hw: T) -> Self
     where
         T: Hardware + 'static,
     {
@@ -100,13 +95,7 @@ where
 
         fc.reset();
 
-        Self {
-            cfg,
-            hw,
-            fc,
-            cpu,
-            _dbg: dbg,
-        }
+        Self { cfg, hw, fc, cpu }
     }
 
     /// Run a single step of emulation.
@@ -129,20 +118,15 @@ where
 
 /// Run the emulator with the given configuration.
 pub fn run<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
-    run_inner(cfg, rom, hw, <dyn Debugger>::empty())
+    run_inner(cfg, rom, hw)
 }
 
 /// Run the emulator with the given configuration and debugger.
-pub fn run_debug<T: Hardware + 'static, D: Debugger + 'static>(
-    cfg: Config,
-    rom: &[u8],
-    hw: T,
-    dbg: D,
-) {
-    run_inner(cfg, rom, hw, dbg)
+pub fn run_debug<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
+    run_inner(cfg, rom, hw)
 }
 
-fn run_inner<T: Hardware + 'static, D: Debugger + 'static>(cfg: Config, rom: &[u8], hw: T, dbg: D) {
-    let mut sys = System::new(cfg, rom, hw, dbg);
+fn run_inner<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
+    let mut sys = System::new(cfg, rom, hw);
     while sys.poll() {}
 }
