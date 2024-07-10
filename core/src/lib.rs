@@ -72,9 +72,9 @@
 //!     }
 //!
 //!     // Called when the emulator stores the save data to the battery-backed RAM.
-//!     fn load_ram(&mut self, size: usize) -> Vec<u8> {
+//!     fn load_ram(&mut self, size: usize) -> arrayvec::ArrayVec<u8, 0x8000> {
 //!         // TODO: Return save data.
-//!         vec![0; size]
+//!         vec![0; size].into_iter().collect()
 //!     }
 //!
 //!     // Called when the emulator loads the save data from the battery-backed RAM.
