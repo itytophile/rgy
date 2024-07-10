@@ -44,11 +44,6 @@
 //!         false
 //!     }
 //!
-//!     // Called when the emulator plays a sound.
-//!     fn sound_play(&mut self, _stream: Box<dyn Stream>) {
-//!         // TODO: Play the wave pattern provided `Stream`.
-//!     }
-//!
 //!     // Provides clock for the emulator.
 //!     fn clock(&mut self) -> u64 {
 //!         // TODO: Return the epoch in microseconds.
@@ -97,8 +92,12 @@
 //! // TODO: The content of a ROM file, which can be downloaded from the Internet.
 //! let rom = vec![0u8; 1024];
 //!
+//! let mut sys = rgy::System::new(cfg, &rom, hw);
+//!
+//! let mut mixer_stream = rgy::apu::mixer::MixerStream::new();
+//!
 //! // Run the emulator.
-//! rgy::run(cfg, &rom, hw);
+//! while sys.poll(&mut mixer_stream) {}
 //!
 //! ```
 
