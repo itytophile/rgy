@@ -1,4 +1,3 @@
-use crate::mmu::Mmu;
 use alloc::fmt;
 use log::*;
 
@@ -11,13 +10,13 @@ pub trait Sys {
     fn peek_int_vec(&mut self) -> Option<u8>;
 
     /// Read a byte from the address.
-    fn get8(&self, addr: u16) -> u8;
+    fn get8(&mut self, addr: u16) -> u8;
 
     /// Write a byte to the address.
     fn set8(&mut self, addr: u16, v: u8);
 
     /// Reads two bytes from the given addresss in the memory.
-    fn get16(&self, addr: u16) -> u16 {
+    fn get16(&mut self, addr: u16) -> u16 {
         let l = self.get8(addr);
         let h = self.get8(addr + 1);
         (h as u16) << 8 | l as u16
@@ -34,7 +33,7 @@ pub trait Sys {
 }
 
 /// Represents CPU state.
-pub struct Cpu<T = Mmu> {
+pub struct Cpu<T> {
     a: u8,
     b: u8,
     c: u8,
@@ -51,7 +50,7 @@ pub struct Cpu<T = Mmu> {
     halt: bool,
     halt_bug: bool,
     cycles: usize,
-    sys: T,
+    pub sys: T,
 }
 
 impl<T: Sys> fmt::Display for Cpu<T> {

@@ -1,6 +1,7 @@
 use crate::dma::DmaRequest;
-use crate::hardware::{HardwareHandle, VRAM_HEIGHT, VRAM_WIDTH};
+use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
+use crate::Hardware;
 use alloc::{vec, vec::Vec};
 use log::*;
 
@@ -64,7 +65,6 @@ pub struct Gpu {
     spsize: u16,
     spenable: bool,
     bgenable: bool,
-    hw: HardwareHandle,
 
     bg_palette: Vec<Color>,
     obj_palette0: Vec<Color>,
@@ -350,7 +350,7 @@ impl Hdma {
 }
 
 impl Gpu {
-    pub fn new(hw: HardwareHandle, color: bool) -> Self {
+    pub fn new(color: bool) -> Self {
         Self {
             color,
             clocks: 0,
@@ -373,7 +373,6 @@ impl Gpu {
             spsize: 8,
             spenable: false,
             bgenable: false,
-            hw,
             bg_palette: vec![
                 Color::White,
                 Color::LightGray,
@@ -401,7 +400,12 @@ impl Gpu {
         }
     }
 
-    pub fn step(&mut self, time: usize, irq: &mut Irq) -> Option<DmaRequest> {
+    pub fn step(
+        &mut self,
+        time: usize,
+        irq: &mut Irq,
+        hw: &mut impl Hardware,
+    ) -> Option<DmaRequest> {
         let clocks = self.clocks + time;
 
         let (clocks, mode) = match &self.mode {
@@ -414,7 +418,7 @@ impl Gpu {
             }
             Mode::Vram => {
                 if clocks >= 172 {
-                    self.draw();
+                    self.draw(hw);
 
                     if self.hblank_interrupt {
                         irq.lcd(true);
@@ -483,7 +487,7 @@ impl Gpu {
         self.hdma.run(enter_hblank)
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, hw: &mut impl Hardware) {
         let height = VRAM_HEIGHT;
         let width = VRAM_WIDTH;
 
@@ -620,10 +624,7 @@ impl Gpu {
             }
         }
 
-        self.hw
-            .get()
-            .borrow_mut()
-            .vram_update(self.ly as usize, &buf);
+        hw.vram_update(self.ly as usize, &buf);
     }
 
     /// Write CTRL register (0xff40)

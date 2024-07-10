@@ -1,24 +1,23 @@
-use crate::hardware::{HardwareHandle, Key};
+use crate::hardware::Key;
 use crate::ic::Irq;
+use crate::Hardware;
 use log::*;
 
 pub struct Joypad {
-    hw: HardwareHandle,
     select: u8,
     pressed: u8,
 }
 
 impl Joypad {
-    pub fn new(hw: HardwareHandle) -> Self {
+    pub fn new() -> Self {
         Self {
-            hw,
             select: 0xff,
             pressed: 0x0f,
         }
     }
 
-    pub fn poll(&mut self, irq: &mut Irq) {
-        let pressed = self.check();
+    pub fn poll(&mut self, irq: &mut Irq, hw: &mut impl Hardware) {
+        let pressed = self.check(hw);
 
         for i in 0..4 {
             let bit = 1 << i;
@@ -31,8 +30,8 @@ impl Joypad {
         self.pressed = pressed;
     }
 
-    fn check(&self) -> u8 {
-        let p = |key| self.hw.get().borrow_mut().joypad_pressed(key);
+    fn check(&self, hw: &mut impl Hardware) -> u8 {
+        let mut p = |key| hw.joypad_pressed(key);
 
         let mut value = 0;
 
@@ -53,9 +52,9 @@ impl Joypad {
         value
     }
 
-    pub(crate) fn read(&self) -> u8 {
+    pub(crate) fn read(&self, hw: &mut impl Hardware) -> u8 {
         debug!("Joypad read: dir: {:02x}", self.select);
-        self.check()
+        self.check(hw)
     }
 
     pub(crate) fn write(&mut self, value: u8) {

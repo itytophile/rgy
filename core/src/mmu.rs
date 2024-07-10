@@ -3,7 +3,6 @@ use crate::cgb::Cgb;
 use crate::cpu::Sys;
 use crate::dma::{Dma, DmaRequest};
 use crate::gpu::Gpu;
-use crate::hardware::HardwareHandle;
 use crate::hram::Hram;
 use crate::ic::{Ic, Irq};
 use crate::joypad::Joypad;
@@ -11,6 +10,7 @@ use crate::mbc::Mbc;
 use crate::serial::Serial;
 use crate::timer::Timer;
 use crate::wram::Wram;
+use crate::Hardware;
 use alloc::vec::Vec;
 use log::*;
 
@@ -19,7 +19,7 @@ use log::*;
 /// This unit holds a memory byte array which represents address space of the memory.
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
-pub struct Mmu {
+pub struct Mmu<H> {
     wram: Wram,
     hram: Hram,
     gpu: Gpu,
@@ -32,30 +32,32 @@ pub struct Mmu {
     dma: Dma,
     cgb: Cgb,
     irq: Irq,
+    pub hw: H,
 }
 
-impl Mmu {
+impl<H: Hardware> Mmu<H> {
     /// Create a new MMU instance.
-    pub fn new(hw: HardwareHandle, rom: Vec<u8>, color: bool) -> Mmu {
+    pub fn new(mut hw: H, rom: Vec<u8>, color: bool) -> Self {
         Mmu {
             wram: Wram::new(color),
             hram: Hram::new(),
-            gpu: Gpu::new(hw.clone(), color),
-            mbc: Mbc::new(hw.clone(), rom, color),
+            gpu: Gpu::new(color),
+            mbc: Mbc::new(&mut hw, rom, color),
             timer: Timer::new(),
             ic: Ic::new(),
-            serial: Serial::new(hw.clone()),
-            joypad: Joypad::new(hw.clone()),
-            apu: Apu::new(hw),
+            serial: Serial::new(),
+            joypad: Joypad::new(),
+            apu: Apu::new(&mut hw),
             dma: Dma::new(),
             cgb: Cgb::new(color),
             irq: Irq::new(),
+            hw,
         }
     }
 
-    fn io_read(&self, addr: u16) -> u8 {
+    fn io_read(&mut self, addr: u16) -> u8 {
         match addr {
-            0xff00 => self.joypad.read(),
+            0xff00 => self.joypad.read(&mut self.hw),
             0xff01 => self.serial.get_data(),
             0xff02 => self.serial.get_ctrl(),
             0xff03 => todo!("i/o write: addr={:04x}", addr),
@@ -121,7 +123,7 @@ impl Mmu {
         match addr {
             0xff00 => self.joypad.write(v),
             0xff01 => self.serial.set_data(v),
-            0xff02 => self.serial.set_ctrl(v),
+            0xff02 => self.serial.set_ctrl(v, &mut self.hw),
             0xff03 => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
             0xff04..=0xff07 => self.timer.on_write(addr, v),
             0xff08..=0xff0e => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
@@ -190,12 +192,13 @@ impl Mmu {
             req.len()
         );
         for i in 0..req.len() {
-            self.set8(req.dst() + i, self.get8(req.src() + i));
+            let value = self.get8(req.src() + i);
+            self.set8(req.dst() + i, value);
         }
     }
 }
 
-impl Sys for Mmu {
+impl<T: Hardware> Sys for Mmu<T> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.ic.peek(&mut self.irq)
@@ -207,7 +210,7 @@ impl Sys for Mmu {
     }
 
     /// Reads one byte from the given address in the memory.
-    fn get8(&self, addr: u16) -> u8 {
+    fn get8(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7fff => self.mbc.on_read(addr),
             0x8000..=0x9fff => self.gpu.read_vram(addr),
@@ -224,9 +227,9 @@ impl Sys for Mmu {
     /// Writes one byte at the given address in the memory.
     fn set8(&mut self, addr: u16, v: u8) {
         match addr {
-            0x0000..=0x7fff => self.mbc.on_write(addr, v),
+            0x0000..=0x7fff => self.mbc.on_write(addr, v, &mut self.hw),
             0x8000..=0x9fff => self.gpu.write_vram(addr, v),
-            0xa000..=0xbfff => self.mbc.on_write(addr, v),
+            0xa000..=0xbfff => self.mbc.on_write(addr, v, &mut self.hw),
             0xc000..=0xfdff => self.wram.set8(addr, v),
             0xfe00..=0xfe9f => self.gpu.write_oam(addr, v),
             0xfea0..=0xfeff => {} // Unusable range
@@ -241,13 +244,13 @@ impl Sys for Mmu {
         if let Some(req) = self.dma.step(cycles) {
             self.run_dma(req);
         }
-        if let Some(req) = self.gpu.step(cycles, &mut self.irq) {
+        if let Some(req) = self.gpu.step(cycles, &mut self.irq, &mut self.hw) {
             self.run_dma(req);
         }
         self.apu.step(cycles);
         self.timer.step(cycles, &mut self.irq);
-        self.serial.step(cycles, &mut self.irq);
-        self.joypad.poll(&mut self.irq);
+        self.serial.step(cycles, &mut self.irq, &mut self.hw);
+        self.joypad.poll(&mut self.irq, &mut self.hw);
     }
 }
 
@@ -285,7 +288,7 @@ impl Sys for Ram {
         None
     }
 
-    fn get8(&self, addr: u16) -> u8 {
+    fn get8(&mut self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }
 

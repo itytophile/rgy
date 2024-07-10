@@ -1,7 +1,5 @@
 use alloc::boxed::Box;
-use alloc::rc::Rc;
 use alloc::vec::Vec;
-use core::cell::RefCell;
 
 /// The width of the VRAM.
 pub const VRAM_WIDTH: usize = 160;
@@ -41,19 +39,6 @@ pub trait Stream: Send + 'static {
 
     /// Indicate the stream is active.
     fn on(&self) -> bool;
-}
-
-#[derive(Clone)]
-pub struct HardwareHandle(Rc<RefCell<dyn Hardware>>);
-
-impl HardwareHandle {
-    pub fn new<T: Hardware + 'static>(inner: T) -> Self {
-        Self(Rc::new(RefCell::new(inner)))
-    }
-
-    pub fn get(&self) -> &Rc<RefCell<dyn Hardware>> {
-        &self.0
-    }
 }
 
 /// The interface to abstracts the OS-specific functions.

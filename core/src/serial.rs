@@ -1,9 +1,7 @@
-use crate::hardware::HardwareHandle;
-use crate::ic::Irq;
+use crate::{ic::Irq, Hardware};
 use log::*;
 
 pub struct Serial {
-    hw: HardwareHandle,
     data: u8,
     recv: u8,
     ctrl: u8,
@@ -11,9 +9,8 @@ pub struct Serial {
 }
 
 impl Serial {
-    pub fn new(hw: HardwareHandle) -> Self {
+    pub fn new() -> Self {
         Self {
-            hw,
             data: 0,
             recv: 0,
             ctrl: 0,
@@ -21,7 +18,7 @@ impl Serial {
         }
     }
 
-    pub fn step(&mut self, time: usize, irq: &mut Irq) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq, hw: &mut impl Hardware) {
         if self.ctrl & 0x80 == 0 {
             // No transfer
             return;
@@ -38,8 +35,8 @@ impl Serial {
             } else {
                 self.clock -= time;
             }
-        } else if let Some(data) = self.hw.get().borrow_mut().recv_byte() {
-            self.hw.get().borrow_mut().send_byte(self.data);
+        } else if let Some(data) = hw.recv_byte() {
+            hw.send_byte(self.data);
             self.data = data;
 
             // End of transfer
@@ -60,7 +57,7 @@ impl Serial {
         self.data = value;
     }
 
-    pub(crate) fn set_ctrl(&mut self, value: u8) {
+    pub(crate) fn set_ctrl(&mut self, value: u8, hw: &mut impl Hardware) {
         self.ctrl = value;
 
         if self.ctrl & 0x80 != 0 {
@@ -71,8 +68,8 @@ impl Serial {
                 self.clock = 512 * 8;
 
                 // Do transfer one byte at once
-                self.hw.get().borrow_mut().send_byte(self.data);
-                self.recv = self.hw.get().borrow_mut().recv_byte().unwrap_or(0xff);
+                hw.send_byte(self.data);
+                self.recv = hw.recv_byte().unwrap_or(0xff);
             } else {
                 debug!("Serial transfer (External): {:02x}", self.data);
             }

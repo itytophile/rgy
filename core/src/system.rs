@@ -1,6 +1,6 @@
 use crate::cpu::Cpu;
 use crate::fc::FreqControl;
-use crate::hardware::{Hardware, HardwareHandle};
+use crate::hardware::Hardware;
 use crate::mmu::Mmu;
 use log::*;
 
@@ -69,47 +69,41 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System {
+pub struct System<H: Hardware> {
     cfg: Config,
-    hw: HardwareHandle,
     fc: FreqControl,
-    cpu: Cpu,
+    cpu: Cpu<Mmu<H>>,
 }
 
-impl System {
+impl<H: Hardware + 'static> System<H> {
     /// Create a new emulator context.
-    pub fn new<T>(cfg: Config, rom: &[u8], hw: T) -> Self
-    where
-        T: Hardware + 'static,
-    {
+    pub fn new(cfg: Config, rom: &[u8], mut hw: H) -> Self {
         info!("Initializing...");
 
-        let hw = HardwareHandle::new(hw);
+        let mut fc = FreqControl::new(&cfg);
 
-        let mut fc = FreqControl::new(hw.clone(), &cfg);
+        fc.reset(&mut hw);
 
-        let mmu = Mmu::new(hw.clone(), rom.to_vec(), cfg.color);
+        let mmu = Mmu::new(hw, rom.to_vec(), cfg.color);
         let cpu = Cpu::new(mmu);
 
         info!("Starting...");
 
-        fc.reset();
-
-        Self { cfg, hw, fc, cpu }
+        Self { cfg, fc, cpu }
     }
 
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
     pub fn poll(&mut self) -> bool {
-        if !self.hw.get().borrow_mut().sched() {
+        if !self.cpu.sys.hw.sched() {
             return false;
         }
 
         let time = self.cpu.execute();
 
         if !self.cfg.native_speed {
-            self.fc.adjust(time);
+            self.fc.adjust(time, &mut self.cpu.sys.hw);
         }
 
         true

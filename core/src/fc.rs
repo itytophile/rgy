@@ -1,9 +1,7 @@
-use crate::hardware::HardwareHandle;
-use crate::system::Config;
+use crate::{system::Config, Hardware};
 use log::*;
 
 pub struct FreqControl {
-    hw: HardwareHandle,
     last: u64,
     cycles: u64,
     sample: u64,
@@ -13,9 +11,8 @@ pub struct FreqControl {
 }
 
 impl FreqControl {
-    pub fn new(hw: HardwareHandle, cfg: &Config) -> Self {
+    pub fn new(cfg: &Config) -> Self {
         Self {
-            hw,
             last: 0,
             cycles: 0,
             delay: 0,
@@ -25,11 +22,11 @@ impl FreqControl {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.last = self.hw.get().borrow_mut().clock();
+    pub fn reset(&mut self, hw: &mut impl Hardware) {
+        self.last = hw.clock();
     }
 
-    pub fn adjust(&mut self, time: usize) {
+    pub fn adjust(&mut self, time: usize, hw: &mut impl Hardware) {
         self.cycles += time as u64;
 
         for _ in 0..self.delay {
@@ -39,7 +36,7 @@ impl FreqControl {
         if self.cycles > self.sample {
             self.cycles -= self.sample;
 
-            let now = self.hw.get().borrow_mut().clock();
+            let now = hw.clock();
             let (diff, of) = now.overflowing_sub(self.last);
             if of || diff == 0 {
                 warn!("Overflow: {} - {}", self.last, now);

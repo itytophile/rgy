@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use log::*;
 
-use crate::hardware::HardwareHandle;
+use crate::Hardware;
 
 use self::{mixer::Mixer, noise::Noise, tone::Tone, wave::Wave};
 
@@ -21,12 +21,10 @@ pub struct Apu {
 }
 
 impl Apu {
-    pub fn new(hw: HardwareHandle) -> Self {
+    pub fn new(hw: &mut impl Hardware) -> Self {
         let mixer = Mixer::new();
 
-        hw.get()
-            .borrow_mut()
-            .sound_play(Box::new(mixer.create_stream()));
+        hw.sound_play(Box::new(mixer.create_stream()));
 
         Self {
             tones: [Tone::new(true), Tone::new(false)],
