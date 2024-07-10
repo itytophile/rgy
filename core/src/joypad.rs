@@ -4,28 +4,26 @@ use log::*;
 
 pub struct Joypad {
     hw: HardwareHandle,
-    irq: Irq,
     select: u8,
     pressed: u8,
 }
 
 impl Joypad {
-    pub fn new(hw: HardwareHandle, irq: Irq) -> Self {
+    pub fn new(hw: HardwareHandle) -> Self {
         Self {
             hw,
-            irq,
             select: 0xff,
             pressed: 0x0f,
         }
     }
 
-    pub fn poll(&mut self) {
+    pub fn poll(&mut self, irq: &mut Irq) {
         let pressed = self.check();
 
         for i in 0..4 {
             let bit = 1 << i;
             if self.pressed & bit != 0 && pressed & bit == 0 {
-                self.irq.joypad(true);
+                irq.joypad(true);
                 break;
             }
         }

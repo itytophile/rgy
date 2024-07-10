@@ -4,7 +4,6 @@ use log::*;
 
 pub struct Serial {
     hw: HardwareHandle,
-    irq: Irq,
     data: u8,
     recv: u8,
     ctrl: u8,
@@ -12,10 +11,9 @@ pub struct Serial {
 }
 
 impl Serial {
-    pub fn new(hw: HardwareHandle, irq: Irq) -> Self {
+    pub fn new(hw: HardwareHandle) -> Self {
         Self {
             hw,
-            irq,
             data: 0,
             recv: 0,
             ctrl: 0,
@@ -23,7 +21,7 @@ impl Serial {
         }
     }
 
-    pub fn step(&mut self, time: usize) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq) {
         if self.ctrl & 0x80 == 0 {
             // No transfer
             return;
@@ -36,7 +34,7 @@ impl Serial {
 
                 // End of transfer
                 self.ctrl &= !0x80;
-                self.irq.serial(true);
+                irq.serial(true);
             } else {
                 self.clock -= time;
             }
@@ -46,7 +44,7 @@ impl Serial {
 
             // End of transfer
             self.ctrl &= !0x80;
-            self.irq.serial(true);
+            irq.serial(true);
         }
     }
 

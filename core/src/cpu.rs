@@ -5,10 +5,10 @@ use log::*;
 /// Interface for CPU to interact with memory/devices
 pub trait Sys {
     /// Get the interrupt vector address clearing the interrupt flag state
-    fn pop_int_vec(&self) -> Option<u8>;
+    fn pop_int_vec(&mut self) -> Option<u8>;
 
     /// Get the interrupt vector address without clearing the interrupt flag state
-    fn peek_int_vec(&self) -> Option<u8>;
+    fn peek_int_vec(&mut self) -> Option<u8>;
 
     /// Read a byte from the address.
     fn get8(&self, addr: u16) -> u8;

@@ -40,8 +40,6 @@ impl From<u8> for Mode {
 pub struct Gpu {
     color: bool,
 
-    irq: Irq,
-
     clocks: usize,
 
     lyc_interrupt: bool,
@@ -352,10 +350,9 @@ impl Hdma {
 }
 
 impl Gpu {
-    pub fn new(hw: HardwareHandle, irq: Irq, color: bool) -> Self {
+    pub fn new(hw: HardwareHandle, color: bool) -> Self {
         Self {
             color,
-            irq,
             clocks: 0,
             lyc_interrupt: false,
             oam_interrupt: false,
@@ -404,7 +401,7 @@ impl Gpu {
         }
     }
 
-    pub fn step(&mut self, time: usize) -> Option<DmaRequest> {
+    pub fn step(&mut self, time: usize, irq: &mut Irq) -> Option<DmaRequest> {
         let clocks = self.clocks + time;
 
         let (clocks, mode) = match &self.mode {
@@ -420,7 +417,7 @@ impl Gpu {
                     self.draw();
 
                     if self.hblank_interrupt {
-                        self.irq.lcd(true);
+                        irq.lcd(true);
                     }
 
                     (clocks - 172, Mode::HBlank)
@@ -434,16 +431,16 @@ impl Gpu {
 
                     // ly becomes 144 before vblank interrupt
                     if self.ly > 143 {
-                        self.irq.vblank(true);
+                        irq.vblank(true);
 
                         if self.vblank_interrupt {
-                            self.irq.lcd(true);
+                            irq.lcd(true);
                         }
 
                         (clocks - 204, Mode::VBlank)
                     } else {
                         if self.oam_interrupt {
-                            self.irq.lcd(true);
+                            irq.lcd(true);
                         }
 
                         (clocks - 204, Mode::Oam)
@@ -460,7 +457,7 @@ impl Gpu {
                         self.ly = 0;
 
                         if self.oam_interrupt {
-                            self.irq.lcd(true);
+                            irq.lcd(true);
                         }
 
                         (clocks - 456, Mode::Oam)
@@ -475,7 +472,7 @@ impl Gpu {
         };
 
         if self.lyc_interrupt && self.lyc == self.ly {
-            self.irq.lcd(true);
+            irq.lcd(true);
         }
 
         let enter_hblank = self.mode != Mode::HBlank && mode == Mode::HBlank;
@@ -630,7 +627,7 @@ impl Gpu {
     }
 
     /// Write CTRL register (0xff40)
-    pub(crate) fn write_ctrl(&mut self, value: u8) {
+    pub(crate) fn write_ctrl(&mut self, value: u8, irq: &mut Irq) {
         let old_enable = self.enable;
 
         self.enable = value & 0x80 != 0;
@@ -646,11 +643,11 @@ impl Gpu {
             info!("LCD enabled");
             self.clocks = 0;
             self.mode = Mode::HBlank;
-            self.irq.vblank(false);
+            irq.vblank(false);
         } else if old_enable && !self.enable {
             info!("LCD disabled");
             self.mode = Mode::None;
-            self.irq.vblank(false);
+            irq.vblank(false);
         }
 
         debug!("Write ctrl: {:02x}", value);

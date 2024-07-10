@@ -70,28 +70,26 @@ impl Ints {
 }
 
 /// Interrupt controller
-pub struct Ic {
-    irq: Irq,
-}
+pub struct Ic;
 
 impl Ic {
-    pub fn new(irq: Irq) -> Ic {
-        Ic { irq }
+    pub fn new() -> Ic {
+        Self
     }
 
     /// Get the interrupt vector address without clearing the interrupt flag state
-    pub fn peek(&mut self) -> Option<u8> {
-        self.check(false)
+    pub fn peek(&mut self, irq: &mut Irq) -> Option<u8> {
+        self.check(false, irq)
     }
 
     /// Get the interrupt vector address clearing the interrupt flag state
-    pub fn pop(&mut self) -> Option<u8> {
-        self.check(true)
+    pub fn pop(&mut self, irq: &mut Irq) -> Option<u8> {
+        self.check(true, irq)
     }
 
-    fn check(&mut self, consume: bool) -> Option<u8> {
-        let e = &self.irq.enable;
-        let r = &mut self.irq.request;
+    fn check(&mut self, consume: bool, irq: &mut Irq) -> Option<u8> {
+        let e = &irq.enable;
+        let r = &mut irq.request;
 
         if e.vblank && r.vblank {
             r.vblank = !consume;
@@ -114,28 +112,28 @@ impl Ic {
     }
 
     /// Read IE register (0xffff)
-    pub fn read_enabled(&self) -> u8 {
-        let v = self.irq.enable.get();
+    pub fn read_enabled(&self, irq: &Irq) -> u8 {
+        let v = irq.enable.get();
         info!("Read interrupt enable: {:02x}", v);
         v
     }
 
     /// Write IF register (0xff0f)
-    pub fn read_flags(&self) -> u8 {
-        let v = self.irq.request.get();
+    pub fn read_flags(&self, irq: &Irq) -> u8 {
+        let v = irq.request.get();
         info!("Read interrupt: {:02x}", v);
         v | 0xe0
     }
 
     /// Write IE register (0xffff)
-    pub fn write_enabled(&mut self, value: u8) {
+    pub fn write_enabled(&mut self, value: u8, irq: &mut Irq) {
         info!("Write interrupt enable: {:02x}", value);
-        self.irq.enable.set(value);
+        irq.enable.set(value);
     }
 
     /// Write IF register (0xff0f)
-    pub fn write_flags(&mut self, value: u8) {
+    pub fn write_flags(&mut self, value: u8, irq: &mut Irq) {
         info!("Write interrupt: {:02x}", value);
-        self.irq.request.set(value);
+        irq.request.set(value);
     }
 }

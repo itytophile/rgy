@@ -31,25 +31,25 @@ pub struct Mmu {
     apu: Apu,
     dma: Dma,
     cgb: Cgb,
+    irq: Irq,
 }
 
 impl Mmu {
     /// Create a new MMU instance.
     pub fn new(hw: HardwareHandle, rom: Vec<u8>, color: bool) -> Mmu {
-        let irq = Irq::new();
-
         Mmu {
             wram: Wram::new(color),
             hram: Hram::new(),
-            gpu: Gpu::new(hw.clone(), irq.clone(), color),
+            gpu: Gpu::new(hw.clone(), color),
             mbc: Mbc::new(hw.clone(), rom, color),
-            timer: Timer::new(irq.clone()),
-            ic: Ic::new(irq.clone()),
-            serial: Serial::new(hw.clone(), irq.clone()),
-            joypad: Joypad::new(hw.clone(), irq),
+            timer: Timer::new(),
+            ic: Ic::new(),
+            serial: Serial::new(hw.clone()),
+            joypad: Joypad::new(hw.clone()),
             apu: Apu::new(hw),
             dma: Dma::new(),
             cgb: Cgb::new(color),
+            irq: Irq::new(),
         }
     }
 
@@ -61,7 +61,7 @@ impl Mmu {
             0xff03 => todo!("i/o write: addr={:04x}", addr),
             0xff04..=0xff07 => self.timer.on_read(addr),
             0xff08..=0xff0e => todo!("i/o read: addr={:04x}", addr),
-            0xff0f => self.ic.read_flags(),
+            0xff0f => self.ic.read_flags(&self.irq),
             0xff10 => self.apu.read_tone_sweep(),
             0xff11 => self.apu.read_tone_wave(0),
             0xff12 => self.apu.read_tone_envelop(0),
@@ -125,7 +125,7 @@ impl Mmu {
             0xff03 => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
             0xff04..=0xff07 => self.timer.on_write(addr, v),
             0xff08..=0xff0e => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
-            0xff0f => self.ic.write_flags(v),
+            0xff0f => self.ic.write_flags(v, &mut self.irq),
             0xff10 => self.apu.write_tone_sweep(v),
             0xff11 => self.apu.write_tone_wave(0, v),
             0xff12 => self.apu.write_tone_envelop(0, v),
@@ -148,7 +148,7 @@ impl Mmu {
             0xff25 => self.apu.write_so_mask(v),
             0xff26 => self.apu.write_enable(v),
             0xff30..=0xff3f => self.apu.write_wave_buf(addr, v),
-            0xff40 => self.gpu.write_ctrl(v),
+            0xff40 => self.gpu.write_ctrl(v, &mut self.irq),
             0xff41 => self.gpu.write_status(v),
             0xff42 => self.gpu.write_scy(v),
             0xff43 => self.gpu.write_scx(v),
@@ -197,13 +197,13 @@ impl Mmu {
 
 impl Sys for Mmu {
     /// Get the interrupt vector address without clearing the interrupt flag state
-    fn peek_int_vec(&self) -> Option<u8> {
-        self.ic.peek()
+    fn peek_int_vec(&mut self) -> Option<u8> {
+        self.ic.peek(&mut self.irq)
     }
 
     /// Get the interrupt vector address clearing the interrupt flag state
-    fn pop_int_vec(&self) -> Option<u8> {
-        self.ic.pop()
+    fn pop_int_vec(&mut self) -> Option<u8> {
+        self.ic.pop(&mut self.irq)
     }
 
     /// Reads one byte from the given address in the memory.
@@ -217,7 +217,7 @@ impl Sys for Mmu {
             0xfea0..=0xfeff => 0, // Unusable range
             0xff00..=0xff7f => self.io_read(addr),
             0xff80..=0xfffe => self.hram.get8(addr),
-            0xffff..=0xffff => self.ic.read_enabled(),
+            0xffff..=0xffff => self.ic.read_enabled(&self.irq),
         }
     }
 
@@ -232,7 +232,7 @@ impl Sys for Mmu {
             0xfea0..=0xfeff => {} // Unusable range
             0xff00..=0xff7f => self.io_write(addr, v),
             0xff80..=0xfffe => self.hram.set8(addr, v),
-            0xffff..=0xffff => self.ic.write_enabled(v),
+            0xffff..=0xffff => self.ic.write_enabled(v, &mut self.irq),
         }
     }
 
@@ -241,13 +241,13 @@ impl Sys for Mmu {
         if let Some(req) = self.dma.step(cycles) {
             self.run_dma(req);
         }
-        if let Some(req) = self.gpu.step(cycles) {
+        if let Some(req) = self.gpu.step(cycles, &mut self.irq) {
             self.run_dma(req);
         }
         self.apu.step(cycles);
-        self.timer.step(cycles);
-        self.serial.step(cycles);
-        self.joypad.poll();
+        self.timer.step(cycles, &mut self.irq);
+        self.serial.step(cycles, &mut self.irq);
+        self.joypad.poll(&mut self.irq);
     }
 }
 
@@ -277,11 +277,11 @@ impl Ram {
 }
 
 impl Sys for Ram {
-    fn peek_int_vec(&self) -> Option<u8> {
+    fn peek_int_vec(&mut self) -> Option<u8> {
         None
     }
 
-    fn pop_int_vec(&self) -> Option<u8> {
+    fn pop_int_vec(&mut self) -> Option<u8> {
         None
     }
 

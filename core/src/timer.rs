@@ -2,7 +2,6 @@ use crate::ic::Irq;
 use log::*;
 
 pub struct Timer {
-    irq: Irq,
     div: u8,
     div_clocks: usize,
     tim: u8,
@@ -12,9 +11,8 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(irq: Irq) -> Self {
+    pub fn new() -> Self {
         Self {
-            irq,
             div: 0,
             div_clocks: 0,
             tim: 0,
@@ -38,7 +36,7 @@ impl Timer {
         self.div_clocks = 256; // 16384Hz = 256 cpu clocks
     }
 
-    pub fn step(&mut self, time: usize) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq) {
         if self.div_clocks < time {
             self.div = self.div.wrapping_add(1);
             let rem = time - self.div_clocks;
@@ -61,7 +59,7 @@ impl Timer {
                 if of {
                     self.tim = self.tim_load;
                     info!("Timer interrupt");
-                    self.irq.timer(true);
+                    irq.timer(true);
                 }
                 self.tim_clock_reset();
                 if rem <= self.tim_clocks {
