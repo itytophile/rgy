@@ -1,45 +1,42 @@
-use alloc::rc::Rc;
-use core::cell::RefCell;
 use log::*;
 
 /// Sharable handle for I/O devices to request/cancel interrupts
-#[derive(Clone)]
 pub struct Irq {
-    enable: Rc<RefCell<Ints>>,
-    request: Rc<RefCell<Ints>>,
+    enable: Ints,
+    request: Ints,
 }
 
 impl Irq {
     pub fn new() -> Irq {
         Irq {
-            enable: Rc::new(RefCell::new(Ints::default())),
-            request: Rc::new(RefCell::new(Ints::default())),
+            enable: Ints::default(),
+            request: Ints::default(),
         }
     }
 
     /// Request/cacnel vblank interrupt
-    pub fn vblank(&self, v: bool) {
-        self.request.borrow_mut().vblank = v;
+    pub fn vblank(&mut self, v: bool) {
+        self.request.vblank = v;
     }
 
     /// Request/cancel LCD interrupt
-    pub fn lcd(&self, v: bool) {
-        self.request.borrow_mut().lcd = v;
+    pub fn lcd(&mut self, v: bool) {
+        self.request.lcd = v;
     }
 
     /// Request/cancel timer interrupt
-    pub fn timer(&self, v: bool) {
-        self.request.borrow_mut().timer = v;
+    pub fn timer(&mut self, v: bool) {
+        self.request.timer = v;
     }
 
     /// Request/cancel serial interrupt
-    pub fn serial(&self, v: bool) {
-        self.request.borrow_mut().serial = v;
+    pub fn serial(&mut self, v: bool) {
+        self.request.serial = v;
     }
 
     /// Request/cancel joypad interrupt
-    pub fn joypad(&self, v: bool) {
-        self.request.borrow_mut().joypad = v;
+    pub fn joypad(&mut self, v: bool) {
+        self.request.joypad = v;
     }
 }
 
@@ -83,18 +80,18 @@ impl Ic {
     }
 
     /// Get the interrupt vector address without clearing the interrupt flag state
-    pub fn peek(&self) -> Option<u8> {
+    pub fn peek(&mut self) -> Option<u8> {
         self.check(false)
     }
 
     /// Get the interrupt vector address clearing the interrupt flag state
-    pub fn pop(&self) -> Option<u8> {
+    pub fn pop(&mut self) -> Option<u8> {
         self.check(true)
     }
 
-    fn check(&self, consume: bool) -> Option<u8> {
-        let e = self.irq.enable.borrow();
-        let mut r = self.irq.request.borrow_mut();
+    fn check(&mut self, consume: bool) -> Option<u8> {
+        let e = &self.irq.enable;
+        let r = &mut self.irq.request;
 
         if e.vblank && r.vblank {
             r.vblank = !consume;
@@ -118,14 +115,14 @@ impl Ic {
 
     /// Read IE register (0xffff)
     pub fn read_enabled(&self) -> u8 {
-        let v = self.irq.enable.borrow().get();
+        let v = self.irq.enable.get();
         info!("Read interrupt enable: {:02x}", v);
         v
     }
 
     /// Write IF register (0xff0f)
     pub fn read_flags(&self) -> u8 {
-        let v = self.irq.request.borrow().get();
+        let v = self.irq.request.get();
         info!("Read interrupt: {:02x}", v);
         v | 0xe0
     }
@@ -133,12 +130,12 @@ impl Ic {
     /// Write IE register (0xffff)
     pub fn write_enabled(&mut self, value: u8) {
         info!("Write interrupt enable: {:02x}", value);
-        self.irq.enable.borrow_mut().set(value);
+        self.irq.enable.set(value);
     }
 
     /// Write IF register (0xff0f)
     pub fn write_flags(&mut self, value: u8) {
         info!("Write interrupt: {:02x}", value);
-        self.irq.request.borrow_mut().set(value);
+        self.irq.request.set(value);
     }
 }
