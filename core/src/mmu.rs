@@ -58,8 +58,8 @@ impl<H: Hardware> Peripherals<H> {
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
 pub struct Mmu<'a, H> {
-    peripherals: &'a mut Peripherals<H>,
-    mixer_stream: &'a mut MixerStream
+    pub peripherals: &'a mut Peripherals<H>,
+    pub mixer_stream: &'a mut MixerStream,
 }
 
 impl<'a, H: Hardware> Mmu<'a, H> {
@@ -131,34 +131,55 @@ impl<'a, H: Hardware> Mmu<'a, H> {
         match addr {
             0xff00 => self.peripherals.joypad.write(v),
             0xff01 => self.peripherals.serial.set_data(v),
-            0xff02 => self.peripherals.serial.set_ctrl(v, &mut self.peripherals.hw),
+            0xff02 => self
+                .peripherals
+                .serial
+                .set_ctrl(v, &mut self.peripherals.hw),
             0xff03 => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
             0xff04..=0xff07 => self.peripherals.timer.on_write(addr, v),
             0xff08..=0xff0e => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
-            0xff0f => self.peripherals.ic.write_flags(v, &mut self.peripherals.irq),
+            0xff0f => self
+                .peripherals
+                .ic
+                .write_flags(v, &mut self.peripherals.irq),
             0xff10 => self.peripherals.apu.write_tone_sweep(v),
             0xff11 => self.peripherals.apu.write_tone_wave(0, v),
             0xff12 => self.peripherals.apu.write_tone_envelop(0, v),
             0xff13 => self.peripherals.apu.write_tone_freq_low(0, v),
-            0xff14 => self.peripherals.apu.write_tone_freq_high(0, v, self.mixer_stream),
+            0xff14 => self
+                .peripherals
+                .apu
+                .write_tone_freq_high(0, v, self.mixer_stream),
             0xff16 => self.peripherals.apu.write_tone_wave(1, v),
             0xff17 => self.peripherals.apu.write_tone_envelop(1, v),
             0xff18 => self.peripherals.apu.write_tone_freq_low(1, v),
-            0xff19 => self.peripherals.apu.write_tone_freq_high(1, v, self.mixer_stream),
+            0xff19 => self
+                .peripherals
+                .apu
+                .write_tone_freq_high(1, v, self.mixer_stream),
             0xff1a => self.peripherals.apu.write_wave_enable(v, self.mixer_stream),
             0xff1b => self.peripherals.apu.write_wave_len(v),
             0xff1c => self.peripherals.apu.write_wave_amp(v),
             0xff1d => self.peripherals.apu.write_wave_freq_low(v),
-            0xff1e => self.peripherals.apu.write_wave_freq_high(v, self.mixer_stream),
+            0xff1e => self
+                .peripherals
+                .apu
+                .write_wave_freq_high(v, self.mixer_stream),
             0xff20 => self.peripherals.apu.write_noise_len(v),
             0xff21 => self.peripherals.apu.write_noise_envelop(v),
             0xff22 => self.peripherals.apu.write_noise_poly_counter(v),
-            0xff23 => self.peripherals.apu.write_noise_select(v, self.mixer_stream),
+            0xff23 => self
+                .peripherals
+                .apu
+                .write_noise_select(v, self.mixer_stream),
             0xff24 => self.peripherals.apu.write_ctrl(v, self.mixer_stream),
             0xff25 => self.peripherals.apu.write_so_mask(v, self.mixer_stream),
             0xff26 => self.peripherals.apu.write_enable(v, self.mixer_stream),
             0xff30..=0xff3f => self.peripherals.apu.write_wave_buf(addr, v),
-            0xff40 => self.peripherals.gpu.write_ctrl(v, &mut self.peripherals.irq),
+            0xff40 => self
+                .peripherals
+                .gpu
+                .write_ctrl(v, &mut self.peripherals.irq),
             0xff41 => self.peripherals.gpu.write_status(v),
             0xff42 => self.peripherals.gpu.write_scy(v),
             0xff43 => self.peripherals.gpu.write_scx(v),
@@ -235,15 +256,24 @@ impl<'a, T: Hardware> Sys for Mmu<'a, T> {
     /// Writes one byte at the given address in the memory.
     fn set8(&mut self, addr: u16, v: u8) {
         match addr {
-            0x0000..=0x7fff => self.peripherals.mbc.on_write(addr, v, &mut self.peripherals.hw),
+            0x0000..=0x7fff => self
+                .peripherals
+                .mbc
+                .on_write(addr, v, &mut self.peripherals.hw),
             0x8000..=0x9fff => self.peripherals.gpu.write_vram(addr, v),
-            0xa000..=0xbfff => self.peripherals.mbc.on_write(addr, v, &mut self.peripherals.hw),
+            0xa000..=0xbfff => self
+                .peripherals
+                .mbc
+                .on_write(addr, v, &mut self.peripherals.hw),
             0xc000..=0xfdff => self.peripherals.wram.set8(addr, v),
             0xfe00..=0xfe9f => self.peripherals.gpu.write_oam(addr, v),
             0xfea0..=0xfeff => {} // Unusable range
             0xff00..=0xff7f => self.io_write(addr, v),
             0xff80..=0xfffe => self.peripherals.hram.set8(addr, v),
-            0xffff..=0xffff => self.peripherals.ic.write_enabled(v, &mut self.peripherals.irq),
+            0xffff..=0xffff => self
+                .peripherals
+                .ic
+                .write_enabled(v, &mut self.peripherals.irq),
         }
     }
 
@@ -252,13 +282,23 @@ impl<'a, T: Hardware> Sys for Mmu<'a, T> {
         if let Some(req) = self.peripherals.dma.step(cycles) {
             self.run_dma(req);
         }
-        if let Some(req) = self.peripherals.gpu.step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw) {
+        if let Some(req) =
+            self.peripherals
+                .gpu
+                .step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw)
+        {
             self.run_dma(req);
         }
         self.peripherals.apu.step(cycles);
-        self.peripherals.timer.step(cycles, &mut self.peripherals.irq);
-        self.peripherals.serial.step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw);
-        self.peripherals.joypad.poll(&mut self.peripherals.irq, &mut self.peripherals.hw);
+        self.peripherals
+            .timer
+            .step(cycles, &mut self.peripherals.irq);
+        self.peripherals
+            .serial
+            .step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw);
+        self.peripherals
+            .joypad
+            .poll(&mut self.peripherals.irq, &mut self.peripherals.hw);
     }
 }
 

@@ -32,8 +32,7 @@ pub trait Sys {
     fn step(&mut self, cycles: usize);
 }
 
-/// Represents CPU state.
-pub struct Cpu<T> {
+pub struct CpuState {
     a: u8,
     b: u8,
     c: u8,
@@ -50,43 +49,12 @@ pub struct Cpu<T> {
     halt: bool,
     halt_bug: bool,
     cycles: usize,
-    pub sys: T,
 }
 
-impl<T: Sys> fmt::Display for Cpu<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "a:  [{:02x}],  b:  [{:02x}]\n\
-             c:  [{:02x}],  d:  [{:02x}]\n\
-             e:  [{:02x}],  f:  [{:02x}]\n\
-             h:  [{:02x}],  l:  [{:02x}]\n\
-             pc: [{:04x}]\n\
-             sp: [{:04x}]\n\
-             flgs: [{}{}{}{}]\
-             ",
-            self.a,
-            self.b,
-            self.c,
-            self.d,
-            self.e,
-            self.f,
-            self.h,
-            self.l,
-            self.pc,
-            self.sp,
-            if self.get_zf() { "z" } else { "_" },
-            if self.get_nf() { "n" } else { "_" },
-            if self.get_hf() { "h" } else { "_" },
-            if self.get_cf() { "c" } else { "_" },
-        )
-    }
-}
-
-impl<T: Sys> Cpu<T> {
+impl CpuState {
     /// Create a new CPU state.
-    pub fn new(sys: T) -> Cpu<T> {
-        Cpu {
+    pub fn new() -> Self {
+        Self {
             a: 0,
             b: 0,
             c: 0,
@@ -103,17 +71,54 @@ impl<T: Sys> Cpu<T> {
             halt: false,
             halt_bug: false,
             cycles: 0,
-            sys,
         }
     }
+}
 
+/// Represents CPU state.
+pub struct Cpu<'a, T> {
+    pub state: &'a mut CpuState,
+    pub sys: &'a mut T,
+}
+
+impl<'a, T: Sys> fmt::Display for Cpu<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "a:  [{:02x}],  b:  [{:02x}]\n\
+             c:  [{:02x}],  d:  [{:02x}]\n\
+             e:  [{:02x}],  f:  [{:02x}]\n\
+             h:  [{:02x}],  l:  [{:02x}]\n\
+             pc: [{:04x}]\n\
+             sp: [{:04x}]\n\
+             flgs: [{}{}{}{}]\
+             ",
+            self.state.a,
+            self.state.b,
+            self.state.c,
+            self.state.d,
+            self.state.e,
+            self.state.f,
+            self.state.h,
+            self.state.l,
+            self.state.pc,
+            self.state.sp,
+            if self.get_zf() { "z" } else { "_" },
+            if self.get_nf() { "n" } else { "_" },
+            if self.get_hf() { "h" } else { "_" },
+            if self.get_cf() { "c" } else { "_" },
+        )
+    }
+}
+
+impl<'a, T: Sys> Cpu<'a, T> {
     /// Switch the CPU state to halting.
     pub fn halt(&mut self) {
         debug!("Halt");
-        if !self.ime && self.sys.peek_int_vec().is_some() {
-            self.halt_bug = true;
+        if !self.state.ime && self.sys.peek_int_vec().is_some() {
+            self.state.halt_bug = true;
         } else {
-            self.halt = true;
+            self.state.halt = true;
         }
     }
 
@@ -124,77 +129,77 @@ impl<T: Sys> Cpu<T> {
     /// The return value is the number of clock cycles consumed by the instruction.
     /// If the CPU is in the halt state, the function does nothing but returns a fixed clock cycle.
     pub fn execute(&mut self) -> usize {
-        if self.halt {
+        if self.state.halt {
             self.step(4);
         } else {
             let code = self.fetch_opcode();
             let time = self.decode(code);
-            assert_eq!(self.cycles, time, "cycle mismatch op={:04x}", code);
+            assert_eq!(self.state.cycles, time, "cycle mismatch op={:04x}", code);
         }
 
         self.update_ime();
         self.check_interrupt();
 
         // Get the cycles consumed and reset
-        let cycles = self.cycles;
-        self.cycles = 0;
+        let cycles = self.state.cycles;
+        self.state.cycles = 0;
         cycles
     }
 
     /// Step forward
     pub fn step(&mut self, cycles: usize) {
-        self.cycles = self.cycles.wrapping_add(cycles);
+        self.state.cycles = self.state.cycles.wrapping_add(cycles);
         self.sys.step(cycles);
     }
 
     /// Handles DI
     pub fn di(&mut self) {
-        self.di_delay = 2;
+        self.state.di_delay = 2;
     }
 
     /// Handles EI
     pub fn ei(&mut self) {
-        self.ei_delay = 2;
+        self.state.ei_delay = 2;
     }
 
     /// Update IME
     fn update_ime(&mut self) {
-        if self.di_delay > 0 {
-            if self.di_delay == 1 {
-                self.ime = false;
+        if self.state.di_delay > 0 {
+            if self.state.di_delay == 1 {
+                self.state.ime = false;
             }
-            self.di_delay -= 1;
+            self.state.di_delay -= 1;
         }
 
-        if self.ei_delay > 0 {
-            if self.ei_delay == 1 {
-                self.ime = true;
+        if self.state.ei_delay > 0 {
+            if self.state.ei_delay == 1 {
+                self.state.ime = true;
             }
-            self.ei_delay -= 1;
+            self.state.ei_delay -= 1;
         }
     }
 
     /// Disable interrupts to this CPU.
     pub fn disable_interrupt(&mut self) {
         debug!("Disable interrupt");
-        self.ime = false;
+        self.state.ime = false;
     }
 
     /// Enable interrupts to this CPU.
     pub fn enable_interrupt(&mut self) {
         debug!("Enable interrupt");
-        self.ime = true;
+        self.state.ime = true;
     }
 
     /// Check if pending interrupts in the interrupt controller,
     /// and process them if any.
     fn check_interrupt(&mut self) {
-        if !self.ime {
-            if self.halt && self.sys.peek_int_vec().is_some() {
+        if !self.state.ime {
+            if self.state.halt && self.sys.peek_int_vec().is_some() {
                 // If HALT is executed while interrupt is disabled,
                 // the interrupt wakes up CPU without being consumed.
                 self.step(4);
-                self.halt = false;
+                self.state.halt = false;
             }
             return;
         }
@@ -210,8 +215,8 @@ impl<T: Sys> Cpu<T> {
     }
 
     fn interrupted(&mut self, vector_addr: u8) {
-        if self.halt {
-            self.halt = false;
+        if self.state.halt {
+            self.state.halt = false;
             self.step(4);
         }
 
@@ -231,192 +236,192 @@ impl<T: Sys> Cpu<T> {
 
     /// Gets the value of `z` flag in the flag register.
     pub fn get_zf(&self) -> bool {
-        self.f & 0x80 == 0x80
+        self.state.f & 0x80 == 0x80
     }
 
     /// Gets the value of `n` flag in the flag register.
     pub fn get_nf(&self) -> bool {
-        self.f & 0x40 == 0x40
+        self.state.f & 0x40 == 0x40
     }
 
     /// Gets the value of `h` flag in the flag register.
     pub fn get_hf(&self) -> bool {
-        self.f & 0x20 == 0x20
+        self.state.f & 0x20 == 0x20
     }
 
     /// Gets the value of `c` flag in the flag register.
     pub fn get_cf(&self) -> bool {
-        self.f & 0x10 == 0x10
+        self.state.f & 0x10 == 0x10
     }
 
     /// Updates the value of `z` flag in the flag register.
     pub fn set_zf(&mut self, v: bool) {
         if v {
-            self.f |= 0x80
+            self.state.f |= 0x80
         } else {
-            self.f &= !0x80
+            self.state.f &= !0x80
         }
     }
 
     /// Updates the value of `n` flag in the flag register.
     pub fn set_nf(&mut self, v: bool) {
         if v {
-            self.f |= 0x40
+            self.state.f |= 0x40
         } else {
-            self.f &= !0x40
+            self.state.f &= !0x40
         }
     }
 
     /// Updates the value of `h` flag in the flag register.
     pub fn set_hf(&mut self, v: bool) {
         if v {
-            self.f |= 0x20
+            self.state.f |= 0x20
         } else {
-            self.f &= !0x20
+            self.state.f &= !0x20
         }
     }
 
     /// Updates the value of `c` flag in the flag register.
     pub fn set_cf(&mut self, v: bool) {
         if v {
-            self.f |= 0x10
+            self.state.f |= 0x10
         } else {
-            self.f &= !0x10
+            self.state.f &= !0x10
         }
     }
 
     /// Updates the value of `a` register.
     pub fn set_a(&mut self, v: u8) {
-        self.a = v
+        self.state.a = v
     }
 
     /// Updates the value of `b` register.
     pub fn set_b(&mut self, v: u8) {
-        self.b = v
+        self.state.b = v
     }
 
     /// Updates the value of `c` register.
     pub fn set_c(&mut self, v: u8) {
-        self.c = v
+        self.state.c = v
     }
 
     /// Updates the value of `d` register.
     pub fn set_d(&mut self, v: u8) {
-        self.d = v
+        self.state.d = v
     }
 
     /// Updates the value of `e` register.
     pub fn set_e(&mut self, v: u8) {
-        self.e = v
+        self.state.e = v
     }
 
     /// Updates the value of `h` register.
     pub fn set_h(&mut self, v: u8) {
-        self.h = v
+        self.state.h = v
     }
 
     /// Updates the value of `l` register.
     pub fn set_l(&mut self, v: u8) {
-        self.l = v
+        self.state.l = v
     }
 
     /// Updates the value of `a` and `f` register as a single 16-bit register.
     pub fn set_af(&mut self, v: u16) {
-        self.a = (v >> 8) as u8;
-        self.f = (v & 0xf0) as u8;
+        self.state.a = (v >> 8) as u8;
+        self.state.f = (v & 0xf0) as u8;
     }
 
     /// Updates the value of `b` and `c` register as a single 16-bit register.
     pub fn set_bc(&mut self, v: u16) {
-        self.b = (v >> 8) as u8;
-        self.c = v as u8;
+        self.state.b = (v >> 8) as u8;
+        self.state.c = v as u8;
     }
 
     /// Updates the value of `d` and `e` register as a single 16-bit register
     pub fn set_de(&mut self, v: u16) {
-        self.d = (v >> 8) as u8;
-        self.e = v as u8;
+        self.state.d = (v >> 8) as u8;
+        self.state.e = v as u8;
     }
 
     /// Updates the value of `h` and `l` register as a single 16-bit register.
     pub fn set_hl(&mut self, v: u16) {
-        self.h = (v >> 8) as u8;
-        self.l = v as u8;
+        self.state.h = (v >> 8) as u8;
+        self.state.l = v as u8;
     }
 
     /// Gets the value of `a` register.
     pub fn get_a(&self) -> u8 {
-        self.a
+        self.state.a
     }
 
     /// Gets the value of `b` register.
     pub fn get_b(&self) -> u8 {
-        self.b
+        self.state.b
     }
 
     /// Gets the value of `c` register.
     pub fn get_c(&self) -> u8 {
-        self.c
+        self.state.c
     }
 
     /// Gets the value of `d` register.
     pub fn get_d(&self) -> u8 {
-        self.d
+        self.state.d
     }
 
     /// Gets the value of `e` register.
     pub fn get_e(&self) -> u8 {
-        self.e
+        self.state.e
     }
 
     /// Gets the value of `h` register.
     pub fn get_h(&self) -> u8 {
-        self.h
+        self.state.h
     }
 
     /// Gets the value of `l` register.
     pub fn get_l(&self) -> u8 {
-        self.l
+        self.state.l
     }
 
     /// Gets the value of `a` and `f` register as a single 16-bit register.
     pub fn get_af(&self) -> u16 {
-        (self.a as u16) << 8 | self.f as u16
+        (self.state.a as u16) << 8 | self.state.f as u16
     }
 
     /// Gets the value of `b` and `c` register as a single 16-bit register.
     pub fn get_bc(&self) -> u16 {
-        (self.b as u16) << 8 | self.c as u16
+        (self.state.b as u16) << 8 | self.state.c as u16
     }
 
     /// Gets the value of `d` and `e` register as a single 16-bit register.
     pub fn get_de(&self) -> u16 {
-        (self.d as u16) << 8 | self.e as u16
+        (self.state.d as u16) << 8 | self.state.e as u16
     }
 
     /// Gets the value of `h` and `l` register as a single 16-bit register.
     pub fn get_hl(&self) -> u16 {
-        (self.h as u16) << 8 | self.l as u16
+        (self.state.h as u16) << 8 | self.state.l as u16
     }
 
     /// Gets the value of the program counter.
     pub fn get_pc(&self) -> u16 {
-        self.pc
+        self.state.pc
     }
 
     /// Updates the value of the program counter.
     pub fn set_pc(&mut self, v: u16) {
-        self.pc = v
+        self.state.pc = v
     }
 
     /// Gets the value of the stack pointer register.
     pub fn get_sp(&self) -> u16 {
-        self.sp
+        self.state.sp
     }
 
     /// Updates the value of the stack pointer register.
     pub fn set_sp(&mut self, v: u16) {
-        self.sp = v
+        self.state.sp = v
     }
 
     /// Jump
@@ -486,9 +491,9 @@ impl<T: Sys> Cpu<T> {
 
     /// Add 1 to pc unless HALT bug is triggerred
     fn inc_pc(&mut self) {
-        if self.halt_bug {
+        if self.state.halt_bug {
             info!("Halt bug");
-            self.halt_bug = false;
+            self.state.halt_bug = false;
         } else {
             self.set_pc(self.get_pc().wrapping_add(1));
         }

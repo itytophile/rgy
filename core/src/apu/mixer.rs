@@ -73,20 +73,19 @@ impl Mixer {
 
         if self.enable {
             for (i, tone) in stream.tones.iter_mut().enumerate() {
-                tone.volume = Self::get_volume(i as u8, self.so_mask, self.so1_volume, self.so2_volume);
+                tone.volume =
+                    Self::get_volume(i as u8, self.so_mask, self.so1_volume, self.so2_volume);
             }
-            stream.wave.volume = Self::get_volume(2, self.so_mask, self.so1_volume, self.so2_volume);
-            stream.noise.volume = Self::get_volume(3, self.so_mask, self.so1_volume, self.so2_volume);
+            stream.wave.volume =
+                Self::get_volume(2, self.so_mask, self.so1_volume, self.so2_volume);
+            stream.noise.volume =
+                Self::get_volume(3, self.so_mask, self.so1_volume, self.so2_volume);
         }
     }
 
     fn get_volume(id: u8, so_mask: usize, so1_volume: usize, so2_volume: usize) -> usize {
         let mask = 1 << id;
-        let v1 = if so_mask & mask != 0 {
-            so1_volume
-        } else {
-            0
-        };
+        let v1 = if so_mask & mask != 0 { so1_volume } else { 0 };
         let v2 = if so_mask & (mask << 4) != 0 {
             so2_volume
         } else {
@@ -133,10 +132,7 @@ impl<T: Stream> Unit<T> {
 
     fn next(&mut self, rate: u32) -> (u16, u16) {
         (
-            self.stream
-                .as_mut()
-                .map(|s| s.next(rate))
-                .unwrap_or(0),
+            self.stream.as_mut().map(|s| s.next(rate)).unwrap_or(0),
             self.volume as u16,
         )
     }

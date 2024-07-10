@@ -1,8 +1,8 @@
 use crate::apu::mixer::MixerStream;
-use crate::cpu::Cpu;
+use crate::cpu::{Cpu, CpuState};
 use crate::fc::FreqControl;
 use crate::hardware::Hardware;
-use crate::mmu::Mmu;
+use crate::mmu::{Mmu, Peripherals};
 use log::*;
 
 /// Configuration of the emulator.
@@ -73,8 +73,8 @@ impl Config {
 pub struct System<H: Hardware> {
     cfg: Config,
     fc: FreqControl,
+    cpu_state: CpuState,
     peripherals: Peripherals<H>,
-    cpu: Cpu<Mmu<H>>,
 }
 
 impl<H: Hardware + 'static> System<H> {
@@ -86,29 +86,41 @@ impl<H: Hardware + 'static> System<H> {
 
         fc.reset(&mut hw);
 
-        let mmu = Mmu::new(hw, rom.to_vec(), cfg.color);
-        let cpu = Cpu::new(mmu);
-
         info!("Starting...");
+        let peripherals = Peripherals::new(hw, rom.to_vec(), cfg.color);
 
-        Self { cfg, fc, cpu }
+        Self {
+            cfg,
+            fc,
+            cpu_state: CpuState::new(),
+            peripherals,
+        }
     }
 
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
     pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> bool {
-        if !self.cpu.sys.hw.sched() {
+        if !self.peripherals.hw.sched() {
             return false;
         }
 
-        let time = self.cpu.execute();
+        let mut mmu = Mmu {
+            mixer_stream,
+            peripherals: &mut self.peripherals,
+        };
+
+        let mut cpu = Cpu {
+            state: &mut self.cpu_state,
+            sys: &mut mmu,
+        };
+
+        let time = cpu.execute();
 
         if !self.cfg.native_speed {
-            self.fc.adjust(time, &mut self.cpu.sys.hw);
+            self.fc.adjust(time, &mut self.peripherals.hw);
         }
 
         true
     }
 }
-
