@@ -1,4 +1,4 @@
-use rgy::{apu::mixer::MixerStream, Config, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
     display: Vec<Vec<u32>>,

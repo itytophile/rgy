@@ -16,6 +16,12 @@ pub struct Wave {
     dac: bool,
 }
 
+impl Default for Wave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Wave {
     pub fn new() -> Self {
         Self {

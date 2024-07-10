@@ -13,6 +13,12 @@ pub struct Mixer {
     enable: bool,
 }
 
+impl Default for Mixer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Mixer {
     pub fn new() -> Self {
         Self {
@@ -143,6 +149,12 @@ pub struct MixerStream {
     wave: Unit<WaveStream>,
     noise: Unit<NoiseStream>,
     enable: bool,
+}
+
+impl Default for MixerStream {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MixerStream {

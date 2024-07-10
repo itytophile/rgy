@@ -17,6 +17,12 @@ pub struct Apu {
     enable: bool,
 }
 
+impl Default for Apu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Apu {
     pub fn new() -> Self {
         let mixer = Mixer::new();

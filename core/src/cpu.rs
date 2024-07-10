@@ -51,6 +51,12 @@ pub struct CpuState {
     cycles: usize,
 }
 
+impl Default for CpuState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CpuState {
     /// Create a new CPU state.
     pub fn new() -> Self {

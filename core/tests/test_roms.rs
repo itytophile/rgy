@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use rgy::{VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, VRAM_HEIGHT, VRAM_WIDTH};
 
 enum Expected {
     Serial(&'static str),
@@ -75,8 +75,6 @@ impl rgy::Hardware for TestHardware {
         false
     }
 
-    fn sound_play(&mut self, _: Box<dyn rgy::Stream>) {}
-
     fn clock(&mut self) -> u64 {
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         epoch.as_micros() as u64
@@ -125,7 +123,8 @@ fn test_rom(expected: Expected, path: &str) {
     let mut sys = rgy::System::new(rgy::Config::new().native_speed(true), &rom, hw);
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
-    while sys.poll() {
+    let mut mixer_stream = MixerStream::new();
+    while sys.poll(&mut mixer_stream) {
         if now.elapsed() >= TIMEOUT {
             panic!("timeout")
         }
