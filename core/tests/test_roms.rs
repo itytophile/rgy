@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use arrayvec::ArrayVec;
 use rgy::{apu::mixer::MixerStream, VRAM_HEIGHT, VRAM_WIDTH};
 
 enum Expected {
@@ -106,8 +107,8 @@ impl rgy::Hardware for TestHardware {
         None
     }
 
-    fn load_ram(&mut self, len: usize) -> Vec<u8> {
-        vec![0; len]
+    fn load_ram(&mut self, len: usize) -> ArrayVec<u8, 0x8000> {
+        vec![0; len].into_iter().collect()
     }
 
     fn save_ram(&mut self, _: &[u8]) {}

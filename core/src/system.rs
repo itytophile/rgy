@@ -87,7 +87,7 @@ impl<H: Hardware + 'static> System<H> {
         fc.reset(&mut hw);
 
         info!("Starting...");
-        let peripherals = Peripherals::new(hw, rom.to_vec(), cfg.color);
+        let peripherals = Peripherals::new(hw, rom.iter().copied().collect(), cfg.color);
 
         Self {
             cfg,

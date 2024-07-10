@@ -104,8 +104,6 @@
 #![no_std]
 // #![warn(missing_docs)]
 
-extern crate alloc;
-
 mod alu;
 pub mod apu;
 mod cgb;

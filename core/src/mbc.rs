@@ -1,8 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    vec,
-    vec::Vec,
-};
+use arrayvec::ArrayVec;
 use log::*;
 
 use crate::Hardware;
@@ -11,15 +7,15 @@ const BOOT_ROM: &[u8] = include_bytes!("dmg.bin");
 const BOOT_ROM_COLOR: &[u8] = include_bytes!("cgb.bin");
 
 struct MbcNone {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+    rom: ArrayVec<u8, 0x8000>,
+    ram: [u8; 0x2000],
 }
 
 impl MbcNone {
-    fn new(rom: Vec<u8>) -> Self {
+    fn new(rom: ArrayVec<u8, 0x8000>) -> Self {
         Self {
             rom,
-            ram: vec![0; 0x2000],
+            ram: [0; 0x2000],
         }
     }
 
@@ -41,8 +37,8 @@ impl MbcNone {
 }
 
 struct Mbc1 {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+    rom: ArrayVec<u8, 0x8000>,
+    ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
@@ -50,7 +46,7 @@ struct Mbc1 {
 }
 
 impl Mbc1 {
-    fn new(hw: &mut impl Hardware, rom: Vec<u8>) -> Self {
+    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
         let ram = hw.load_ram(0x8000);
 
         Self {
@@ -138,14 +134,14 @@ impl Mbc1 {
 }
 
 struct Mbc2 {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+    rom: ArrayVec<u8, 0x8000>,
+    ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     ram_enable: bool,
 }
 
 impl Mbc2 {
-    fn new(hw: &mut impl Hardware, rom: Vec<u8>) -> Self {
+    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
         let ram = hw.load_ram(0x200);
 
         Self {
@@ -212,8 +208,8 @@ impl Mbc2 {
 }
 
 struct Mbc3 {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+    rom: ArrayVec<u8, 0x8000>,
+    ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     enable: bool,
     select: u8,
@@ -227,7 +223,7 @@ struct Mbc3 {
 }
 
 impl Mbc3 {
-    fn new(hw: &mut impl Hardware, rom: Vec<u8>) -> Self {
+    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
         let ram = hw.load_ram(0x8000);
 
         let mut s = Self {
@@ -402,15 +398,15 @@ impl Mbc3 {
 }
 
 struct Mbc5 {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+    rom: ArrayVec<u8, 0x8000>,
+    ram: ArrayVec<u8, 0x8000>,
     rom_bank: usize,
     ram_bank: usize,
     ram_enable: bool,
 }
 
 impl Mbc5 {
-    fn new(hw: &mut impl Hardware, rom: Vec<u8>) -> Self {
+    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
         let ram = hw.load_ram(0x20000);
 
         Self {
@@ -477,11 +473,11 @@ impl Mbc5 {
 
 #[allow(unused)]
 struct HuC1 {
-    rom: Vec<u8>,
+    rom: ArrayVec<u8, 0x8000>,
 }
 
 impl HuC1 {
-    fn new(rom: Vec<u8>) -> Self {
+    fn new(rom: ArrayVec<u8, 0x8000>) -> Self {
         Self { rom }
     }
 
@@ -504,7 +500,7 @@ enum MbcType {
 }
 
 impl MbcType {
-    fn new(hw: &mut impl Hardware, code: u8, rom: Vec<u8>) -> Self {
+    fn new(hw: &mut impl Hardware, code: u8, rom: ArrayVec<u8, 0x8000>) -> Self {
         match code {
             0x00 => MbcType::None(MbcNone::new(rom)),
             0x01..=0x03 => MbcType::Mbc1(Mbc1::new(hw, rom)),
@@ -545,35 +541,9 @@ impl MbcType {
     }
 }
 
-impl alloc::fmt::Display for MbcType {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        let name = match self {
-            MbcType::None(_) => "None",
-            MbcType::Mbc1(_) => "Mbc1",
-            MbcType::Mbc2(_) => "Mbc2",
-            MbcType::Mbc3(_) => "Mbc3",
-            MbcType::Mbc5(_) => "Mbc5",
-            MbcType::HuC1(_) => "HuC1",
-        };
-
-        write!(f, "{}", name)
-    }
-}
-
-fn parse_str(b: &[u8]) -> String {
-    let b: Vec<u8> = b
-        .iter()
-        .take_while(|b| *b & 0x80 == 0)
-        .map(|b| if *b == 0x00 { b' ' } else { *b })
-        .collect();
-    String::from_utf8_lossy(&b).to_string()
-}
-
 struct Cartridge {
-    title: String,
     cgb: bool,
     cgb_only: bool,
-    license_new: String,
     license_old: u8,
     sgb: bool,
     mbc: MbcType,
@@ -604,16 +574,14 @@ fn verify(rom: &[u8], checksum: u16) {
 }
 
 impl Cartridge {
-    fn new(hw: &mut impl Hardware, rom: Vec<u8>) -> Self {
+    fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>) -> Self {
         let checksum = (rom[0x14e] as u16) << 8 | (rom[0x14f] as u16);
 
         verify(&rom, checksum);
 
         Self {
-            title: parse_str(&rom[0x134..0x144]),
             cgb: rom[0x143] & 0x80 != 0,
             cgb_only: rom[0x143] == 0xc0,
-            license_new: parse_str(&rom[0x144..0x146]),
             license_old: rom[0x14b],
             sgb: rom[0x146] == 0x03,
             mbc: MbcType::new(hw, rom[0x147], rom.clone()),
@@ -625,11 +593,6 @@ impl Cartridge {
     }
 
     fn show_info(&self) {
-        info!("Title: {}", self.title);
-        info!(
-            "License: {} ({:02x}), Version: {}",
-            self.license_new, self.license_old, self.rom_version,
-        );
         let dstcode = match self.dstcode {
             0x00 => "Japanese",
             0x01 => "Non-Japanese",
@@ -637,7 +600,6 @@ impl Cartridge {
         };
         info!("Destination: {}", dstcode);
 
-        info!("Mbc: {}", self.mbc);
         info!(
             "Color: {} (Compat: {}), Super: {}",
             self.cgb, !self.cgb_only, self.sgb,
@@ -684,7 +646,7 @@ pub struct Mbc {
 }
 
 impl Mbc {
-    pub fn new(hw: &mut impl Hardware, rom: Vec<u8>, color: bool) -> Self {
+    pub fn new(hw: &mut impl Hardware, rom: ArrayVec<u8, 0x8000>, color: bool) -> Self {
         let cartridge = Cartridge::new(hw, rom);
 
         cartridge.show_info();

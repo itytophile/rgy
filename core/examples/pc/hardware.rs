@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use log::*;
 use minifb::{Scale, Window, WindowOptions};
 use rgy::apu::mixer::MixerStream;
@@ -187,21 +188,21 @@ impl rgy::Hardware for Hardware {
         epoch.as_micros() as u64
     }
 
-    fn load_ram(&mut self, size: usize) -> Vec<u8> {
+    fn load_ram(&mut self, size: usize) -> ArrayVec<u8, 0x8000> {
         let mut ram = vec![0; size];
 
         match &self.rampath {
             Some(path) => match File::open(path) {
                 Ok(mut fs) => {
                     fs.read_exact(&mut ram).expect("Couldn't read file");
-                    ram
+                    ram.into_iter().collect()
                 }
                 Err(e) => {
                     warn!("Couldn't open RAM file `{}`: {}", path, e);
-                    ram
+                    ram.into_iter().collect()
                 }
             },
-            None => ram,
+            None => ram.into_iter().collect(),
         }
     }
 

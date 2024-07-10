@@ -12,7 +12,7 @@ use crate::serial::Serial;
 use crate::timer::Timer;
 use crate::wram::Wram;
 use crate::Hardware;
-use alloc::vec::Vec;
+use arrayvec::ArrayVec;
 use log::*;
 
 pub struct Peripherals<H> {
@@ -33,7 +33,7 @@ pub struct Peripherals<H> {
 
 impl<H: Hardware> Peripherals<H> {
     /// Create a new MMU instance.
-    pub fn new(mut hw: H, rom: Vec<u8>, color: bool) -> Self {
+    pub fn new(mut hw: H, rom: ArrayVec<u8, 0x8000>, color: bool) -> Self {
         Self {
             wram: Wram::new(color),
             hram: Hram::new(),

@@ -2,7 +2,6 @@ use crate::dma::DmaRequest;
 use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
 use crate::Hardware;
-use alloc::{vec, vec::Vec};
 use log::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,21 +65,21 @@ pub struct Gpu {
     spenable: bool,
     bgenable: bool,
 
-    bg_palette: Vec<Color>,
-    obj_palette0: Vec<Color>,
-    obj_palette1: Vec<Color>,
+    bg_palette: [Color; 4],
+    obj_palette0: [Color; 4],
+    obj_palette1: [Color; 4],
     bg_color_palette: ColorPalette,
     obj_color_palette: ColorPalette,
-    vram: Vec<Vec<u8>>,
+    vram: [[u8; 0x2000]; 2],
     vram_select: usize,
 
-    oam: Vec<u8>,
+    oam: [u8; 0xa0],
 
     hdma: Hdma,
 }
 
-fn to_palette(p: u8) -> Vec<Color> {
-    vec![
+fn to_palette(p: u8) -> [Color; 4] {
+    [
         (p & 0x3).into(),
         ((p >> 2) & 0x3).into(),
         ((p >> 4) & 0x3).into(),
@@ -88,7 +87,7 @@ fn to_palette(p: u8) -> Vec<Color> {
     ]
 }
 
-fn from_palette(p: Vec<Color>) -> u8 {
+fn from_palette(p: [Color; 4]) -> u8 {
     assert_eq!(p.len(), 4);
 
     u8::from(p[0]) | u8::from(p[1]) << 2 | u8::from(p[2]) << 4 | u8::from(p[3]) << 6
@@ -111,7 +110,7 @@ struct MapAttribute<'a> {
 }
 
 struct ColorPalette {
-    cols: Vec<Vec<Color>>,
+    cols: [[Color; 4]; 8],
     index: usize,
     auto_inc: bool,
 }
@@ -119,7 +118,7 @@ struct ColorPalette {
 impl ColorPalette {
     fn new() -> Self {
         Self {
-            cols: vec![vec![Color::rgb(); 4]; 8],
+            cols: [[Color::rgb(); 4]; 8],
             index: 0,
             auto_inc: false,
         }
@@ -373,19 +372,19 @@ impl Gpu {
             spsize: 8,
             spenable: false,
             bgenable: false,
-            bg_palette: vec![
+            bg_palette: [
                 Color::White,
                 Color::LightGray,
                 Color::DarkGray,
                 Color::Black,
             ],
-            obj_palette0: vec![
+            obj_palette0: [
                 Color::White,
                 Color::LightGray,
                 Color::DarkGray,
                 Color::Black,
             ],
-            obj_palette1: vec![
+            obj_palette1: [
                 Color::White,
                 Color::LightGray,
                 Color::DarkGray,
@@ -393,9 +392,9 @@ impl Gpu {
             ],
             bg_color_palette: ColorPalette::new(),
             obj_color_palette: ColorPalette::new(),
-            vram: vec![vec![0; 0x2000]; 2],
+            vram: [[0; 0x2000]; 2],
             vram_select: 0,
-            oam: vec![0; 0xa0],
+            oam: [0; 0xa0],
             hdma: Hdma::new(),
         }
     }
@@ -495,8 +494,8 @@ impl Gpu {
             return;
         }
 
-        let mut buf = vec![0; width];
-        let mut bgbuf = vec![0; width];
+        let mut buf = [0; VRAM_WIDTH];
+        let mut bgbuf = [0; VRAM_WIDTH];
 
         if self.bgenable {
             let mapbase = self.bgmap;

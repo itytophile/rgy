@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use rgy::{apu::mixer::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
@@ -52,9 +53,9 @@ impl rgy::Hardware for Hardware {
         true
     }
 
-    fn load_ram(&mut self, size: usize) -> Vec<u8> {
+    fn load_ram(&mut self, size: usize) -> ArrayVec<u8, 0x8000> {
         // Return save data.
-        vec![0; size]
+        vec![0; size].into_iter().collect()
     }
 
     fn save_ram(&mut self, _ram: &[u8]) {

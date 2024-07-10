@@ -1,4 +1,3 @@
-use alloc::fmt;
 use log::*;
 
 /// Interface for CPU to interact with memory/devices
@@ -87,35 +86,35 @@ pub struct Cpu<'a, T> {
     pub sys: &'a mut T,
 }
 
-impl<'a, T: Sys> fmt::Display for Cpu<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "a:  [{:02x}],  b:  [{:02x}]\n\
-             c:  [{:02x}],  d:  [{:02x}]\n\
-             e:  [{:02x}],  f:  [{:02x}]\n\
-             h:  [{:02x}],  l:  [{:02x}]\n\
-             pc: [{:04x}]\n\
-             sp: [{:04x}]\n\
-             flgs: [{}{}{}{}]\
-             ",
-            self.state.a,
-            self.state.b,
-            self.state.c,
-            self.state.d,
-            self.state.e,
-            self.state.f,
-            self.state.h,
-            self.state.l,
-            self.state.pc,
-            self.state.sp,
-            if self.get_zf() { "z" } else { "_" },
-            if self.get_nf() { "n" } else { "_" },
-            if self.get_hf() { "h" } else { "_" },
-            if self.get_cf() { "c" } else { "_" },
-        )
-    }
-}
+// impl<'a, T: Sys> fmt::Display for Cpu<'a, T> {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(
+//             f,
+//             "a:  [{:02x}],  b:  [{:02x}]\n\
+//              c:  [{:02x}],  d:  [{:02x}]\n\
+//              e:  [{:02x}],  f:  [{:02x}]\n\
+//              h:  [{:02x}],  l:  [{:02x}]\n\
+//              pc: [{:04x}]\n\
+//              sp: [{:04x}]\n\
+//              flgs: [{}{}{}{}]\
+//              ",
+//             self.state.a,
+//             self.state.b,
+//             self.state.c,
+//             self.state.d,
+//             self.state.e,
+//             self.state.f,
+//             self.state.h,
+//             self.state.l,
+//             self.state.pc,
+//             self.state.sp,
+//             if self.get_zf() { "z" } else { "_" },
+//             if self.get_nf() { "n" } else { "_" },
+//             if self.get_hf() { "h" } else { "_" },
+//             if self.get_cf() { "c" } else { "_" },
+//         )
+//     }
+// }
 
 impl<'a, T: Sys> Cpu<'a, T> {
     /// Switch the CPU state to halting.
