@@ -1,12 +1,9 @@
-use alloc::boxed::Box;
-
 use log::*;
-
-use crate::Hardware;
+use mixer::MixerStream;
 
 use self::{mixer::Mixer, noise::Noise, tone::Tone, wave::Wave};
 
-mod mixer;
+pub mod mixer;
 mod noise;
 mod tone;
 mod util;
@@ -21,10 +18,8 @@ pub struct Apu {
 }
 
 impl Apu {
-    pub fn new(hw: &mut impl Hardware) -> Self {
+    pub fn new() -> Self {
         let mixer = Mixer::new();
-
-        hw.sound_play(Box::new(mixer.create_stream()));
 
         Self {
             tones: [Tone::new(true), Tone::new(false)],
@@ -93,12 +88,12 @@ impl Apu {
     }
 
     /// Write NR14/NR24 register (0xff14/0xff19)
-    pub fn write_tone_freq_high(&mut self, tone: usize, value: u8) {
+    pub fn write_tone_freq_high(&mut self, tone: usize, value: u8, stream: &mut MixerStream) {
         if !self.enable {
             return;
         }
         if self.tones[tone].write_freq_high(value) {
-            self.mixer.sync_tone(tone, self.tones[tone].clone());
+            self.mixer.sync_tone(tone, self.tones[tone].clone(), stream);
         }
     }
 
@@ -108,12 +103,12 @@ impl Apu {
     }
 
     /// Write NR30 register (0xff1a)
-    pub fn write_wave_enable(&mut self, value: u8) {
+    pub fn write_wave_enable(&mut self, value: u8, stream: &mut MixerStream) {
         if !self.enable {
             return;
         }
         self.wave.write_enable(value);
-        self.mixer.sync_wave(self.wave.clone());
+        self.mixer.sync_wave(self.wave.clone(), stream);
     }
 
     /// Read NR31 register (0xff1b)
@@ -161,12 +156,12 @@ impl Apu {
     }
 
     /// Write NR34 register (0xff1e)
-    pub fn write_wave_freq_high(&mut self, value: u8) {
+    pub fn write_wave_freq_high(&mut self, value: u8, stream: &mut MixerStream) {
         if !self.enable {
             return;
         }
         if self.wave.write_freq_high(value) {
-            self.mixer.sync_wave(self.wave.clone());
+            self.mixer.sync_wave(self.wave.clone(), stream);
         }
     }
 
@@ -228,12 +223,12 @@ impl Apu {
     }
 
     /// Write NR44 register (0xff23)
-    pub fn write_noise_select(&mut self, value: u8) {
+    pub fn write_noise_select(&mut self, value: u8, stream: &mut MixerStream) {
         if !self.enable {
             return;
         }
         if self.noise.write_select(value) {
-            self.mixer.sync_noise(self.noise.clone());
+            self.mixer.sync_noise(self.noise.clone(), stream);
         }
     }
 
@@ -245,11 +240,11 @@ impl Apu {
     }
 
     /// Write NR50 register (0xff24)
-    pub fn write_ctrl(&mut self, value: u8) {
+    pub fn write_ctrl(&mut self, value: u8, stream: &mut MixerStream) {
         if !self.enable {
             return;
         }
-        self.mixer.write_ctrl(value)
+        self.mixer.write_ctrl(value, stream);
     }
 
     /// Read NR51 register (0xff25)
@@ -260,11 +255,11 @@ impl Apu {
     }
 
     /// Write NR51 register (0xff25)
-    pub fn write_so_mask(&mut self, value: u8) {
+    pub fn write_so_mask(&mut self, value: u8, stream: &mut MixerStream) {
         if !self.enable {
             return;
         }
-        self.mixer.write_so_mask(value)
+        self.mixer.write_so_mask(value, stream)
     }
 
     /// Read NR52 register (0xff26)
@@ -288,12 +283,12 @@ impl Apu {
     }
 
     /// Write NR52 register (0xff26)
-    pub fn write_enable(&mut self, value: u8) {
+    pub fn write_enable(&mut self, value: u8, stream: &mut MixerStream) {
         debug!("Write NR52: {:02x}", value);
 
         self.enable = value & 0x80 != 0;
 
-        self.mixer.enable(self.enable);
+        self.mixer.enable(self.enable, stream);
 
         if self.enable {
             info!("Sound master enabled");
@@ -305,7 +300,7 @@ impl Apu {
             }
             self.wave.clear();
             self.noise.clear();
-            self.mixer.clear();
+            self.mixer.clear(stream);
         }
     }
 

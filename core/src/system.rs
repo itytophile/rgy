@@ -1,3 +1,4 @@
+use crate::apu::mixer::MixerStream;
 use crate::cpu::Cpu;
 use crate::fc::FreqControl;
 use crate::hardware::Hardware;
@@ -72,6 +73,7 @@ impl Config {
 pub struct System<H: Hardware> {
     cfg: Config,
     fc: FreqControl,
+    peripherals: Peripherals<H>,
     cpu: Cpu<Mmu<H>>,
 }
 
@@ -95,7 +97,7 @@ impl<H: Hardware + 'static> System<H> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self) -> bool {
+    pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> bool {
         if !self.cpu.sys.hw.sched() {
             return false;
         }
@@ -110,17 +112,3 @@ impl<H: Hardware + 'static> System<H> {
     }
 }
 
-/// Run the emulator with the given configuration.
-pub fn run<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
-    run_inner(cfg, rom, hw)
-}
-
-/// Run the emulator with the given configuration and debugger.
-pub fn run_debug<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
-    run_inner(cfg, rom, hw)
-}
-
-fn run_inner<T: Hardware + 'static>(cfg: Config, rom: &[u8], hw: T) {
-    let mut sys = System::new(cfg, rom, hw);
-    while sys.poll() {}
-}

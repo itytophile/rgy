@@ -1,37 +1,4 @@
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-
 use log::*;
-
-pub trait AtomicHelper {
-    type Item;
-
-    fn get(&self) -> Self::Item;
-    fn set(&self, v: Self::Item);
-}
-
-impl AtomicHelper for AtomicUsize {
-    type Item = usize;
-
-    fn get(&self) -> Self::Item {
-        self.load(Ordering::SeqCst)
-    }
-
-    fn set(&self, v: Self::Item) {
-        self.store(v, Ordering::SeqCst)
-    }
-}
-
-impl AtomicHelper for AtomicBool {
-    type Item = bool;
-
-    fn get(&self) -> Self::Item {
-        self.load(Ordering::SeqCst)
-    }
-
-    fn set(&self, v: Self::Item) {
-        self.store(v, Ordering::SeqCst)
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct Counter {

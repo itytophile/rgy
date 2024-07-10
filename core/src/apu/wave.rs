@@ -1,19 +1,16 @@
-use alloc::sync::Arc;
-use core::sync::atomic::AtomicUsize;
-
 use log::*;
 
 use crate::hardware::Stream;
 
-use super::util::{AtomicHelper, Counter, WaveIndex};
+use super::util::{Counter, WaveIndex};
 
 #[derive(Debug, Clone)]
 pub struct Wave {
     enable: bool,
     amp: u8,
-    amp_shift: Arc<AtomicUsize>,
+    amp_shift: usize,
     counter: Counter,
-    freq: Arc<AtomicUsize>,
+    freq: usize,
     freq_high: u8,
     wavebuf: [u8; 16],
     dac: bool,
@@ -24,9 +21,9 @@ impl Wave {
         Self {
             enable: false,
             amp: 0,
-            amp_shift: Arc::new(AtomicUsize::new(0)),
+            amp_shift: 0,
             counter: Counter::type256(),
-            freq: Arc::new(AtomicUsize::new(0)),
+            freq: 0,
             freq_high: 0,
             wavebuf: [0; 16],
             dac: false,
@@ -71,7 +68,7 @@ impl Wave {
     pub fn write_amp(&mut self, value: u8) {
         debug!("Wave amp shift: {:02x}", value);
         self.amp = value;
-        self.amp_shift.set((value as usize >> 5) & 0x3);
+        self.amp_shift = (value as usize >> 5) & 0x3;
     }
 
     /// Read NR33 register (0xff1d)
@@ -82,7 +79,7 @@ impl Wave {
 
     /// Write NR33 register (0xff1d)
     pub fn write_freq_low(&mut self, value: u8) {
-        self.freq.set((self.freq.get() & !0xff) | value as usize);
+        self.freq = (self.freq & !0xff) | value as usize;
     }
 
     /// Read NR34 register (0xff1e)
@@ -94,8 +91,7 @@ impl Wave {
     /// Write NR34 register (0xff1e)
     pub fn write_freq_high(&mut self, value: u8) -> bool {
         self.freq_high = value;
-        self.freq
-            .set((self.freq.get() & !0x700) | (((value & 0x7) as usize) << 8));
+        self.freq = (self.freq & !0x700) | (((value & 0x7) as usize) << 8);
         let trigger = value & 0x80 != 0;
         let enable = value & 0x40 != 0;
         self.counter.update(trigger, enable);
@@ -169,7 +165,7 @@ impl Stream for WaveStream {
         }
 
         let samples = self.wave.wavebuf.len() * 2;
-        let freq = 65536 / (2048 - self.wave.freq.get());
+        let freq = 65536 / (2048 - self.wave.freq);
         let index_freq = freq * samples;
         let index = self.index.index(rate, index_freq, samples);
 
@@ -179,7 +175,7 @@ impl Stream for WaveStream {
             self.wave.wavebuf[index / 2] & 0xf
         };
 
-        let amp = match self.wave.amp_shift.get() {
+        let amp = match self.wave.amp_shift {
             0 => 0,
             1 => amp,
             2 => amp >> 1,

@@ -138,4 +138,4 @@ pub mod mmu;
 mod hardware;
 
 pub use crate::hardware::{Hardware, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
-pub use crate::system::{run, run_debug, Config, System};
+pub use crate::system::{Config, System};

@@ -1706,7 +1706,6 @@ dependencies = [
  "minifb",
  "rustyline",
  "signal-hook",
- "spin 0.5.2",
  "structopt",
  "utils",
 ]
