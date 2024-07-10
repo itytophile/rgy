@@ -544,13 +544,11 @@ impl MbcType {
 struct Cartridge {
     cgb: bool,
     cgb_only: bool,
-    license_old: u8,
     sgb: bool,
     mbc: MbcType,
     rom_size: u8,
     ram_size: u8,
     dstcode: u8,
-    rom_version: u8,
 }
 
 fn verify(rom: &[u8], checksum: u16) {
@@ -582,13 +580,11 @@ impl Cartridge {
         Self {
             cgb: rom[0x143] & 0x80 != 0,
             cgb_only: rom[0x143] == 0xc0,
-            license_old: rom[0x14b],
             sgb: rom[0x146] == 0x03,
             mbc: MbcType::new(hw, rom[0x147], rom.clone()),
             rom_size: rom[0x148],
             ram_size: rom[0x149],
             dstcode: rom[0x14a],
-            rom_version: rom[0x14c],
         }
     }
 

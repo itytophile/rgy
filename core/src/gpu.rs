@@ -766,7 +766,7 @@ impl Gpu {
     /// Read BGP register (0xff47)
     pub(crate) fn read_bg_palette(&self) -> u8 {
         debug!("Read Bg palette");
-        from_palette(self.bg_palette.clone())
+        from_palette(self.bg_palette)
     }
 
     /// Write BGP register (0xff47)
@@ -778,7 +778,7 @@ impl Gpu {
     /// Read OBP0 register (0xff48)
     pub(crate) fn read_obj_palette0(&self) -> u8 {
         debug!("Read Object palette 0");
-        from_palette(self.obj_palette0.clone())
+        from_palette(self.obj_palette0)
     }
 
     /// Write OBP0 register (0xff48)
@@ -790,7 +790,7 @@ impl Gpu {
     /// Read OBP1 register (0xff49)
     pub(crate) fn read_obj_palette1(&self) -> u8 {
         debug!("Read Object palette 1");
-        from_palette(self.obj_palette1.clone())
+        from_palette(self.obj_palette1)
     }
 
     /// Write OBP1 register (0xff49)
