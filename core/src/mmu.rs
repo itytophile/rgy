@@ -32,12 +32,12 @@ pub struct Peripherals<'a, H> {
 
 impl<'a, H: Hardware> Peripherals<'a, H> {
     /// Create a new MMU instance.
-    pub fn new(mut hw: H, rom: &'a [u8], color: bool) -> Self {
+    pub fn new(mut hw: H, rom: &'a [u8], color: bool, cartridge_ram: &'a mut [u8]) -> Self {
         Self {
             wram: Wram::new(color),
             hram: Hram::new(),
             gpu: Gpu::new(color),
-            mbc: Mbc::new(&mut hw, rom, color),
+            mbc: Mbc::new(&mut hw, rom, color, cartridge_ram),
             timer: Timer::new(),
             ic: Ic::new(),
             serial: Serial::new(),

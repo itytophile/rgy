@@ -71,12 +71,6 @@
 //!         true
 //!     }
 //!
-//!     // Called when the emulator stores the save data to the battery-backed RAM.
-//!     fn load_ram(&mut self, size: usize) -> arrayvec::ArrayVec<u8, 0x8000> {
-//!         // TODO: Return save data.
-//!         vec![0; size].into_iter().collect()
-//!     }
-//!
 //!     // Called when the emulator loads the save data from the battery-backed RAM.
 //!     fn save_ram(&mut self, _ram: &[u8]) {
 //!         // TODO: Store save data.
@@ -92,7 +86,9 @@
 //! // TODO: The content of a ROM file, which can be downloaded from the Internet.
 //! let rom = vec![0u8; 1024];
 //!
-//! let mut sys = rgy::System::new(cfg, &rom, hw);
+//! let mut cartridge_ram = [0; 0x8000];
+//!
+//! let mut sys = rgy::System::new(cfg, &rom, hw, &mut cartridge_ram);
 //!
 //! let mut mixer_stream = rgy::apu::mixer::MixerStream::new();
 //!

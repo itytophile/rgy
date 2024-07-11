@@ -1,4 +1,3 @@
-use arrayvec::ArrayVec;
 use rgy::{apu::mixer::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
@@ -53,11 +52,6 @@ impl rgy::Hardware for Hardware {
         true
     }
 
-    fn load_ram(&mut self, size: usize) -> ArrayVec<u8, 0x8000> {
-        // Return save data.
-        vec![0; size].into_iter().collect()
-    }
-
     fn save_ram(&mut self, _ram: &[u8]) {
         // Store save data.
     }
@@ -73,7 +67,8 @@ fn main() {
     // The content of a ROM file, which can be downloaded from the Internet.
     let rom = vec![0u8; 1024];
 
-    let mut sys = rgy::System::new(cfg, &rom, hw);
+    let mut cartridge_ram = [0; 100];
+    let mut sys = rgy::System::new(cfg, &rom, hw, &mut cartridge_ram);
 
     let mut mixer_stream = MixerStream::new();
 

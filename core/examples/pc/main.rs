@@ -11,6 +11,8 @@ use crate::{
 use log::*;
 use rgy::apu::mixer::MixerStream;
 use std::{
+    fs::File,
+    io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -94,7 +96,20 @@ fn main() {
 
         set_affinity();
 
-        let mut sys = rgy::System::new(to_cfg(opt), &rom, hw1);
+        let mut ram = vec![0; 0x20000];
+
+        if let Some(path) = &opt.ram {
+            match File::open(path) {
+                Ok(mut fs) => {
+                    fs.read_exact(&mut ram).expect("Couldn't read file");
+                }
+                Err(e) => {
+                    warn!("Couldn't open RAM file `{}`: {}", path, e);
+                }
+            }
+        }
+
+        let mut sys = rgy::System::new(to_cfg(opt), &rom, hw1, &mut ram);
 
         while sys.poll(&mut mixer_stream.lock().unwrap()) {}
     });

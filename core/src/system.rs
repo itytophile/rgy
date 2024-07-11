@@ -79,7 +79,7 @@ pub struct System<'a, H: Hardware> {
 
 impl<'a, H: Hardware + 'static> System<'a, H> {
     /// Create a new emulator context.
-    pub fn new(cfg: Config, rom: &'a [u8], mut hw: H) -> Self {
+    pub fn new(cfg: Config, rom: &'a [u8], mut hw: H, cartridge_ram: &'a mut [u8]) -> Self {
         info!("Initializing...");
 
         let mut fc = FreqControl::new(&cfg);
@@ -87,7 +87,7 @@ impl<'a, H: Hardware + 'static> System<'a, H> {
         fc.reset(&mut hw);
 
         info!("Starting...");
-        let peripherals = Peripherals::new(hw, rom, cfg.color);
+        let peripherals = Peripherals::new(hw, rom, cfg.color, cartridge_ram);
 
         Self {
             cfg,

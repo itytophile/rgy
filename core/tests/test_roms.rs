@@ -3,7 +3,6 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use arrayvec::ArrayVec;
 use rgy::{apu::mixer::MixerStream, VRAM_HEIGHT, VRAM_WIDTH};
 
 enum Expected {
@@ -107,10 +106,6 @@ impl rgy::Hardware for TestHardware {
         None
     }
 
-    fn load_ram(&mut self, len: usize) -> ArrayVec<u8, 0x8000> {
-        vec![0; len].into_iter().collect()
-    }
-
     fn save_ram(&mut self, _: &[u8]) {}
 
     fn sched(&mut self) -> bool {
@@ -121,7 +116,13 @@ impl rgy::Hardware for TestHardware {
 fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
     let hw = TestHardware::new(expected);
-    let mut sys = rgy::System::new(rgy::Config::new().native_speed(true), &rom, hw);
+    let mut cartridge_ram = [0; 0x8000];
+    let mut sys = rgy::System::new(
+        rgy::Config::new().native_speed(true),
+        &rom,
+        hw,
+        &mut cartridge_ram,
+    );
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();

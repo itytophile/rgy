@@ -1,5 +1,3 @@
-use arrayvec::ArrayVec;
-
 /// The width of the VRAM.
 pub const VRAM_WIDTH: usize = 160;
 
@@ -66,9 +64,6 @@ pub trait Hardware {
     fn sched(&mut self) -> bool {
         true
     }
-
-    /// Called when the CPU attempts to write save data to the cartridge battery-backed RAM.
-    fn load_ram(&mut self, size: usize) -> ArrayVec<u8, 0x8000>;
 
     /// Called when the CPU attempts to read save data from the cartridge battery-backed RAM.
     fn save_ram(&mut self, ram: &[u8]);
