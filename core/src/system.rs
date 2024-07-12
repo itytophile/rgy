@@ -3,6 +3,7 @@ use crate::cpu::{Cpu, CpuState};
 use crate::fc::FreqControl;
 use crate::hardware::Hardware;
 use crate::mmu::{Mmu, Peripherals};
+use crate::wram::WramCgbExtension;
 use log::*;
 
 /// Configuration of the emulator.
@@ -79,7 +80,13 @@ pub struct System<'a, H: Hardware> {
 
 impl<'a, H: Hardware + 'static> System<'a, H> {
     /// Create a new emulator context.
-    pub fn new(cfg: Config, rom: &'a [u8], mut hw: H, cartridge_ram: &'a mut [u8]) -> Self {
+    pub fn new(
+        cfg: Config,
+        rom: &'a [u8],
+        mut hw: H,
+        cartridge_ram: &'a mut [u8],
+        cgb_ext: Option<WramCgbExtension>,
+    ) -> Self {
         info!("Initializing...");
 
         let mut fc = FreqControl::new(&cfg);
@@ -87,7 +94,7 @@ impl<'a, H: Hardware + 'static> System<'a, H> {
         fc.reset(&mut hw);
 
         info!("Starting...");
-        let peripherals = Peripherals::new(hw, rom, cfg.color, cartridge_ram);
+        let peripherals = Peripherals::new(hw, rom, cfg.color, cartridge_ram, cgb_ext);
 
         Self {
             cfg,

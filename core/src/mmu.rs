@@ -10,7 +10,7 @@ use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::serial::Serial;
 use crate::timer::Timer;
-use crate::wram::Wram;
+use crate::wram::{Wram, WramCgbExtension};
 use crate::Hardware;
 use log::*;
 
@@ -32,9 +32,15 @@ pub struct Peripherals<'a, H> {
 
 impl<'a, H: Hardware> Peripherals<'a, H> {
     /// Create a new MMU instance.
-    pub fn new(mut hw: H, rom: &'a [u8], color: bool, cartridge_ram: &'a mut [u8]) -> Self {
+    pub fn new(
+        mut hw: H,
+        rom: &'a [u8],
+        color: bool,
+        cartridge_ram: &'a mut [u8],
+        cgb_ext: Option<WramCgbExtension>,
+    ) -> Self {
         Self {
-            wram: Wram::new(color),
+            wram: Wram::new(cgb_ext),
             hram: Hram::new(),
             gpu: Gpu::new(color),
             mbc: Mbc::new(&mut hw, rom, color, cartridge_ram),
@@ -117,7 +123,7 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
             0xff69 => self.peripherals.gpu.read_bg_color_palette(),
             0xff6a => todo!("cgb bg palette data"),
             0xff6b => self.peripherals.gpu.read_obj_color_palette(),
-            0xff70 => self.peripherals.wram.get_bank(),
+            0xff70 => self.peripherals.wram.get_bank().get(),
             0x0000..=0xfeff | 0xff80..=0xffff => unreachable!("read non-i/o addr={:04x}", addr),
             _ => {
                 warn!("read unknown i/o addr={:04x}", addr);

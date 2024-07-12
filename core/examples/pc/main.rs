@@ -109,7 +109,7 @@ fn main() {
             }
         }
 
-        let mut sys = rgy::System::new(to_cfg(opt), &rom, hw1, &mut ram);
+        let mut sys = rgy::System::new(to_cfg(opt), &rom, hw1, &mut ram, None);
 
         while sys.poll(&mut mixer_stream.lock().unwrap()) {}
     });

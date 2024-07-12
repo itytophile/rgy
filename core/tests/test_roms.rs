@@ -122,6 +122,7 @@ fn test_rom(expected: Expected, path: &str) {
         &rom,
         hw,
         &mut cartridge_ram,
+        None,
     );
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();

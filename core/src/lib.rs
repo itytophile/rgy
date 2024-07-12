@@ -88,7 +88,7 @@
 //!
 //! let mut cartridge_ram = [0; 0x8000];
 //!
-//! let mut sys = rgy::System::new(cfg, &rom, hw, &mut cartridge_ram);
+//! let mut sys = rgy::System::new(cfg, &rom, hw, &mut cartridge_ram, None);
 //!
 //! let mut mixer_stream = rgy::apu::mixer::MixerStream::new();
 //!
