@@ -68,7 +68,7 @@ fn main() {
     let rom = vec![0u8; 1024];
 
     let mut cartridge_ram = [0; 100];
-    let mut sys = rgy::System::new(cfg, &rom, hw, &mut cartridge_ram, None);
+    let mut sys = rgy::System::<_, ()>::new(cfg, &rom, hw, &mut cartridge_ram);
 
     let mut mixer_stream = MixerStream::new();
 

@@ -117,12 +117,11 @@ fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
     let hw = TestHardware::new(expected);
     let mut cartridge_ram = [0; 0x8000];
-    let mut sys = rgy::System::new(
+    let mut sys = rgy::System::<_, ()>::new(
         rgy::Config::new().native_speed(true),
         &rom,
         hw,
         &mut cartridge_ram,
-        None,
     );
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();

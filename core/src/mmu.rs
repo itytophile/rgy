@@ -10,12 +10,12 @@ use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::serial::Serial;
 use crate::timer::Timer;
-use crate::wram::{Wram, WramCgbExtension};
+use crate::wram::{self, Wram};
 use crate::Hardware;
 use log::*;
 
-pub struct Peripherals<'a, H> {
-    wram: Wram,
+pub struct Peripherals<'a, H, GB: wram::CgbExt> {
+    wram: Wram<GB>,
     hram: Hram,
     gpu: Gpu,
     mbc: Mbc<'a>,
@@ -30,17 +30,11 @@ pub struct Peripherals<'a, H> {
     pub hw: H,
 }
 
-impl<'a, H: Hardware> Peripherals<'a, H> {
+impl<'a, H: Hardware, GB: wram::CgbExt> Peripherals<'a, H, GB> {
     /// Create a new MMU instance.
-    pub fn new(
-        mut hw: H,
-        rom: &'a [u8],
-        color: bool,
-        cartridge_ram: &'a mut [u8],
-        cgb_ext: Option<WramCgbExtension>,
-    ) -> Self {
+    pub fn new(mut hw: H, rom: &'a [u8], color: bool, cartridge_ram: &'a mut [u8]) -> Self {
         Self {
-            wram: Wram::new(cgb_ext),
+            wram: Wram::new(),
             hram: Hram::new(),
             gpu: Gpu::new(color),
             mbc: Mbc::new(&mut hw, rom, color, cartridge_ram),
@@ -62,12 +56,12 @@ impl<'a, H: Hardware> Peripherals<'a, H> {
 /// This unit holds a memory byte array which represents address space of the memory.
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
-pub struct Mmu<'a, 'b, H> {
-    pub peripherals: &'a mut Peripherals<'b, H>,
+pub struct Mmu<'a, 'b, H, GB: wram::CgbExt> {
+    pub peripherals: &'a mut Peripherals<'b, H, GB>,
     pub mixer_stream: &'a mut MixerStream,
 }
 
-impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
+impl<'a, 'b, H: Hardware, GB: wram::CgbExt> Mmu<'a, 'b, H, GB> {
     fn io_read(&mut self, addr: u16) -> u8 {
         match addr {
             0xff00 => self.peripherals.joypad.read(&mut self.peripherals.hw),
@@ -232,7 +226,7 @@ impl<'a, 'b, H: Hardware> Mmu<'a, 'b, H> {
     }
 }
 
-impl<'a, 'b, T: Hardware> Sys for Mmu<'a, 'b, T> {
+impl<'a, 'b, T: Hardware, GB: wram::CgbExt> Sys for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.peripherals.ic.peek(&mut self.peripherals.irq)
