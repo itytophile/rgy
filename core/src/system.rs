@@ -2,8 +2,7 @@ use crate::apu::mixer::MixerStream;
 use crate::cpu::{Cpu, CpuState};
 use crate::fc::FreqControl;
 use crate::hardware::Hardware;
-use crate::mmu::{Mmu, Peripherals};
-use crate::wram;
+use crate::mmu::{GameboyMode, Mmu, Peripherals};
 use log::*;
 
 /// Configuration of the emulator.
@@ -71,14 +70,14 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<'a, H: Hardware, GB: wram::CgbExt> {
+pub struct System<'a, H: Hardware, GB: GameboyMode> {
     cfg: Config,
     fc: FreqControl,
     cpu_state: CpuState,
     peripherals: Peripherals<'a, H, GB>,
 }
 
-impl<'a, H: Hardware + 'static, GB: wram::CgbExt> System<'a, H, GB> {
+impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     /// Create a new emulator context.
     pub fn new(cfg: Config, rom: &'a [u8], mut hw: H, cartridge_ram: &'a mut [u8]) -> Self {
         info!("Initializing...");

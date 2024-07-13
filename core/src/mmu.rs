@@ -3,7 +3,7 @@ use crate::apu::Apu;
 use crate::cgb::Cgb;
 use crate::cpu::Sys;
 use crate::dma::{Dma, DmaRequest};
-use crate::gpu::Gpu;
+use crate::gpu::{self, Gpu};
 use crate::hram::Hram;
 use crate::ic::{Ic, Irq};
 use crate::joypad::Joypad;
@@ -14,10 +14,30 @@ use crate::wram::{self, Wram};
 use crate::Hardware;
 use log::*;
 
-pub struct Peripherals<'a, H, GB: wram::CgbExt> {
-    wram: Wram<GB>,
+pub enum DmgMode {}
+pub enum CgbMode {}
+
+impl GameboyMode for CgbMode {
+    type Wram = wram::WramCgbExtension;
+
+    type Gpu = gpu::GpuCgbExtension;
+}
+
+impl GameboyMode for DmgMode {
+    type Wram = ();
+
+    type Gpu = gpu::Dmg;
+}
+
+pub trait GameboyMode {
+    type Wram: wram::CgbExt;
+    type Gpu: gpu::CgbExt;
+}
+
+pub struct Peripherals<'a, H, GB: GameboyMode> {
+    wram: Wram<GB::Wram>,
     hram: Hram,
-    gpu: Gpu,
+    gpu: Gpu<GB::Gpu>,
     mbc: Mbc<'a>,
     timer: Timer,
     ic: Ic,
@@ -30,13 +50,13 @@ pub struct Peripherals<'a, H, GB: wram::CgbExt> {
     pub hw: H,
 }
 
-impl<'a, H: Hardware, GB: wram::CgbExt> Peripherals<'a, H, GB> {
+impl<'a, H: Hardware, GB: GameboyMode> Peripherals<'a, H, GB> {
     /// Create a new MMU instance.
     pub fn new(mut hw: H, rom: &'a [u8], color: bool, cartridge_ram: &'a mut [u8]) -> Self {
         Self {
             wram: Wram::new(),
             hram: Hram::new(),
-            gpu: Gpu::new(color),
+            gpu: Gpu::new(),
             mbc: Mbc::new(&mut hw, rom, color, cartridge_ram),
             timer: Timer::new(),
             ic: Ic::new(),
@@ -56,12 +76,12 @@ impl<'a, H: Hardware, GB: wram::CgbExt> Peripherals<'a, H, GB> {
 /// This unit holds a memory byte array which represents address space of the memory.
 /// It provides the logic to intercept access from the CPU to the memory byte array,
 /// and to modify the memory access behaviour.
-pub struct Mmu<'a, 'b, H, GB: wram::CgbExt> {
+pub struct Mmu<'a, 'b, H, GB: GameboyMode> {
     pub peripherals: &'a mut Peripherals<'b, H, GB>,
     pub mixer_stream: &'a mut MixerStream,
 }
 
-impl<'a, 'b, H: Hardware, GB: wram::CgbExt> Mmu<'a, 'b, H, GB> {
+impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
     fn io_read(&mut self, addr: u16) -> u8 {
         match addr {
             0xff00 => self.peripherals.joypad.read(&mut self.peripherals.hw),
@@ -226,7 +246,7 @@ impl<'a, 'b, H: Hardware, GB: wram::CgbExt> Mmu<'a, 'b, H, GB> {
     }
 }
 
-impl<'a, 'b, T: Hardware, GB: wram::CgbExt> Sys for Mmu<'a, 'b, T, GB> {
+impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.peripherals.ic.peek(&mut self.peripherals.irq)

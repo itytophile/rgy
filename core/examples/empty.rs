@@ -1,4 +1,4 @@
-use rgy::{apu::mixer::MixerStream, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, mmu::DmgMode, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
 
 struct Hardware {
     display: Vec<Vec<u32>>,
@@ -68,7 +68,7 @@ fn main() {
     let rom = vec![0u8; 1024];
 
     let mut cartridge_ram = [0; 100];
-    let mut sys = rgy::System::<_, ()>::new(cfg, &rom, hw, &mut cartridge_ram);
+    let mut sys = rgy::System::<_, DmgMode>::new(cfg, &rom, hw, &mut cartridge_ram);
 
     let mut mixer_stream = MixerStream::new();
 

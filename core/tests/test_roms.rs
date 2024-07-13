@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use rgy::{apu::mixer::MixerStream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
 
 enum Expected {
     Serial(&'static str),
@@ -117,7 +117,7 @@ fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
     let hw = TestHardware::new(expected);
     let mut cartridge_ram = [0; 0x8000];
-    let mut sys = rgy::System::<_, ()>::new(
+    let mut sys = rgy::System::<_, DmgMode>::new(
         rgy::Config::new().native_speed(true),
         &rom,
         hw,

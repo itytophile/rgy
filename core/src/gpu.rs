@@ -37,7 +37,7 @@ impl From<u8> for Mode {
     }
 }
 
-trait CgbExt: Default {
+pub trait CgbExt: Default {
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -111,7 +111,7 @@ trait CgbExt: Default {
     fn write_obj_color_palette(&mut self, v: u8);
 }
 
-struct GpuCgbExtension {
+pub struct GpuCgbExtension {
     vram: [u8; 0x2000],
     vram_select: usize,
     bg_color_palette: ColorPalette,
@@ -197,9 +197,7 @@ impl CgbExt for GpuCgbExtension {
                 &self.vram
             },
         );
-        let col = palette[coli].into();
-
-        col
+        palette[coli].into()
     }
 
     fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a> {
@@ -217,13 +215,28 @@ impl CgbExt for GpuCgbExtension {
             priority: attr & 0x80 != 0,
         }
     }
-    
+
     fn read_vram(&self, addr: u16, vram_bank0: &[u8; 0x2000]) -> u8 {
-       read_vram_bank(addr, if self.vram_select == 0 { vram_bank0} else {&self.vram})
+        read_vram_bank(
+            addr,
+            if self.vram_select == 0 {
+                vram_bank0
+            } else {
+                &self.vram
+            },
+        )
     }
-    
+
     fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]) {
-        write_vram_bank(addr, v, if self.vram_select == 0 { vram_bank0} else {&mut self.vram})
+        write_vram_bank(
+            addr,
+            v,
+            if self.vram_select == 0 {
+                vram_bank0
+            } else {
+                &mut self.vram
+            },
+        )
     }
 
     /// Read BGP register (0xff47)
@@ -297,7 +310,7 @@ impl CgbExt for GpuCgbExtension {
     }
 }
 
-struct Dmg {
+pub struct Dmg {
     bg_palette: [Color; 4],
     obj_palette0: [Color; 4],
     obj_palette1: [Color; 4],
@@ -358,9 +371,8 @@ impl CgbExt for Dmg {
     ) -> u32 {
         let tbase = get_tile_base(tiles, mapbase, tx, ty, vram_bank0);
         let coli = get_tile_byte(tbase, txoff, tyoff, vram_bank0);
-        let col = self.bg_palette[coli].into();
 
-        col
+        self.bg_palette[coli].into()
     }
 
     fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a> {
@@ -375,14 +387,14 @@ impl CgbExt for Dmg {
             xflip: attr & 0x20 != 0,
             yflip: attr & 0x40 != 0,
             priority: attr & 0x80 != 0,
-            vram_bank: &vram_bank0,
+            vram_bank: vram_bank0,
         }
     }
-    
+
     fn read_vram(&self, addr: u16, vram_bank0: &[u8; 0x2000]) -> u8 {
         read_vram_bank(addr, vram_bank0)
     }
-    
+
     fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]) {
         write_vram_bank(addr, v, vram_bank0)
     }
@@ -496,7 +508,7 @@ pub struct Gpu<Ext: CgbExt> {
 
     hdma: Hdma,
 
-    cgb_ext: Ext,
+    pub cgb_ext: Ext,
 }
 
 fn to_palette(p: u8) -> [Color; 4] {
@@ -514,7 +526,7 @@ fn from_palette(p: [Color; 4]) -> u8 {
     u8::from(p[0]) | u8::from(p[1]) << 2 | u8::from(p[2]) << 4 | u8::from(p[3]) << 6
 }
 
-struct MapAttribute<'a> {
+pub struct MapAttribute<'a> {
     palette: [Color; 4],
     vram_bank: &'a [u8; 0x2000],
     xflip: bool,
@@ -1093,10 +1105,6 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.oam[addr as usize - 0xfe00] = v;
     }
 
-    
-
-    
-
     /// Read SCY register (0xff42)
     pub(crate) fn read_scy(&self) -> u8 {
         self.scy
@@ -1137,10 +1145,6 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.lyc = v;
     }
 
-    
-
-    
-
     /// Read WY register (0xff4a)
     pub(crate) fn read_wy(&self) -> u8 {
         self.wy
@@ -1160,8 +1164,6 @@ impl<Ext: CgbExt> Gpu<Ext> {
     pub(crate) fn write_wx(&mut self, v: u8) {
         self.wx = v;
     }
-
-    
 
     /// Read HDMA1 register (0xff51)
     pub(crate) fn read_hdma_src_high(&self) -> u8 {
@@ -1213,9 +1215,83 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.hdma.start(v);
     }
 
-    
+    /// Read BGP register (0xff47)
+    pub(crate) fn read_bg_palette(&self) -> u8 {
+        self.cgb_ext.read_bg_palette()
+    }
 
-    
+    /// Write BGP register (0xff47)
+    pub(crate) fn write_bg_palette(&mut self, v: u8) {
+        self.cgb_ext.write_bg_palette(v)
+    }
+
+    /// Read OBP0 register (0xff48)
+    pub(crate) fn read_obj_palette0(&self) -> u8 {
+        self.cgb_ext.read_obj_palette0()
+    }
+
+    /// Write OBP0 register (0xff48)
+    pub(crate) fn write_obj_palette0(&mut self, v: u8) {
+        self.cgb_ext.write_obj_palette0(v)
+    }
+
+    /// Read OBP1 register (0xff49)
+    pub(crate) fn read_obj_palette1(&self) -> u8 {
+        self.cgb_ext.read_obj_palette1()
+    }
+
+    /// Write OBP1 register (0xff49)
+    pub(crate) fn write_obj_palette1(&mut self, v: u8) {
+        self.cgb_ext.write_obj_palette1(v)
+    }
+
+    /// Read VBK register (0xff4f)
+    pub(crate) fn read_vram_bank_select(&self) -> u8 {
+        self.cgb_ext.read_vram_bank_select()
+    }
+
+    /// Write VBK register (0xff4f)
+    pub(crate) fn select_vram_bank(&mut self, v: u8) {
+        self.cgb_ext.select_vram_bank(v)
+    }
+
+    /// Write BCPS/BGPI register (0xff68)
+    pub(crate) fn select_bg_color_palette(&mut self, v: u8) {
+        self.cgb_ext.select_bg_color_palette(v)
+    }
+
+    /// Read BCPD/BGPD register (0xff69)
+    pub(crate) fn read_bg_color_palette(&self) -> u8 {
+        self.cgb_ext.read_bg_color_palette()
+    }
+
+    /// Write BCPD/BGPD register (0xff69)
+    pub(crate) fn write_bg_color_palette(&mut self, v: u8) {
+        self.cgb_ext.write_bg_color_palette(v)
+    }
+
+    /// Write OCPS/OBPI register (0xff6a)
+    pub(crate) fn select_obj_color_palette(&mut self, v: u8) {
+        self.cgb_ext.select_obj_color_palette(v)
+    }
+
+    /// Read OCPD/OBPD register (0xff6b)
+    pub(crate) fn read_obj_color_palette(&self) -> u8 {
+        self.cgb_ext.read_obj_color_palette()
+    }
+
+    /// Write OCPD/OBPD register (0xff6b)
+    pub(crate) fn write_obj_color_palette(&mut self, v: u8) {
+        self.cgb_ext.write_obj_color_palette(v)
+    }
+
+    pub(crate) fn read_vram(&self, addr: u16) -> u8 {
+        self.cgb_ext.read_vram(addr, &self.vram)
+    }
+
+    pub(crate) fn write_vram(&mut self, addr: u16, v: u8) {
+        self.cgb_ext.write_vram(addr, v, &mut self.vram)
+    }
 }
 
 fn get_tile_base(tiles: u16, mapbase: u16, tx: u16, ty: u16, vram_bank0: &[u8; 0x2000]) -> u16 {
@@ -1242,7 +1318,7 @@ fn read_vram_bank(addr: u16, bank: &[u8; 0x2000]) -> u8 {
     let off = addr as usize - 0x8000;
     bank[off]
 }
-fn write_vram_bank(addr: u16, value: u8, bank: &mut[u8;0x2000]) {
+fn write_vram_bank(addr: u16, value: u8, bank: &mut [u8; 0x2000]) {
     let off = addr as usize - 0x8000;
     bank[off] = value;
 }

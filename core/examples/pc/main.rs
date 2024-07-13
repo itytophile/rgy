@@ -9,7 +9,7 @@ use crate::{
 };
 
 use log::*;
-use rgy::apu::mixer::MixerStream;
+use rgy::{apu::mixer::MixerStream, mmu::DmgMode};
 use std::{
     fs::File,
     io::Read,
@@ -109,7 +109,7 @@ fn main() {
             }
         }
 
-        let mut sys = rgy::System::<_, ()>::new(to_cfg(opt), &rom, hw1, &mut ram);
+        let mut sys = rgy::System::<_, DmgMode>::new(to_cfg(opt), &rom, hw1, &mut ram);
 
         while sys.poll(&mut mixer_stream.lock().unwrap()) {}
     });
