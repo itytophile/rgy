@@ -1,7 +1,8 @@
 use crate::apu::mixer::MixerStream;
 use crate::cpu::{Cpu, CpuState};
 use crate::hardware::Hardware;
-use crate::mmu::{GameboyMode, Mmu, Peripherals, StepData};
+use crate::mmu::{GameboyMode, Mmu, Peripherals};
+use crate::VRAM_WIDTH;
 
 /// Configuration of the emulator.
 pub struct Config {
@@ -96,13 +97,18 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
         let time = cpu.execute();
 
         Some(PollData {
-            steps: &self.cpu_state.steps_data,
+            line_to_draw: self
+                .cpu_state
+                .steps_data
+                .line_to_draw
+                .as_ref()
+                .map(|line_to_draw| (line_to_draw.0, &line_to_draw.1)),
             cpu_time: time,
         })
     }
 }
 
 pub struct PollData<'a> {
-    pub steps: &'a [StepData],
+    pub line_to_draw: Option<(u8, &'a [u32; VRAM_WIDTH])>,
     pub cpu_time: usize,
 }

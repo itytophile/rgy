@@ -102,32 +102,30 @@ fn test_rom(expected: Expected, path: &str) {
         let Expected::Display(expected) = &expected else {
             continue;
         };
-        for step in poll_data.steps {
-            let Some((ly, buf)) = step.line_to_draw else {
-                continue;
-            };
-            display[usize::from(ly) * VRAM_WIDTH..(usize::from(ly) + 1) * VRAM_WIDTH]
-                .copy_from_slice(&buf);
+        let Some((ly, buf)) = poll_data.line_to_draw else {
+            continue;
+        };
+        display[usize::from(ly) * VRAM_WIDTH..(usize::from(ly) + 1) * VRAM_WIDTH]
+            .copy_from_slice(buf);
 
-            if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
-                return;
-            }
-
-            // // print display to console
-            // if ly == VRAM_HEIGHT - 1 {
-            //     println!();
-            //     for (index, color) in self.display.iter().enumerate() {
-            //         if *color == 0xdddddd {
-            //             print!(".")
-            //         } else {
-            //             print!("#")
-            //         }
-            //         if index % VRAM_WIDTH == VRAM_WIDTH - 1 {
-            //             println!();
-            //         }
-            //     }
-            // }
+        if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
+            return;
         }
+
+        // // print display to console
+        // if ly == VRAM_HEIGHT - 1 {
+        //     println!();
+        //     for (index, color) in self.display.iter().enumerate() {
+        //         if *color == 0xdddddd {
+        //             print!(".")
+        //         } else {
+        //             print!("#")
+        //         }
+        //         if index % VRAM_WIDTH == VRAM_WIDTH - 1 {
+        //             println!();
+        //         }
+        //     }
+        // }
     }
 }
 

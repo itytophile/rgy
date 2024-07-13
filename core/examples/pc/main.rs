@@ -109,15 +109,13 @@ fn main() {
 
         while let Some(poll_data) = sys.poll(&mut mixer_stream.lock().unwrap()) {
             max_cycles = max_cycles.max(poll_data.cpu_time);
-            for step in poll_data.steps {
-                if let Some((ly, buf)) = step.line_to_draw {
-                    let mut vram = vram.lock().unwrap();
-                    let base = usize::from(ly) * VRAM_WIDTH;
-                    vram[base..base + buf.len()].copy_from_slice(&buf);
-                    drop(vram);
-                    if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
-                        std::thread::sleep(Duration::from_micros(16740))
-                    }
+            if let Some((ly, buf)) = poll_data.line_to_draw {
+                let mut vram = vram.lock().unwrap();
+                let base = usize::from(ly) * VRAM_WIDTH;
+                vram[base..base + buf.len()].copy_from_slice(buf);
+                drop(vram);
+                if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
+                    std::thread::sleep(Duration::from_micros(16740))
                 }
             }
         }
