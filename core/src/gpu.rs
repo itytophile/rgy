@@ -48,6 +48,17 @@ trait CgbExt: Default {
         tyoff: u16,
         mapbase: u16,
     ) -> (u32, usize);
+
+    fn get_window_col(
+        &self,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        tx: u16,
+        ty: u16,
+        txoff: u16,
+        tyoff: u16,
+        mapbase: u16,
+    ) -> u32;
 }
 
 struct GpuCgbExtension {
@@ -106,6 +117,38 @@ impl CgbExt for GpuCgbExtension {
 
         (col, coli)
     }
+
+    fn get_window_col(
+        &self,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        tx: u16,
+        ty: u16,
+        txoff: u16,
+        tyoff: u16,
+        mapbase: u16,
+    ) -> u32 {
+        let tbase = get_tile_base(tiles, mapbase, tx, ty, vram_bank0);
+        let ti = tx + ty * 32;
+        let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
+
+        let palette = &self.bg_color_palette.cols[attr & 0x7][..];
+        let vram_bank = (attr >> 3) & 1;
+
+        let coli = get_tile_byte(
+            tbase,
+            txoff,
+            tyoff,
+            if vram_bank == 0 {
+                vram_bank0
+            } else {
+                &self.vram
+            },
+        );
+        let col = palette[coli].into();
+
+        col
+    }
 }
 
 struct Dmg {
@@ -141,6 +184,23 @@ impl CgbExt for Dmg {
         let col = self.bg_palette[coli].into();
 
         (col, coli)
+    }
+
+    fn get_window_col(
+        &self,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        tx: u16,
+        ty: u16,
+        txoff: u16,
+        tyoff: u16,
+        mapbase: u16,
+    ) -> u32 {
+        let tbase = get_tile_base(tiles, mapbase, tx, ty, vram_bank0);
+        let coli = get_tile_byte(tbase, txoff, tyoff, vram_bank0);
+        let col = self.bg_palette[coli].into();
+
+        col
     }
 }
 
@@ -632,24 +692,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     let tx = xx / 8;
                     let txoff = xx % 8;
 
-                    let tbase = self.get_tile_base(mapbase, tx, ty);
-
-                    if self.color {
-                        let ti = tx + ty * 32;
-                        let attr = self.read_vram_bank(mapbase + ti, 1) as usize;
-                        let palette = &self.bg_color_palette.cols[attr & 0x7][..];
-                        let vram_bank = (attr >> 3) & 1;
-
-                        let coli = self.get_tile_byte(tbase, txoff, tyoff, vram_bank);
-                        let col = palette[coli].into();
-
-                        buf[x as usize] = col;
-                    } else {
-                        let coli = self.get_tile_byte(tbase, txoff, tyoff, 0);
-                        let col = self.bg_palette[coli].into();
-
-                        buf[x as usize] = col;
-                    }
+                    buf[x as usize] = self
+                        .cgb_ext
+                        .get_window_col(&self.vram, self.tiles, tx, ty, txoff, tyoff, mapbase);
                 }
             }
         }
