@@ -558,12 +558,23 @@ impl Gpu {
                     let txoff = xx % 8;
 
                     let tbase = self.get_tile_base(mapbase, tx, ty);
-                    let tattr = self.get_tile_attr(mapbase, tx, ty);
 
-                    let coli = self.get_tile_byte(tbase, txoff, tyoff, tattr.vram_bank);
-                    let col = tattr.palette[coli].into();
+                    if self.color {
+                        let ti = tx + ty * 32;
+                        let attr = self.read_vram_bank(mapbase + ti, 1) as usize;
+                        let palette = &self.bg_color_palette.cols[attr & 0x7][..];
+                        let vram_bank = (attr >> 3) & 1;
 
-                    buf[x as usize] = col;
+                        let coli = self.get_tile_byte(tbase, txoff, tyoff, vram_bank);
+                        let col = palette[coli].into();
+
+                        buf[x as usize] = col;
+                    } else {
+                        let coli = self.get_tile_byte(tbase, txoff, tyoff, 0);
+                        let col = self.bg_palette[coli].into();
+
+                        buf[x as usize] = col;
+                    }
                 }
             }
         }
@@ -941,29 +952,6 @@ impl Gpu {
             self.tiles + num as u16 * 16
         } else {
             self.tiles + (0x800 + num as i8 as i16 * 16) as u16
-        }
-    }
-
-    fn get_tile_attr(&self, mapbase: u16, tx: u16, ty: u16) -> MapAttribute {
-        if self.color {
-            let ti = tx + ty * 32;
-            let attr = self.read_vram_bank(mapbase + ti, 1) as usize;
-
-            MapAttribute {
-                palette: &self.bg_color_palette.cols[attr & 0x7][..],
-                vram_bank: (attr >> 3) & 1,
-                xflip: attr & 0x20 != 0,
-                yflip: attr & 0x40 != 0,
-                priority: attr & 0x80 != 0,
-            }
-        } else {
-            MapAttribute {
-                palette: &self.bg_palette,
-                vram_bank: 0,
-                xflip: false,
-                yflip: false,
-                priority: false,
-            }
         }
     }
 
