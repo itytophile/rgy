@@ -67,6 +67,48 @@ trait CgbExt: Default {
 
     /// Write VRAM region (0x8000 - 0x9fff)
     fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]);
+
+    /// Read BGP register (0xff47)
+    fn read_bg_palette(&self) -> u8;
+
+    /// Write BGP register (0xff47)
+    fn write_bg_palette(&mut self, v: u8);
+
+    /// Read OBP0 register (0xff48)
+    fn read_obj_palette0(&self) -> u8;
+
+    /// Write OBP0 register (0xff48)
+    fn write_obj_palette0(&mut self, v: u8);
+
+    /// Read OBP1 register (0xff49)
+    fn read_obj_palette1(&self) -> u8;
+
+    /// Write OBP1 register (0xff49)
+    fn write_obj_palette1(&mut self, v: u8);
+
+    /// Read VBK register (0xff4f)
+    fn read_vram_bank_select(&self) -> u8;
+
+    /// Write VBK register (0xff4f)
+    fn select_vram_bank(&mut self, v: u8);
+
+    /// Write BCPS/BGPI register (0xff68)
+    fn select_bg_color_palette(&mut self, v: u8);
+
+    /// Read BCPD/BGPD register (0xff69)
+    fn read_bg_color_palette(&self) -> u8;
+
+    /// Write BCPD/BGPD register (0xff69)
+    fn write_bg_color_palette(&mut self, v: u8);
+
+    /// Write OCPS/OBPI register (0xff6a)
+    fn select_obj_color_palette(&mut self, v: u8);
+
+    /// Read OCPD/OBPD register (0xff6b)
+    fn read_obj_color_palette(&self) -> u8;
+
+    /// Write OCPD/OBPD register (0xff6b)
+    fn write_obj_color_palette(&mut self, v: u8);
 }
 
 struct GpuCgbExtension {
@@ -183,6 +225,76 @@ impl CgbExt for GpuCgbExtension {
     fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]) {
         write_vram_bank(addr, v, if self.vram_select == 0 { vram_bank0} else {&mut self.vram})
     }
+
+    /// Read BGP register (0xff47)
+    fn read_bg_palette(&self) -> u8 {
+        panic!("Read bg palette in CGB mode")
+    }
+
+    /// Write BGP register (0xff47)
+    fn write_bg_palette(&mut self, _: u8) {
+        panic!("Write palette in CGB mode");
+    }
+
+    /// Read OBP0 register (0xff48)
+    fn read_obj_palette0(&self) -> u8 {
+        panic!("Read Object palette in CGB mode");
+    }
+
+    /// Write OBP0 register (0xff48)
+    fn write_obj_palette0(&mut self, _: u8) {
+        panic!("Write Object palette in CGB mode");
+    }
+
+    /// Read OBP1 register (0xff49)
+    fn read_obj_palette1(&self) -> u8 {
+        panic!("Read Object palette 1 in CGB mode");
+    }
+
+    /// Write OBP1 register (0xff49)
+    fn write_obj_palette1(&mut self, _: u8) {
+        panic!("Write Object palette in CGB mode");
+    }
+
+    /// Read VBK register (0xff4f)
+    fn read_vram_bank_select(&self) -> u8 {
+        self.vram_select as u8 & 0xfe
+    }
+
+    /// Write VBK register (0xff4f)
+    fn select_vram_bank(&mut self, v: u8) {
+        self.vram_select = v as usize & 1;
+    }
+
+    /// Write BCPS/BGPI register (0xff68)
+    fn select_bg_color_palette(&mut self, v: u8) {
+        self.bg_color_palette.select(v);
+    }
+
+    /// Read BCPD/BGPD register (0xff69)
+    fn read_bg_color_palette(&self) -> u8 {
+        self.bg_color_palette.read()
+    }
+
+    /// Write BCPD/BGPD register (0xff69)
+    fn write_bg_color_palette(&mut self, v: u8) {
+        self.bg_color_palette.write(v);
+    }
+
+    /// Write OCPS/OBPI register (0xff6a)
+    fn select_obj_color_palette(&mut self, v: u8) {
+        self.obj_color_palette.select(v);
+    }
+
+    /// Read OCPD/OBPD register (0xff6b)
+    fn read_obj_color_palette(&self) -> u8 {
+        self.obj_color_palette.read()
+    }
+
+    /// Write OCPD/OBPD register (0xff6b)
+    fn write_obj_color_palette(&mut self, v: u8) {
+        self.obj_color_palette.write(v);
+    }
 }
 
 struct Dmg {
@@ -273,6 +385,82 @@ impl CgbExt for Dmg {
     
     fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]) {
         write_vram_bank(addr, v, vram_bank0)
+    }
+
+    /// Read BGP register (0xff47)
+    fn read_bg_palette(&self) -> u8 {
+        debug!("Read Bg palette");
+        from_palette(self.bg_palette)
+    }
+
+    /// Write BGP register (0xff47)
+    fn write_bg_palette(&mut self, v: u8) {
+        self.bg_palette = to_palette(v);
+        debug!("Bg palette updated: {:?}", self.bg_palette);
+    }
+
+    /// Read OBP0 register (0xff48)
+    fn read_obj_palette0(&self) -> u8 {
+        debug!("Read Object palette 0");
+        from_palette(self.obj_palette0)
+    }
+
+    /// Write OBP0 register (0xff48)
+    fn write_obj_palette0(&mut self, v: u8) {
+        self.obj_palette0 = to_palette(v);
+        debug!("Object palette 0 updated: {:?}", self.obj_palette0);
+    }
+
+    /// Read OBP1 register (0xff49)
+    fn read_obj_palette1(&self) -> u8 {
+        debug!("Read Object palette 1");
+        from_palette(self.obj_palette1)
+    }
+
+    /// Write OBP1 register (0xff49)
+    fn write_obj_palette1(&mut self, v: u8) {
+        self.obj_palette1 = to_palette(v);
+        debug!("Object palette 1 updated: {:?}", self.obj_palette1);
+    }
+
+    /// Read VBK register (0xff4f)
+    fn read_vram_bank_select(&self) -> u8 {
+        panic!("Read VRAM bank select in DMG mode");
+    }
+
+    /// Write VBK register (0xff4f)
+    fn select_vram_bank(&mut self, _: u8) {
+        panic!("Write VRAM bank select in DMG mode");
+    }
+
+    /// Write BCPS/BGPI register (0xff68)
+    fn select_bg_color_palette(&mut self, _: u8) {
+        panic!("Select BG Color palette in DMG mode");
+    }
+
+    /// Read BCPD/BGPD register (0xff69)
+    fn read_bg_color_palette(&self) -> u8 {
+        panic!("Read BG Color palette in DMG mode");
+    }
+
+    /// Write BCPD/BGPD register (0xff69)
+    fn write_bg_color_palette(&mut self, _: u8) {
+        panic!("Write BG Color palette in DMG mode");
+    }
+
+    /// Write OCPS/OBPI register (0xff6a)
+    fn select_obj_color_palette(&mut self, _: u8) {
+        panic!("Select Obj Color palette in DMG mode");
+    }
+
+    /// Read OCPD/OBPD register (0xff6b)
+    fn read_obj_color_palette(&self) -> u8 {
+        panic!("Read Obj Color palette in DMG mode");
+    }
+
+    /// Write OCPD/OBPD register (0xff6b)
+    fn write_obj_color_palette(&mut self, _: u8) {
+        panic!("Write BG Color palette in DMG mode");
     }
 }
 
@@ -949,41 +1137,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.lyc = v;
     }
 
-    /// Read BGP register (0xff47)
-    pub(crate) fn read_bg_palette(&self) -> u8 {
-        debug!("Read Bg palette");
-        from_palette(self.bg_palette)
-    }
+    
 
-    /// Write BGP register (0xff47)
-    pub(crate) fn write_bg_palette(&mut self, v: u8) {
-        self.bg_palette = to_palette(v);
-        debug!("Bg palette updated: {:?}", self.bg_palette);
-    }
-
-    /// Read OBP0 register (0xff48)
-    pub(crate) fn read_obj_palette0(&self) -> u8 {
-        debug!("Read Object palette 0");
-        from_palette(self.obj_palette0)
-    }
-
-    /// Write OBP0 register (0xff48)
-    pub(crate) fn write_obj_palette0(&mut self, v: u8) {
-        self.obj_palette0 = to_palette(v);
-        debug!("Object palette 0 updated: {:?}", self.obj_palette0);
-    }
-
-    /// Read OBP1 register (0xff49)
-    pub(crate) fn read_obj_palette1(&self) -> u8 {
-        debug!("Read Object palette 1");
-        from_palette(self.obj_palette1)
-    }
-
-    /// Write OBP1 register (0xff49)
-    pub(crate) fn write_obj_palette1(&mut self, v: u8) {
-        self.obj_palette1 = to_palette(v);
-        debug!("Object palette 1 updated: {:?}", self.obj_palette1);
-    }
+    
 
     /// Read WY register (0xff4a)
     pub(crate) fn read_wy(&self) -> u8 {
@@ -1005,15 +1161,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.wx = v;
     }
 
-    /// Read VBK register (0xff4f)
-    pub(crate) fn read_vram_bank_select(&self) -> u8 {
-        self.vram_select as u8 & 0xfe
-    }
-
-    /// Write VBK register (0xff4f)
-    pub(crate) fn select_vram_bank(&mut self, v: u8) {
-        self.vram_select = v as usize & 1;
-    }
+    
 
     /// Read HDMA1 register (0xff51)
     pub(crate) fn read_hdma_src_high(&self) -> u8 {
@@ -1065,35 +1213,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.hdma.start(v);
     }
 
-    /// Write BCPS/BGPI register (0xff68)
-    pub(crate) fn select_bg_color_palette(&mut self, v: u8) {
-        self.bg_color_palette.select(v);
-    }
-
-    /// Read BCPD/BGPD register (0xff69)
-    pub(crate) fn read_bg_color_palette(&self) -> u8 {
-        self.bg_color_palette.read()
-    }
-
-    /// Write BCPD/BGPD register (0xff69)
-    pub(crate) fn write_bg_color_palette(&mut self, v: u8) {
-        self.bg_color_palette.write(v);
-    }
-
-    /// Write OCPS/OBPI register (0xff6a)
-    pub(crate) fn select_obj_color_palette(&mut self, v: u8) {
-        self.obj_color_palette.select(v);
-    }
-
-    /// Read OCPD/OBPD register (0xff6b)
-    pub(crate) fn read_obj_color_palette(&self) -> u8 {
-        self.obj_color_palette.read()
-    }
-
-    /// Write OCPD/OBPD register (0xff6b)
-    pub(crate) fn write_obj_color_palette(&mut self, v: u8) {
-        self.obj_color_palette.write(v);
-    }
+    
 
     
 }
