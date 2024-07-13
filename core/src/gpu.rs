@@ -37,9 +37,114 @@ impl From<u8> for Mode {
     }
 }
 
-pub struct Gpu {
-    color: bool,
+trait CgbExt: Default {
+    fn get_col_coli(
+        &self,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        tx: u16,
+        ty: u16,
+        txoff: u16,
+        tyoff: u16,
+        mapbase: u16,
+    ) -> (u32, usize);
+}
 
+struct GpuCgbExtension {
+    vram: [u8; 0x2000],
+    bg_color_palette: ColorPalette,
+    obj_color_palette: ColorPalette,
+}
+
+impl Default for GpuCgbExtension {
+    fn default() -> Self {
+        Self {
+            vram: [0; 0x2000],
+            bg_color_palette: ColorPalette::new(),
+            obj_color_palette: ColorPalette::new(),
+        }
+    }
+}
+
+impl CgbExt for GpuCgbExtension {
+    fn get_col_coli(
+        &self,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        tx: u16,
+        ty: u16,
+        txoff: u16,
+        tyoff: u16,
+        mapbase: u16,
+    ) -> (u32, usize) {
+        let tbase = get_tile_base(tiles, mapbase, tx, ty, vram_bank0);
+        let ti = tx + ty * 32;
+        let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
+
+        let palette = &self.bg_color_palette.cols[attr & 0x7][..];
+        let vram_bank = (attr >> 3) & 1;
+        let xflip = attr & 0x20 != 0;
+        let yflip = attr & 0x40 != 0;
+        let priority = attr & 0x80 != 0;
+
+        let tyoff = if yflip { 7 - tyoff } else { tyoff };
+        let txoff = if xflip { 7 - txoff } else { txoff };
+
+        assert!(!priority);
+
+        let coli = get_tile_byte(
+            tbase,
+            txoff,
+            tyoff,
+            if vram_bank == 0 {
+                vram_bank0
+            } else {
+                &self.vram
+            },
+        );
+        let col = palette[coli].into();
+
+        (col, coli)
+    }
+}
+
+struct Dmg {
+    bg_palette: [Color; 4],
+}
+
+impl Default for Dmg {
+    fn default() -> Self {
+        Self {
+            bg_palette: [
+                Color::White,
+                Color::LightGray,
+                Color::DarkGray,
+                Color::Black,
+            ],
+        }
+    }
+}
+
+impl CgbExt for Dmg {
+    fn get_col_coli(
+        &self,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        tx: u16,
+        ty: u16,
+        txoff: u16,
+        tyoff: u16,
+        mapbase: u16,
+    ) -> (u32, usize) {
+        let tbase = get_tile_base(tiles, mapbase, tx, ty, vram_bank0);
+        let coli = get_tile_byte(tbase, txoff, tyoff, vram_bank0);
+        let col = self.bg_palette[coli].into();
+
+        (col, coli)
+    }
+}
+
+pub struct Gpu<Ext: CgbExt> {
     clocks: usize,
 
     lyc_interrupt: bool,
@@ -65,17 +170,17 @@ pub struct Gpu {
     spenable: bool,
     bgenable: bool,
 
-    bg_palette: [Color; 4],
     obj_palette0: [Color; 4],
     obj_palette1: [Color; 4],
-    bg_color_palette: ColorPalette,
-    obj_color_palette: ColorPalette,
-    vram: [[u8; 0x2000]; 2],
+
+    vram: [u8; 0x2000],
     vram_select: usize,
 
     oam: [u8; 0xa0],
 
     hdma: Hdma,
+
+    cgb_ext: Ext,
 }
 
 fn to_palette(p: u8) -> [Color; 4] {
@@ -348,10 +453,9 @@ impl Hdma {
     }
 }
 
-impl Gpu {
-    pub fn new(color: bool) -> Self {
+impl<Ext: CgbExt> Gpu<Ext> {
+    pub fn new() -> Self {
         Self {
-            color,
             clocks: 0,
             lyc_interrupt: false,
             oam_interrupt: false,
@@ -372,12 +476,7 @@ impl Gpu {
             spsize: 8,
             spenable: false,
             bgenable: false,
-            bg_palette: [
-                Color::White,
-                Color::LightGray,
-                Color::DarkGray,
-                Color::Black,
-            ],
+
             obj_palette0: [
                 Color::White,
                 Color::LightGray,
@@ -390,12 +489,12 @@ impl Gpu {
                 Color::DarkGray,
                 Color::Black,
             ],
-            bg_color_palette: ColorPalette::new(),
-            obj_color_palette: ColorPalette::new(),
-            vram: [[0; 0x2000]; 2],
+
+            vram: [0; 0x2000],
             vram_select: 0,
             oam: [0; 0xa0],
             hdma: Hdma::new(),
+            cgb_ext: Ext::default(),
         }
     }
 
@@ -509,35 +608,11 @@ impl Gpu {
                 let tx = xx / 8;
                 let txoff = xx % 8;
 
-                let tbase = self.get_tile_base(mapbase, tx, ty);
-
-                if self.color {
-                    let ti = tx + ty * 32;
-                    let attr = self.read_vram_bank(mapbase + ti, 1) as usize;
-
-                    let palette = &self.bg_color_palette.cols[attr & 0x7][..];
-                    let vram_bank = (attr >> 3) & 1;
-                    let xflip = attr & 0x20 != 0;
-                    let yflip = attr & 0x40 != 0;
-                    let priority = attr & 0x80 != 0;
-
-                    let tyoff = if yflip { 7 - tyoff } else { tyoff };
-                    let txoff = if xflip { 7 - txoff } else { txoff };
-
-                    assert!(!priority);
-
-                    let coli = self.get_tile_byte(tbase, txoff, tyoff, vram_bank);
-                    let col = palette[coli].into();
-
-                    buf[x as usize] = col;
-                    bgbuf[x as usize] = coli;
-                } else {
-                    let coli = self.get_tile_byte(tbase, txoff, tyoff, 0);
-                    let col = self.bg_palette[coli].into();
-
-                    buf[x as usize] = col;
-                    bgbuf[x as usize] = coli;
-                }
+                let (col, coli) = self
+                    .cgb_ext
+                    .get_col_coli(&self.vram, self.tiles, tx, ty, txoff, tyoff, mapbase);
+                buf[x as usize] = col;
+                bgbuf[x as usize] = coli;
             }
         }
 
@@ -934,25 +1009,9 @@ impl Gpu {
         self.obj_color_palette.write(v);
     }
 
-    fn read_vram_bank(&self, addr: u16, bank: usize) -> u8 {
-        let off = addr as usize - 0x8000;
-        self.vram[bank][off]
-    }
-
     fn write_vram_bank(&mut self, addr: u16, value: u8, bank: usize) {
         let off = addr as usize - 0x8000;
         self.vram[bank][off] = value;
-    }
-
-    fn get_tile_base(&self, mapbase: u16, tx: u16, ty: u16) -> u16 {
-        let ti = tx + ty * 32;
-        let num = self.read_vram_bank(mapbase + ti, 0);
-
-        if self.tiles == 0x8000 {
-            self.tiles + num as u16 * 16
-        } else {
-            self.tiles + (0x800 + num as i8 as i16 * 16) as u16
-        }
     }
 
     fn get_sp_attr(&self, attr: u8) -> MapAttribute {
@@ -982,14 +1041,29 @@ impl Gpu {
             }
         }
     }
+}
 
-    fn get_tile_byte(&self, tilebase: u16, txoff: u16, tyoff: u16, bank: usize) -> usize {
-        let l = self.read_vram_bank(tilebase + tyoff * 2, bank);
-        let h = self.read_vram_bank(tilebase + tyoff * 2 + 1, bank);
+fn get_tile_base(tiles: u16, mapbase: u16, tx: u16, ty: u16, vram_bank0: &[u8; 0x2000]) -> u16 {
+    let ti = tx + ty * 32;
+    let num = read_vram_bank(mapbase + ti, vram_bank0);
 
-        let l = (l >> (7 - txoff)) & 1;
-        let h = ((h >> (7 - txoff)) & 1) << 1;
-
-        (h | l) as usize
+    if tiles == 0x8000 {
+        tiles + num as u16 * 16
+    } else {
+        tiles + (0x800 + num as i8 as i16 * 16) as u16
     }
+}
+
+fn get_tile_byte(tilebase: u16, txoff: u16, tyoff: u16, bank: &[u8; 0x2000]) -> usize {
+    let l = read_vram_bank(tilebase + tyoff * 2, bank);
+    let h = read_vram_bank(tilebase + tyoff * 2 + 1, bank);
+
+    let l = (l >> (7 - txoff)) & 1;
+    let h = ((h >> (7 - txoff)) & 1) << 1;
+
+    (h | l) as usize
+}
+fn read_vram_bank(addr: u16, bank: &[u8; 0x2000]) -> u8 {
+    let off = addr as usize - 0x8000;
+    bank[off]
 }
