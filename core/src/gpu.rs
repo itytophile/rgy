@@ -61,10 +61,17 @@ trait CgbExt: Default {
     ) -> u32;
 
     fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a>;
+
+    /// Read VRAM region (0x8000 - 0x9fff)
+    fn read_vram(&self, addr: u16, vram_bank0: &[u8; 0x2000]) -> u8;
+
+    /// Write VRAM region (0x8000 - 0x9fff)
+    fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]);
 }
 
 struct GpuCgbExtension {
     vram: [u8; 0x2000],
+    vram_select: usize,
     bg_color_palette: ColorPalette,
     obj_color_palette: ColorPalette,
 }
@@ -75,6 +82,7 @@ impl Default for GpuCgbExtension {
             vram: [0; 0x2000],
             bg_color_palette: ColorPalette::new(),
             obj_color_palette: ColorPalette::new(),
+            vram_select: 0,
         }
     }
 }
@@ -167,6 +175,14 @@ impl CgbExt for GpuCgbExtension {
             priority: attr & 0x80 != 0,
         }
     }
+    
+    fn read_vram(&self, addr: u16, vram_bank0: &[u8; 0x2000]) -> u8 {
+       read_vram_bank(addr, if self.vram_select == 0 { vram_bank0} else {&self.vram})
+    }
+    
+    fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]) {
+        write_vram_bank(addr, v, if self.vram_select == 0 { vram_bank0} else {&mut self.vram})
+    }
 }
 
 struct Dmg {
@@ -250,6 +266,14 @@ impl CgbExt for Dmg {
             vram_bank: &vram_bank0,
         }
     }
+    
+    fn read_vram(&self, addr: u16, vram_bank0: &[u8; 0x2000]) -> u8 {
+        read_vram_bank(addr, vram_bank0)
+    }
+    
+    fn write_vram(&mut self, addr: u16, v: u8, vram_bank0: &mut [u8; 0x2000]) {
+        write_vram_bank(addr, v, vram_bank0)
+    }
 }
 
 pub struct Gpu<Ext: CgbExt> {
@@ -279,7 +303,6 @@ pub struct Gpu<Ext: CgbExt> {
     bgenable: bool,
 
     vram: [u8; 0x2000],
-    vram_select: usize,
 
     oam: [u8; 0xa0],
 
@@ -575,7 +598,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             bgenable: false,
 
             vram: [0; 0x2000],
-            vram_select: 0,
+
             oam: [0; 0xa0],
             hdma: Hdma::new(),
             cgb_ext: Ext::default(),
@@ -882,15 +905,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.oam[addr as usize - 0xfe00] = v;
     }
 
-    /// Read VRAM region (0x8000 - 0x9fff)
-    pub(crate) fn read_vram(&self, addr: u16) -> u8 {
-        self.read_vram_bank(addr, self.vram_select)
-    }
+    
 
-    /// Write VRAM region (0x8000 - 0x9fff)
-    pub(crate) fn write_vram(&mut self, addr: u16, v: u8) {
-        self.write_vram_bank(addr, v, self.vram_select)
-    }
+    
 
     /// Read SCY register (0xff42)
     pub(crate) fn read_scy(&self) -> u8 {
@@ -1078,10 +1095,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.obj_color_palette.write(v);
     }
 
-    fn write_vram_bank(&mut self, addr: u16, value: u8, bank: usize) {
-        let off = addr as usize - 0x8000;
-        self.vram[bank][off] = value;
-    }
+    
 }
 
 fn get_tile_base(tiles: u16, mapbase: u16, tx: u16, ty: u16, vram_bank0: &[u8; 0x2000]) -> u16 {
@@ -1107,4 +1121,8 @@ fn get_tile_byte(tilebase: u16, txoff: u16, tyoff: u16, bank: &[u8; 0x2000]) -> 
 fn read_vram_bank(addr: u16, bank: &[u8; 0x2000]) -> u8 {
     let off = addr as usize - 0x8000;
     bank[off]
+}
+fn write_vram_bank(addr: u16, value: u8, bank: &mut[u8;0x2000]) {
+    let off = addr as usize - 0x8000;
+    bank[off] = value;
 }
