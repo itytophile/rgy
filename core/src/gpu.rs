@@ -510,20 +510,34 @@ impl Gpu {
                 let txoff = xx % 8;
 
                 let tbase = self.get_tile_base(mapbase, tx, ty);
-                let tattr = self.get_tile_attr(mapbase, tx, ty);
-
-                let tyoff = if tattr.yflip { 7 - tyoff } else { tyoff };
-                let txoff = if tattr.xflip { 7 - txoff } else { txoff };
 
                 if self.color {
-                    assert!(!tattr.priority);
+                    let ti = tx + ty * 32;
+                    let attr = self.read_vram_bank(mapbase + ti, 1) as usize;
+
+                    let palette = &self.bg_color_palette.cols[attr & 0x7][..];
+                    let vram_bank = (attr >> 3) & 1;
+                    let xflip = attr & 0x20 != 0;
+                    let yflip = attr & 0x40 != 0;
+                    let priority = attr & 0x80 != 0;
+
+                    let tyoff = if yflip { 7 - tyoff } else { tyoff };
+                    let txoff = if xflip { 7 - txoff } else { txoff };
+
+                    assert!(!priority);
+
+                    let coli = self.get_tile_byte(tbase, txoff, tyoff, vram_bank);
+                    let col = palette[coli].into();
+
+                    buf[x as usize] = col;
+                    bgbuf[x as usize] = coli;
+                } else {
+                    let coli = self.get_tile_byte(tbase, txoff, tyoff, 0);
+                    let col = self.bg_palette[coli].into();
+
+                    buf[x as usize] = col;
+                    bgbuf[x as usize] = coli;
                 }
-
-                let coli = self.get_tile_byte(tbase, txoff, tyoff, tattr.vram_bank);
-                let col = tattr.palette[coli].into();
-
-                buf[x as usize] = col;
-                bgbuf[x as usize] = coli;
             }
         }
 
