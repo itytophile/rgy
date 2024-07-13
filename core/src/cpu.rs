@@ -51,7 +51,7 @@ pub struct CpuState {
     halt: bool,
     halt_bug: bool,
     cycles: usize,
-    pub steps_data: ArrayVec<StepData, 20>,
+    pub steps_data: ArrayVec<StepData, 8>,
 }
 
 impl Default for CpuState {

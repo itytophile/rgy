@@ -121,7 +121,7 @@ fn main() {
                 }
             }
         }
-        println!("{max_cycles}");
+        dbg!(max_cycles);
     });
 
     hw.run();
