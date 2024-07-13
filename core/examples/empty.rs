@@ -1,17 +1,6 @@
-use rgy::{apu::mixer::MixerStream, mmu::DmgMode, Config, Key, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, mmu::DmgMode, Config, Key};
 
-struct Hardware {
-    display: Vec<Vec<u32>>,
-}
-
-impl Hardware {
-    fn new() -> Self {
-        // Create a frame buffer with the size VRAM_WIDTH * VRAM_HEIGHT.
-        let display = vec![vec![0u32; VRAM_HEIGHT]; VRAM_WIDTH];
-
-        Self { display }
-    }
-}
+struct Hardware;
 
 impl rgy::Hardware for Hardware {
     fn joypad_pressed(&mut self, key: Key) -> bool {
@@ -52,16 +41,13 @@ fn main() {
     // Create the default config.
     let cfg = Config::new();
 
-    // Create the hardware instance.
-    let hw = Hardware::new();
-
     // The content of a ROM file, which can be downloaded from the Internet.
     let rom = vec![0u8; 1024];
 
     let mut cartridge_ram = [0; 100];
-    let mut sys = rgy::System::<_, DmgMode>::new(cfg, &rom, hw, &mut cartridge_ram);
+    let mut sys = rgy::System::<_, DmgMode>::new(cfg, &rom, Hardware, &mut cartridge_ram);
 
     let mut mixer_stream = MixerStream::new();
 
-    while sys.poll(&mut mixer_stream) {}
+    while sys.poll(&mut mixer_stream).is_some() {}
 }

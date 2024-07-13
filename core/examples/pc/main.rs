@@ -9,12 +9,13 @@ use crate::{
 };
 
 use log::*;
-use rgy::{apu::mixer::MixerStream, mmu::DmgMode};
+use rgy::{apu::mixer::MixerStream, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
 use std::{
     fs::File,
     io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 use structopt::StructOpt;
 
@@ -52,18 +53,6 @@ fn to_cfg(opt: Opt) -> rgy::Config {
         .native_speed(opt.native_speed)
 }
 
-fn set_affinity() {
-    let set = || {
-        let core_ids = core_affinity::get_core_ids()?;
-        core_affinity::set_for_current(*core_ids.first()?);
-        Some(())
-    };
-
-    if set().is_none() {
-        warn!("Couldn't set CPU affinity")
-    }
-}
-
 fn main() {
     let opt = Opt::from_args();
 
@@ -82,7 +71,13 @@ fn main() {
 
     let mixer_stream = Arc::new(Mutex::new(MixerStream::new()));
 
-    let hw = Hardware::new(opt.ram.clone(), opt.color, mixer_stream.clone());
+    let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
+    let hw = Hardware::new(
+        opt.ram.clone(),
+        opt.color,
+        mixer_stream.clone(),
+        vram.clone(),
+    );
     let hw1 = hw.clone();
 
     std::thread::spawn(move || {
@@ -93,8 +88,6 @@ fn main() {
         } else {
             (load_rom(&opt.rom), hw1)
         };
-
-        set_affinity();
 
         let mut ram = vec![0; 0x20000];
 
@@ -111,7 +104,17 @@ fn main() {
 
         let mut sys = rgy::System::<_, DmgMode>::new(to_cfg(opt), &rom, hw1, &mut ram);
 
-        while sys.poll(&mut mixer_stream.lock().unwrap()) {}
+        while let Some(poll_data) = sys.poll(&mut mixer_stream.lock().unwrap()) {
+            if let Some((ly, buf)) = poll_data.line_to_draw {
+                let mut vram = vram.lock().unwrap();
+                let base = usize::from(ly) * VRAM_WIDTH;
+                vram[base..base + buf.len()].copy_from_slice(&buf);
+                drop(vram);
+                if usize::from(ly) == VRAM_HEIGHT - 1 {
+                    std::thread::sleep(Duration::from_micros(16740))
+                }
+            }
+        }
     });
 
     hw.run();

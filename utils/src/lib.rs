@@ -46,7 +46,7 @@ impl List {
         &self.roms[self.selected as usize]
     }
 
-    fn draw(&mut self, h: &mut dyn Hardware, d: &mut Display) {
+    fn draw(&mut self, _h: &mut dyn Hardware, d: &mut Display) {
         for i in 0..self.height {
             let index = i + self.base;
 
@@ -56,7 +56,7 @@ impl List {
             }
         }
 
-        d.fill(h);
+        // d.fill(h);
     }
 }
 
@@ -109,13 +109,13 @@ impl Display {
         }
     }
 
-    fn fill(&mut self, h: &mut dyn Hardware) {
-        for y in 0..VRAM_HEIGHT {
-            let b = y * VRAM_WIDTH;
-            let e = b + VRAM_WIDTH;
-            h.vram_update(y, &self.vram[b..e]);
-        }
-    }
+    // fn fill(&mut self, h: &mut dyn Hardware) {
+    //     for y in 0..VRAM_HEIGHT {
+    //         let b = y * VRAM_WIDTH;
+    //         let e = b + VRAM_WIDTH;
+    //         h.vram_update(y, &self.vram[b..e]);
+    //     }
+    // }
 }
 
 struct KeyState {

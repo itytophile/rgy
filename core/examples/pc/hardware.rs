@@ -113,9 +113,8 @@ impl Hardware {
         rampath: Option<String>,
         color: bool,
         mixer_stream: Arc<Mutex<MixerStream>>,
+        vram: Arc<Mutex<Vec<u32>>>,
     ) -> Self {
-        let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
-
         let pcm = Pcm;
         pcm.run_forever(mixer_stream);
 
@@ -153,14 +152,6 @@ impl Hardware {
 }
 
 impl rgy::Hardware for Hardware {
-    fn vram_update(&mut self, line: usize, buf: &[u32]) {
-        let mut vram = self.vram.lock().unwrap();
-        for i in 0..buf.len() {
-            let base = line * VRAM_WIDTH;
-            vram[base + i] = buf[i];
-        }
-    }
-
     fn joypad_pressed(&mut self, key: Key) -> bool {
         *self
             .keystate

@@ -22,7 +22,6 @@ minifb = "0.12"
 structopt = "0.3"
 cpal = "0.9"
 signal-hook = "0.3"
-core_affinity = "0.5"
 utils = { path = "../utils" }
 
 
