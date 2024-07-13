@@ -38,8 +38,6 @@ impl From<u8> for Mode {
 }
 
 trait CgbExt: Default {
-    type MapAttribute;
-
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -62,7 +60,7 @@ trait CgbExt: Default {
         mapbase: u16,
     ) -> u32;
 
-    fn get_sp_attr(&self, attr: u8) -> Self::MapAttribute;
+    fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a>;
 }
 
 struct GpuCgbExtension {
@@ -82,7 +80,6 @@ impl Default for GpuCgbExtension {
 }
 
 impl CgbExt for GpuCgbExtension {
-    type MapAttribute = MapAttributeCgb;
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -155,12 +152,16 @@ impl CgbExt for GpuCgbExtension {
         col
     }
 
-    fn get_sp_attr(&self, attr: u8) -> Self::MapAttribute {
+    fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a> {
         let attr = attr as usize;
 
-        Self::MapAttribute {
+        MapAttribute {
             palette: self.obj_color_palette.cols[attr & 0x7],
-            vram_bank: (attr >> 3) & 1,
+            vram_bank: if (attr >> 3) & 1 == 0 {
+                vram_bank0
+            } else {
+                &self.vram
+            },
             xflip: attr & 0x20 != 0,
             yflip: attr & 0x40 != 0,
             priority: attr & 0x80 != 0,
@@ -200,7 +201,6 @@ impl Default for Dmg {
 }
 
 impl CgbExt for Dmg {
-    type MapAttribute = MapAttributeDmg;
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -235,18 +235,19 @@ impl CgbExt for Dmg {
         col
     }
 
-    fn get_sp_attr(&self, attr: u8) -> Self::MapAttribute {
+    fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a> {
         let palette = if attr & 0x10 != 0 {
             self.obj_palette1
         } else {
             self.obj_palette0
         };
 
-        Self::MapAttribute {
+        MapAttribute {
             palette,
             xflip: attr & 0x20 != 0,
             yflip: attr & 0x40 != 0,
             priority: attr & 0x80 != 0,
+            vram_bank: &vram_bank0,
         }
     }
 }
@@ -302,16 +303,9 @@ fn from_palette(p: [Color; 4]) -> u8 {
     u8::from(p[0]) | u8::from(p[1]) << 2 | u8::from(p[2]) << 4 | u8::from(p[3]) << 6
 }
 
-struct MapAttributeDmg {
+struct MapAttribute<'a> {
     palette: [Color; 4],
-    xflip: bool,
-    yflip: bool,
-    priority: bool,
-}
-
-struct MapAttributeCgb {
-    palette: [Color; 4],
-    vram_bank: usize,
+    vram_bank: &'a [u8; 0x2000],
     xflip: bool,
     yflip: bool,
     priority: bool,
@@ -735,7 +729,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 let ypos = self.oam[oam] as u16;
                 let xpos = self.oam[oam + 1] as u16;
                 let ti = self.oam[oam + 2];
-                let attr = self.get_sp_attr(self.oam[oam + 3]);
+                let attr = self.cgb_ext.get_sp_attr(self.oam[oam + 3], &self.vram);
 
                 let ly = self.ly as u16;
                 if ly + 16 < ypos {
