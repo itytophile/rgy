@@ -43,9 +43,6 @@ pub trait Stream: Send + 'static {
 /// The users of this emulator library need to implement this trait,
 /// providing OS-specific functions.
 pub trait Hardware {
-    /// Called when one horizontal line in the display is updated.
-    fn vram_update(&mut self, line: usize, buffer: &[u32]);
-
     /// Called when the emulator checks if the key is pressed.
     fn joypad_pressed(&mut self, key: Key) -> bool;
 

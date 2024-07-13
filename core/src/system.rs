@@ -1,9 +1,8 @@
 use crate::apu::mixer::MixerStream;
-use crate::cpu::{Cpu, CpuState};
-use crate::fc::FreqControl;
+use crate::cpu::{Cpu, CpuState, Sys};
 use crate::hardware::Hardware;
 use crate::mmu::{GameboyMode, Mmu, Peripherals};
-use log::*;
+use crate::VRAM_WIDTH;
 
 /// Configuration of the emulator.
 pub struct Config {
@@ -71,27 +70,16 @@ impl Config {
 
 /// Represents the entire emulator context.
 pub struct System<'a, H: Hardware, GB: GameboyMode> {
-    cfg: Config,
-    fc: FreqControl,
     cpu_state: CpuState,
     peripherals: Peripherals<'a, H, GB>,
 }
 
 impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     /// Create a new emulator context.
-    pub fn new(cfg: Config, rom: &'a [u8], mut hw: H, cartridge_ram: &'a mut [u8]) -> Self {
-        info!("Initializing...");
-
-        let mut fc = FreqControl::new(&cfg);
-
-        fc.reset(&mut hw);
-
-        info!("Starting...");
+    pub fn new(cfg: Config, rom: &'a [u8], hw: H, cartridge_ram: &'a mut [u8]) -> Self {
         let peripherals = Peripherals::new(hw, rom, cfg.color, cartridge_ram);
 
         Self {
-            cfg,
-            fc,
             cpu_state: CpuState::new(),
             peripherals,
         }
@@ -100,9 +88,9 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> bool {
+    pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> Option<PollData> {
         if !self.peripherals.hw.sched() {
-            return false;
+            return None;
         }
 
         let mut mmu = Mmu {
@@ -116,11 +104,16 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
         };
 
         let time = cpu.execute();
+        let step_data = mmu.step(time);
 
-        if !self.cfg.native_speed {
-            self.fc.adjust(time, &mut self.peripherals.hw);
-        }
-
-        true
+        Some(PollData {
+            line_to_draw: step_data.line_to_draw,
+            cpu_time: time,
+        })
     }
+}
+
+pub struct PollData {
+    pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
+    pub cpu_time: usize,
 }

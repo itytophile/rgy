@@ -11,7 +11,7 @@ use crate::mbc::Mbc;
 use crate::serial::Serial;
 use crate::timer::Timer;
 use crate::wram::{self, Wram};
-use crate::Hardware;
+use crate::{Hardware, VRAM_WIDTH};
 use log::*;
 
 pub enum DmgMode {}
@@ -297,15 +297,15 @@ impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
     }
 
     /// Updates the machine state by the given cycles
-    fn step(&mut self, cycles: usize) {
+    fn step(&mut self, cycles: usize) -> StepData {
         if let Some(req) = self.peripherals.dma.step(cycles) {
             self.run_dma(req);
         }
-        if let Some(req) =
-            self.peripherals
-                .gpu
-                .step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw)
-        {
+
+        let (dma_request, line_to_draw) =
+            self.peripherals.gpu.step(cycles, &mut self.peripherals.irq);
+
+        if let Some(req) = dma_request {
             self.run_dma(req);
         }
         self.peripherals.apu.step(cycles);
@@ -318,7 +318,14 @@ impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
         self.peripherals
             .joypad
             .poll(&mut self.peripherals.irq, &mut self.peripherals.hw);
+
+        StepData { line_to_draw }
     }
+}
+
+#[must_use]
+pub struct StepData {
+    pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
 }
 
 /// Behaves as a byte array for unit tests
@@ -363,5 +370,7 @@ impl Sys for Ram {
         self.ram[addr as usize] = v;
     }
 
-    fn step(&mut self, _: usize) {}
+    fn step(&mut self, _: usize) -> StepData {
+        StepData { line_to_draw: None }
+    }
 }

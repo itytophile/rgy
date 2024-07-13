@@ -1,7 +1,6 @@
 use crate::dma::DmaRequest;
 use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
-use crate::Hardware;
 use log::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -809,9 +808,10 @@ impl<Ext: CgbExt> Gpu<Ext> {
         &mut self,
         time: usize,
         irq: &mut Irq,
-        hw: &mut impl Hardware,
-    ) -> Option<DmaRequest> {
+    ) -> (Option<DmaRequest>, Option<(u8, [u32; VRAM_WIDTH])>) {
         let clocks = self.clocks + time;
+
+        let mut draw_line = None;
 
         let (clocks, mode) = match &self.mode {
             Mode::Oam => {
@@ -823,7 +823,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             }
             Mode::Vram => {
                 if clocks >= 172 {
-                    self.draw(hw);
+                    draw_line = self.draw();
 
                     if self.hblank_interrupt {
                         irq.lcd(true);
@@ -889,15 +889,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.clocks = clocks;
         self.mode = mode;
 
-        self.hdma.run(enter_hblank)
+        (self.hdma.run(enter_hblank), draw_line)
     }
 
-    fn draw(&mut self, hw: &mut impl Hardware) {
+    fn draw(&mut self) -> Option<(u8, [u32; VRAM_WIDTH])> {
         let height = VRAM_HEIGHT;
         let width = VRAM_WIDTH;
 
         if self.ly >= height as u8 {
-            return;
+            return None;
         }
 
         let mut buf = [0; VRAM_WIDTH];
@@ -1023,7 +1023,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             }
         }
 
-        hw.vram_update(self.ly as usize, &buf);
+        Some((self.ly, buf))
     }
 
     /// Write CTRL register (0xff40)

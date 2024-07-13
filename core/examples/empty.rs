@@ -14,15 +14,6 @@ impl Hardware {
 }
 
 impl rgy::Hardware for Hardware {
-    fn vram_update(&mut self, line: usize, buffer: &[u32]) {
-        // `line` corresponds to the y coordinate.
-        let y = line;
-
-        for (x, col) in buffer.iter().enumerate() {
-            self.display[x][y] = *col;
-        }
-    }
-
     fn joypad_pressed(&mut self, key: Key) -> bool {
         // Read a keyboard device and check if the `key` is pressed or not.
         println!("Check if {:?} is pressed", key);

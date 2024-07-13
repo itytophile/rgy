@@ -1,5 +1,7 @@
 use log::*;
 
+use crate::mmu::StepData;
+
 /// Interface for CPU to interact with memory/devices
 pub trait Sys {
     /// Get the interrupt vector address clearing the interrupt flag state
@@ -28,7 +30,7 @@ pub trait Sys {
     }
 
     /// Proceed the system state by the given CPU cycles.
-    fn step(&mut self, cycles: usize);
+    fn step(&mut self, cycles: usize) -> StepData;
 }
 
 pub struct CpuState {
@@ -154,7 +156,6 @@ impl<'a, T: Sys> Cpu<'a, T> {
     /// Step forward
     pub fn step(&mut self, cycles: usize) {
         self.state.cycles = self.state.cycles.wrapping_add(cycles);
-        self.sys.step(cycles);
     }
 
     /// Handles DI

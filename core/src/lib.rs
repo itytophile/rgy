@@ -104,7 +104,6 @@ mod alu;
 pub mod apu;
 mod cgb;
 mod dma;
-mod fc;
 mod gpu;
 mod hram;
 mod ic;
