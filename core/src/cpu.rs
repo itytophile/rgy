@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use log::*;
 
 use crate::mmu::StepData;
@@ -50,6 +51,7 @@ pub struct CpuState {
     halt: bool,
     halt_bug: bool,
     cycles: usize,
+    pub steps_data: ArrayVec<StepData, 20>,
 }
 
 impl Default for CpuState {
@@ -78,6 +80,7 @@ impl CpuState {
             halt: false,
             halt_bug: false,
             cycles: 0,
+            steps_data: Default::default(),
         }
     }
 }
@@ -136,6 +139,9 @@ impl<'a, T: Sys> Cpu<'a, T> {
     /// The return value is the number of clock cycles consumed by the instruction.
     /// If the CPU is in the halt state, the function does nothing but returns a fixed clock cycle.
     pub fn execute(&mut self) -> usize {
+        self.state.cycles = 0;
+        self.state.steps_data.clear();
+
         if self.state.halt {
             self.step(4);
         } else {
@@ -147,15 +153,13 @@ impl<'a, T: Sys> Cpu<'a, T> {
         self.update_ime();
         self.check_interrupt();
 
-        // Get the cycles consumed and reset
-        let cycles = self.state.cycles;
-        self.state.cycles = 0;
-        cycles
+        self.state.cycles
     }
 
     /// Step forward
     pub fn step(&mut self, cycles: usize) {
         self.state.cycles = self.state.cycles.wrapping_add(cycles);
+        self.state.steps_data.push(self.sys.step(cycles));
     }
 
     /// Handles DI

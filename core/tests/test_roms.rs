@@ -90,12 +90,7 @@ fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
     let hw = TestHardware::new(expected.clone());
     let mut cartridge_ram = [0; 0x8000];
-    let mut sys = rgy::System::<_, DmgMode>::new(
-        rgy::Config::new().native_speed(true),
-        &rom,
-        hw,
-        &mut cartridge_ram,
-    );
+    let mut sys = rgy::System::<_, DmgMode>::new(Default::default(), &rom, hw, &mut cartridge_ram);
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();
@@ -107,30 +102,32 @@ fn test_rom(expected: Expected, path: &str) {
         let Expected::Display(expected) = &expected else {
             continue;
         };
-        let Some((ly, buf)) = poll_data.line_to_draw else {
-            continue;
-        };
-        display[usize::from(ly) * VRAM_WIDTH..(usize::from(ly) + 1) * VRAM_WIDTH]
-            .copy_from_slice(&buf);
+        for step in poll_data.steps {
+            let Some((ly, buf)) = step.line_to_draw else {
+                continue;
+            };
+            display[usize::from(ly) * VRAM_WIDTH..(usize::from(ly) + 1) * VRAM_WIDTH]
+                .copy_from_slice(&buf);
 
-        if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
-            return;
+            if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
+                return;
+            }
+
+            // // print display to console
+            // if ly == VRAM_HEIGHT - 1 {
+            //     println!();
+            //     for (index, color) in self.display.iter().enumerate() {
+            //         if *color == 0xdddddd {
+            //             print!(".")
+            //         } else {
+            //             print!("#")
+            //         }
+            //         if index % VRAM_WIDTH == VRAM_WIDTH - 1 {
+            //             println!();
+            //         }
+            //     }
+            // }
         }
-
-        // // print display to console
-        // if ly == VRAM_HEIGHT - 1 {
-        //     println!();
-        //     for (index, color) in self.display.iter().enumerate() {
-        //         if *color == 0xdddddd {
-        //             print!(".")
-        //         } else {
-        //             print!("#")
-        //         }
-        //         if index % VRAM_WIDTH == VRAM_WIDTH - 1 {
-        //             println!();
-        //         }
-        //     }
-        // }
     }
 }
 

@@ -24,17 +24,6 @@
 //! }
 //!
 //! impl rgy::Hardware for Hardware {
-//!     // Called when a horizontal line in the display is updated by the emulator.
-//!     fn vram_update(&mut self, line: usize, buffer: &[u32]) {
-//!         // `line` corresponds to the y coordinate.
-//!         let y = line;
-//!
-//!         for (x, col) in buffer.iter().enumerate() {
-//!             // TODO: Update the pixels in the actual display here.
-//!             self.dummy_display[x][y] = *col;
-//!         }
-//!     }
-//!
 //!     // Called when the emulator checks if a key is pressed or not.
 //!     fn joypad_pressed(&mut self, key: Key) -> bool {
 //!         println!("Is {:?} pressed?", key);
@@ -93,7 +82,7 @@
 //! let mut mixer_stream = rgy::apu::mixer::MixerStream::new();
 //!
 //! // Run the emulator.
-//! while sys.poll(&mut mixer_stream) {}
+//! while sys.poll(&mut mixer_stream).is_some() {}
 //!
 //! ```
 

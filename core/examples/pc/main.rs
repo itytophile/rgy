@@ -79,7 +79,7 @@ fn main() {
     );
     let hw1 = hw.clone();
 
-    std::thread::spawn(move || {
+    let handle = std::thread::spawn(move || {
         let (rom, hw1) = if opt.rom.is_dir() {
             let mut ldr = Loader::new(&opt.rom);
 
@@ -105,18 +105,25 @@ fn main() {
 
         let mut sys = rgy::System::<_, DmgMode>::new(to_cfg(opt), &rom, hw1, &mut ram);
 
+        let mut max_cycles = 0;
+
         while let Some(poll_data) = sys.poll(&mut mixer_stream.lock().unwrap()) {
-            if let Some((ly, buf)) = poll_data.line_to_draw {
-                let mut vram = vram.lock().unwrap();
-                let base = usize::from(ly) * VRAM_WIDTH;
-                vram[base..base + buf.len()].copy_from_slice(&buf);
-                drop(vram);
-                if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
-                    std::thread::sleep(Duration::from_micros(16740))
+            max_cycles = max_cycles.max(poll_data.cpu_time);
+            for step in poll_data.steps {
+                if let Some((ly, buf)) = step.line_to_draw {
+                    let mut vram = vram.lock().unwrap();
+                    let base = usize::from(ly) * VRAM_WIDTH;
+                    vram[base..base + buf.len()].copy_from_slice(&buf);
+                    drop(vram);
+                    if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
+                        std::thread::sleep(Duration::from_micros(16740))
+                    }
                 }
             }
         }
+        println!("{max_cycles}");
     });
 
     hw.run();
+    handle.join().unwrap();
 }
