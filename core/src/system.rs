@@ -12,8 +12,6 @@ pub struct Config {
     pub(crate) sample: u64,
     /// Delay unit in CPU frequency controller.
     pub(crate) delay_unit: u64,
-    /// Don't adjust CPU frequency.
-    pub(crate) native_speed: bool,
     /// Emulate Gameboy Color
     pub(crate) color: bool,
 }
@@ -32,7 +30,6 @@ impl Config {
             freq,
             sample: freq / 1000,
             delay_unit: 10,
-            native_speed: false,
             color: false,
         }
     }
@@ -52,12 +49,6 @@ impl Config {
     /// Set the delay unit.
     pub fn delay_unit(mut self, delay: u64) -> Self {
         self.delay_unit = delay;
-        self
-    }
-
-    /// Set the flag to run at native speed.
-    pub fn native_speed(mut self, native: bool) -> Self {
-        self.native_speed = native;
         self
     }
 

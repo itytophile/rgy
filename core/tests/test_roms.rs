@@ -5,6 +5,7 @@ use std::{
 
 use rgy::{apu::mixer::MixerStream, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
 
+#[derive(Clone)]
 enum Expected {
     Serial(&'static str),
     Display(Vec<u32>),
@@ -30,7 +31,6 @@ struct TestHardware {
     expected: Expected,
     index: usize,
     is_done: bool,
-    display: [u32; VRAM_HEIGHT * VRAM_WIDTH],
 }
 
 impl TestHardware {
@@ -39,38 +39,11 @@ impl TestHardware {
             expected,
             index: 0,
             is_done: false,
-            display: [0; VRAM_HEIGHT * VRAM_WIDTH],
         }
     }
 }
 
 impl rgy::Hardware for TestHardware {
-    fn vram_update(&mut self, ly: usize, buffer: &[u32]) {
-        let Expected::Display(expected) = &self.expected else {
-            return;
-        };
-        self.display[ly * VRAM_WIDTH..(ly + 1) * VRAM_WIDTH].copy_from_slice(buffer);
-
-        if ly == VRAM_HEIGHT - 1 && self.display.as_slice() == expected.as_slice() {
-            self.is_done = true;
-        }
-
-        // // print display to console
-        // if ly == VRAM_HEIGHT - 1 {
-        //     println!();
-        //     for (index, color) in self.display.iter().enumerate() {
-        //         if *color == 0xdddddd {
-        //             print!(".")
-        //         } else {
-        //             print!("#")
-        //         }
-        //         if index % VRAM_WIDTH == VRAM_WIDTH - 1 {
-        //             println!();
-        //         }
-        //     }
-        // }
-    }
-
     fn joypad_pressed(&mut self, _: rgy::Key) -> bool {
         false
     }
@@ -115,7 +88,7 @@ impl rgy::Hardware for TestHardware {
 
 fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
-    let hw = TestHardware::new(expected);
+    let hw = TestHardware::new(expected.clone());
     let mut cartridge_ram = [0; 0x8000];
     let mut sys = rgy::System::<_, DmgMode>::new(
         rgy::Config::new().native_speed(true),
@@ -126,10 +99,38 @@ fn test_rom(expected: Expected, path: &str) {
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();
-    while sys.poll(&mut mixer_stream) {
+    let mut display = [0; VRAM_HEIGHT * VRAM_WIDTH];
+    while let Some(poll_data) = sys.poll(&mut mixer_stream) {
         if now.elapsed() >= TIMEOUT {
             panic!("timeout")
         }
+        let Expected::Display(expected) = &expected else {
+            continue;
+        };
+        let Some((ly, buf)) = poll_data.line_to_draw else {
+            continue;
+        };
+        display[usize::from(ly) * VRAM_WIDTH..(usize::from(ly) + 1) * VRAM_WIDTH]
+            .copy_from_slice(&buf);
+
+        if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
+            return;
+        }
+
+        // // print display to console
+        // if ly == VRAM_HEIGHT - 1 {
+        //     println!();
+        //     for (index, color) in self.display.iter().enumerate() {
+        //         if *color == 0xdddddd {
+        //             print!(".")
+        //         } else {
+        //             print!("#")
+        //         }
+        //         if index % VRAM_WIDTH == VRAM_WIDTH - 1 {
+        //             println!();
+        //         }
+        //     }
+        // }
     }
 }
 

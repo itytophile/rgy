@@ -50,7 +50,6 @@ fn to_cfg(opt: Opt) -> rgy::Config {
         .freq(opt.freq)
         .sample(opt.sample)
         .delay_unit(opt.delay_unit)
-        .native_speed(opt.native_speed)
 }
 
 fn main() {
@@ -102,6 +101,8 @@ fn main() {
             }
         }
 
+        let native_speed = opt.native_speed;
+
         let mut sys = rgy::System::<_, DmgMode>::new(to_cfg(opt), &rom, hw1, &mut ram);
 
         while let Some(poll_data) = sys.poll(&mut mixer_stream.lock().unwrap()) {
@@ -110,7 +111,7 @@ fn main() {
                 let base = usize::from(ly) * VRAM_WIDTH;
                 vram[base..base + buf.len()].copy_from_slice(&buf);
                 drop(vram);
-                if usize::from(ly) == VRAM_HEIGHT - 1 {
+                if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
                     std::thread::sleep(Duration::from_micros(16740))
                 }
             }
