@@ -594,18 +594,13 @@ impl ColorPalette {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub enum DmgColor {
+    #[default]
     White,
     LightGray,
     DarkGray,
     Black,
-}
-
-impl Default for DmgColor {
-    fn default() -> Self {
-        DmgColor::White
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -825,6 +820,14 @@ impl Hdma {
     }
 }
 
+impl<Ext: CgbExt> Default for Gpu<Ext> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub type LineToDraw<C> = (u8, [C; VRAM_WIDTH]);
+
 impl<Ext: CgbExt> Gpu<Ext> {
     pub fn new() -> Self {
         Self {
@@ -861,7 +864,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         &mut self,
         time: usize,
         irq: &mut Irq,
-    ) -> (Option<DmaRequest>, Option<(u8, [Ext::Color; VRAM_WIDTH])>) {
+    ) -> (Option<DmaRequest>, Option<LineToDraw<Ext::Color>>) {
         let clocks = self.clocks + time;
 
         let mut draw_line = None;
@@ -1071,7 +1074,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                         continue;
                     }
 
-                    buf[x as usize] = col.into();
+                    buf[x as usize] = col;
                 }
             }
         }

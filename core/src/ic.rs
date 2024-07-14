@@ -1,19 +1,13 @@
 use log::*;
 
 /// Sharable handle for I/O devices to request/cancel interrupts
+#[derive(Default)]
 pub struct Irq {
     enable: Ints,
     request: Ints,
 }
 
 impl Irq {
-    pub fn new() -> Irq {
-        Irq {
-            enable: Ints::default(),
-            request: Ints::default(),
-        }
-    }
-
     /// Request/cacnel vblank interrupt
     pub fn vblank(&mut self, v: bool) {
         self.request.vblank = v;

@@ -65,7 +65,7 @@ impl<'a, H: Hardware, GB: GameboyMode> Peripherals<'a, H, GB> {
             apu: Apu::new(),
             dma: Dma::new(),
             cgb: Cgb::new(color),
-            irq: Irq::new(),
+            irq: Irq::default(),
             hw,
         }
     }
