@@ -1,9 +1,12 @@
 use log::*;
 
-use crate::mmu::StepData;
+use crate::{
+    gpu,
+    mmu::{GameboyMode, StepData},
+};
 
 /// Interface for CPU to interact with memory/devices
-pub trait Sys {
+pub trait Sys<GB: GameboyMode> {
     /// Get the interrupt vector address clearing the interrupt flag state
     fn pop_int_vec(&mut self) -> Option<u8>;
 
@@ -30,10 +33,10 @@ pub trait Sys {
     }
 
     /// Proceed the system state by the given CPU cycles.
-    fn step(&mut self, cycles: usize) -> StepData;
+    fn step(&mut self, cycles: usize) -> StepData<<GB::Gpu as gpu::CgbExt>::Color>;
 }
 
-pub struct CpuState {
+pub struct CpuState<GB: GameboyMode> {
     a: u8,
     b: u8,
     c: u8,
@@ -50,16 +53,16 @@ pub struct CpuState {
     halt: bool,
     halt_bug: bool,
     cycles: usize,
-    pub steps_data: StepData,
+    pub steps_data: StepData<<GB::Gpu as gpu::CgbExt>::Color>,
 }
 
-impl Default for CpuState {
+impl<GB: GameboyMode> Default for CpuState<GB> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CpuState {
+impl<GB: GameboyMode> CpuState<GB> {
     /// Create a new CPU state.
     pub fn new() -> Self {
         Self {
@@ -85,8 +88,8 @@ impl CpuState {
 }
 
 /// Represents CPU state.
-pub struct Cpu<'a, T> {
-    pub state: &'a mut CpuState,
+pub struct Cpu<'a, T, GB: GameboyMode> {
+    pub state: &'a mut CpuState<GB>,
     pub sys: &'a mut T,
 }
 
@@ -120,7 +123,7 @@ pub struct Cpu<'a, T> {
 //     }
 // }
 
-impl<'a, T: Sys> Cpu<'a, T> {
+impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
     /// Switch the CPU state to halting.
     pub fn halt(&mut self) {
         debug!("Halt");
@@ -523,9 +526,9 @@ impl<'a, T: Sys> Cpu<'a, T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::mmu::Ram;
+    use crate::mmu::{DmgMode, Ram};
 
-    fn exec(cpu: &mut Cpu<Ram>) {
+    fn exec(cpu: &mut Cpu<Ram, DmgMode>) {
         let code = cpu.fetch_opcode();
         cpu.decode(code);
     }

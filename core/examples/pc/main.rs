@@ -112,7 +112,9 @@ fn main() {
             if let Some((ly, buf)) = poll_data.line_to_draw {
                 let mut vram = vram.lock().unwrap();
                 let base = usize::from(ly) * VRAM_WIDTH;
-                vram[base..base + buf.len()].copy_from_slice(buf);
+                for (a, b) in vram[base..].iter_mut().zip(buf) {
+                    *a = u32::from(*b);
+                }
                 drop(vram);
                 if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
                     std::thread::sleep(Duration::from_micros(16740))

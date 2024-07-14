@@ -246,7 +246,7 @@ impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
     }
 }
 
-impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
+impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.peripherals.ic.peek(&mut self.peripherals.irq)
@@ -297,7 +297,7 @@ impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
     }
 
     /// Updates the machine state by the given cycles
-    fn step(&mut self, cycles: usize) -> StepData {
+    fn step(&mut self, cycles: usize) -> StepData<<GB::Gpu as gpu::CgbExt>::Color> {
         if let Some(req) = self.peripherals.dma.step(cycles) {
             self.run_dma(req);
         }
@@ -324,8 +324,8 @@ impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
 }
 
 #[must_use]
-pub struct StepData {
-    pub line_to_draw: Option<(u8, [u32; VRAM_WIDTH])>,
+pub struct StepData<C> {
+    pub line_to_draw: Option<(u8, [C; VRAM_WIDTH])>,
 }
 
 /// Behaves as a byte array for unit tests
@@ -353,7 +353,9 @@ impl Ram {
     }
 }
 
-impl Sys for Ram {
+use crate::gpu::DmgColor;
+
+impl Sys<DmgMode> for Ram {
     fn peek_int_vec(&mut self) -> Option<u8> {
         None
     }
@@ -370,7 +372,7 @@ impl Sys for Ram {
         self.ram[addr as usize] = v;
     }
 
-    fn step(&mut self, _: usize) -> StepData {
+    fn step(&mut self, _: usize) -> StepData<DmgColor> {
         StepData { line_to_draw: None }
     }
 }

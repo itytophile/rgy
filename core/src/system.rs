@@ -2,7 +2,7 @@ use crate::apu::mixer::MixerStream;
 use crate::cpu::{Cpu, CpuState};
 use crate::hardware::Hardware;
 use crate::mmu::{GameboyMode, Mmu, Peripherals};
-use crate::VRAM_WIDTH;
+use crate::{gpu, VRAM_WIDTH};
 
 /// Configuration of the emulator.
 pub struct Config {
@@ -61,7 +61,7 @@ impl Config {
 
 /// Represents the entire emulator context.
 pub struct System<'a, H: Hardware, GB: GameboyMode> {
-    cpu_state: CpuState,
+    cpu_state: CpuState<GB>,
     peripherals: Peripherals<'a, H, GB>,
 }
 
@@ -79,7 +79,10 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     /// Run a single step of emulation.
     /// This function needs to be called repeatedly until it returns `false`.
     /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
-    pub fn poll(&mut self, mixer_stream: &mut MixerStream) -> Option<PollData> {
+    pub fn poll(
+        &mut self,
+        mixer_stream: &mut MixerStream,
+    ) -> Option<PollData<<GB::Gpu as gpu::CgbExt>::Color>> {
         if !self.peripherals.hw.sched() {
             return None;
         }
@@ -108,7 +111,7 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     }
 }
 
-pub struct PollData<'a> {
-    pub line_to_draw: Option<(u8, &'a [u32; VRAM_WIDTH])>,
+pub struct PollData<'a, C> {
+    pub line_to_draw: Option<(u8, &'a [C; VRAM_WIDTH])>,
     pub cpu_time: usize,
 }

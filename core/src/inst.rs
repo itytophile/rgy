@@ -1,5 +1,6 @@
 use crate::alu;
 use crate::cpu::{Cpu, Sys};
+use crate::mmu::GameboyMode;
 // use lazy_static::lazy_static;
 // use log::*;
 
@@ -511,7 +512,7 @@ use crate::cpu::{Cpu, Sys};
 //     };
 // }
 
-impl<'a, T: Sys> Cpu<'a, T> {
+impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
     /// nop
     #[allow(unused_variables)]
     fn op_0000(&mut self) -> usize {
@@ -6755,7 +6756,7 @@ impl<'a, T: Sys> Cpu<'a, T> {
 // }
 
 /// Decodes the opecode and actually executes one instruction.
-impl<'a, T: Sys> Cpu<'a, T> {
+impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
     /// Execute the instruction returning the expected consumed cycles
     pub fn decode(&mut self, code: u16) -> usize {
         // trace!("{:04x}: {:04x}: {}", self.get_pc(), code, mnem(code));

@@ -93,7 +93,7 @@ mod alu;
 pub mod apu;
 mod cgb;
 mod dma;
-mod gpu;
+pub mod gpu;
 mod hram;
 mod ic;
 mod joypad;

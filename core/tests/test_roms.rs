@@ -105,8 +105,9 @@ fn test_rom(expected: Expected, path: &str) {
         let Some((ly, buf)) = poll_data.line_to_draw else {
             continue;
         };
-        display[usize::from(ly) * VRAM_WIDTH..(usize::from(ly) + 1) * VRAM_WIDTH]
-            .copy_from_slice(buf);
+        for (a, b) in display[usize::from(ly) * VRAM_WIDTH..].iter_mut().zip(buf) {
+            *a = u32::from(*b);
+        }
 
         if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
             return;

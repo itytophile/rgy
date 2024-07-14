@@ -43,6 +43,8 @@ pub struct Point {
 }
 
 pub trait CgbExt: Default {
+    type Color: Default + Copy;
+
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -50,7 +52,7 @@ pub trait CgbExt: Default {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> (u32, usize);
+    ) -> (Self::Color, usize);
 
     fn get_window_col(
         &self,
@@ -59,9 +61,13 @@ pub trait CgbExt: Default {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> u32;
+    ) -> Self::Color;
 
-    fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a>;
+    fn get_sp_attr<'a>(
+        &'a self,
+        attr: u8,
+        vram_bank0: &'a [u8; 0x2000],
+    ) -> MapAttribute<'a, Self::Color>;
 
     /// Read VRAM region (0x8000 - 0x9fff)
     fn read_vram(&self, addr: u16, vram_bank0: &[u8; 0x2000]) -> u8;
@@ -131,6 +137,7 @@ impl Default for GpuCgbExtension {
 }
 
 impl CgbExt for GpuCgbExtension {
+    type Color = Color;
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -138,7 +145,7 @@ impl CgbExt for GpuCgbExtension {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> (u32, usize) {
+    ) -> (Self::Color, usize) {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let ti = tile.x + tile.y * 32;
         let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
@@ -171,9 +178,7 @@ impl CgbExt for GpuCgbExtension {
                 &self.vram
             },
         );
-        let col = palette[coli].into();
-
-        (col, coli)
+        (palette[coli], coli)
     }
 
     fn get_window_col(
@@ -183,7 +188,7 @@ impl CgbExt for GpuCgbExtension {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> u32 {
+    ) -> Self::Color {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let ti = tile.x + tile.y * 32;
         let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
@@ -200,10 +205,14 @@ impl CgbExt for GpuCgbExtension {
                 &self.vram
             },
         );
-        palette[coli].into()
+        palette[coli]
     }
 
-    fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a> {
+    fn get_sp_attr<'a>(
+        &'a self,
+        attr: u8,
+        vram_bank0: &'a [u8; 0x2000],
+    ) -> MapAttribute<'a, Self::Color> {
         let attr = attr as usize;
 
         MapAttribute {
@@ -314,37 +323,39 @@ impl CgbExt for GpuCgbExtension {
 }
 
 pub struct Dmg {
-    bg_palette: [Color; 4],
-    obj_palette0: [Color; 4],
-    obj_palette1: [Color; 4],
+    bg_palette: [DmgColor; 4],
+    obj_palette0: [DmgColor; 4],
+    obj_palette1: [DmgColor; 4],
 }
 
 impl Default for Dmg {
     fn default() -> Self {
         Self {
             bg_palette: [
-                Color::White,
-                Color::LightGray,
-                Color::DarkGray,
-                Color::Black,
+                DmgColor::White,
+                DmgColor::LightGray,
+                DmgColor::DarkGray,
+                DmgColor::Black,
             ],
             obj_palette0: [
-                Color::White,
-                Color::LightGray,
-                Color::DarkGray,
-                Color::Black,
+                DmgColor::White,
+                DmgColor::LightGray,
+                DmgColor::DarkGray,
+                DmgColor::Black,
             ],
             obj_palette1: [
-                Color::White,
-                Color::LightGray,
-                Color::DarkGray,
-                Color::Black,
+                DmgColor::White,
+                DmgColor::LightGray,
+                DmgColor::DarkGray,
+                DmgColor::Black,
             ],
         }
     }
 }
 
 impl CgbExt for Dmg {
+    type Color = DmgColor;
+
     fn get_col_coli(
         &self,
         vram_bank0: &[u8; 0x2000],
@@ -352,12 +363,11 @@ impl CgbExt for Dmg {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> (u32, usize) {
+    ) -> (Self::Color, usize) {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let coli = get_tile_byte(tbase, tile_offset, vram_bank0);
-        let col = self.bg_palette[coli].into();
 
-        (col, coli)
+        (self.bg_palette[coli], coli)
     }
 
     fn get_window_col(
@@ -367,14 +377,18 @@ impl CgbExt for Dmg {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> u32 {
+    ) -> Self::Color {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let coli = get_tile_byte(tbase, tile_offset, vram_bank0);
 
-        self.bg_palette[coli].into()
+        self.bg_palette[coli]
     }
 
-    fn get_sp_attr<'a>(&'a self, attr: u8, vram_bank0: &'a [u8; 0x2000]) -> MapAttribute<'a> {
+    fn get_sp_attr<'a>(
+        &'a self,
+        attr: u8,
+        vram_bank0: &'a [u8; 0x2000],
+    ) -> MapAttribute<'a, Self::Color> {
         let palette = if attr & 0x10 != 0 {
             self.obj_palette1
         } else {
@@ -510,7 +524,7 @@ pub struct Gpu<Ext: CgbExt> {
     pub cgb_ext: Ext,
 }
 
-fn to_palette(p: u8) -> [Color; 4] {
+fn to_palette(p: u8) -> [DmgColor; 4] {
     [
         (p & 0x3).into(),
         ((p >> 2) & 0x3).into(),
@@ -519,14 +533,14 @@ fn to_palette(p: u8) -> [Color; 4] {
     ]
 }
 
-fn from_palette(p: [Color; 4]) -> u8 {
+fn from_palette(p: [DmgColor; 4]) -> u8 {
     assert_eq!(p.len(), 4);
 
     u8::from(p[0]) | u8::from(p[1]) << 2 | u8::from(p[2]) << 4 | u8::from(p[3]) << 6
 }
 
-pub struct MapAttribute<'a> {
-    palette: [Color; 4],
+pub struct MapAttribute<'a, C> {
+    palette: [C; 4],
     vram_bank: &'a [u8; 0x2000],
     xflip: bool,
     yflip: bool,
@@ -581,12 +595,29 @@ impl ColorPalette {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Color {
+pub enum DmgColor {
     White,
     LightGray,
     DarkGray,
     Black,
+}
+
+impl Default for DmgColor {
+    fn default() -> Self {
+        DmgColor::White
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Color {
+    Dmg(DmgColor),
     Rgb(u8, u8, u8),
+}
+
+impl Default for Color {
+    fn default() -> Self {
+        Color::Dmg(DmgColor::default())
+    }
 }
 
 impl Color {
@@ -644,10 +675,7 @@ fn color_adjust(v: u8) -> u32 {
 impl From<Color> for u32 {
     fn from(c: Color) -> u32 {
         match c {
-            Color::White => 0xdddddd,
-            Color::LightGray => 0xaaaaaa,
-            Color::DarkGray => 0x888888,
-            Color::Black => 0x555555,
+            Color::Dmg(dmg) => u32::from(dmg),
             Color::Rgb(r, g, b) => {
                 let mut c = 0;
                 c |= color_adjust(r) << 16;
@@ -659,25 +687,50 @@ impl From<Color> for u32 {
     }
 }
 
+impl From<DmgColor> for u32 {
+    fn from(c: DmgColor) -> u32 {
+        match c {
+            DmgColor::White => 0xdddddd,
+            DmgColor::LightGray => 0xaaaaaa,
+            DmgColor::DarkGray => 0x888888,
+            DmgColor::Black => 0x555555,
+        }
+    }
+}
+
 impl From<Color> for u8 {
     fn from(c: Color) -> u8 {
         match c {
-            Color::White => 0,
-            Color::LightGray => 1,
-            Color::DarkGray => 2,
-            Color::Black => 3,
+            Color::Dmg(dmg) => u8::from(dmg),
             _ => unreachable!(),
+        }
+    }
+}
+
+impl From<DmgColor> for u8 {
+    fn from(c: DmgColor) -> u8 {
+        match c {
+            DmgColor::White => 0,
+            DmgColor::LightGray => 1,
+            DmgColor::DarkGray => 2,
+            DmgColor::Black => 3,
         }
     }
 }
 
 impl From<u8> for Color {
     fn from(v: u8) -> Color {
+        Color::Dmg(v.into())
+    }
+}
+
+impl From<u8> for DmgColor {
+    fn from(v: u8) -> DmgColor {
         match v {
-            0 => Color::White,
-            1 => Color::LightGray,
-            2 => Color::DarkGray,
-            3 => Color::Black,
+            0 => DmgColor::White,
+            1 => DmgColor::LightGray,
+            2 => DmgColor::DarkGray,
+            3 => DmgColor::Black,
             _ => unreachable!(),
         }
     }
@@ -808,7 +861,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         &mut self,
         time: usize,
         irq: &mut Irq,
-    ) -> (Option<DmaRequest>, Option<(u8, [u32; VRAM_WIDTH])>) {
+    ) -> (Option<DmaRequest>, Option<(u8, [Ext::Color; VRAM_WIDTH])>) {
         let clocks = self.clocks + time;
 
         let mut draw_line = None;
@@ -892,7 +945,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         (self.hdma.run(enter_hblank), draw_line)
     }
 
-    fn draw(&mut self) -> Option<(u8, [u32; VRAM_WIDTH])> {
+    fn draw(&mut self) -> Option<(u8, [Ext::Color; VRAM_WIDTH])> {
         let height = VRAM_HEIGHT;
         let width = VRAM_WIDTH;
 
@@ -900,7 +953,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             return None;
         }
 
-        let mut buf = [0; VRAM_WIDTH];
+        let mut buf = [Ext::Color::default(); VRAM_WIDTH];
         let mut bgbuf = [0; VRAM_WIDTH];
 
         if self.bgenable {
