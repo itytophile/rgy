@@ -33,19 +33,6 @@
 //!         epoch.as_micros() as u64
 //!     }
 //!
-//!     // Called when the emulator peeks a byte from the serial port.
-//!     fn recv_byte(&mut self) -> Option<u8> {
-//!         // TODO: Check the status of the serial port and read a byte if any.
-//!         None
-//!     }
-//!
-//!     // Called every time the emulator executes an instruction.
-//!     fn sched(&mut self) -> bool {
-//!         // TODO: Do some periodic jobs if any. Return `true` to continue, `false` to stop the emulator.
-//!         println!("It's running!");
-//!         true
-//!     }
-//!
 //!     // Called when the emulator loads the save data from the battery-backed RAM.
 //!     fn save_ram(&mut self, _ram: &[u8]) {
 //!         // TODO: Store save data.
@@ -68,7 +55,9 @@
 //! let mut mixer_stream = rgy::apu::mixer::MixerStream::new();
 //!
 //! // Run the emulator.
-//! while sys.poll(&mut mixer_stream, Default::default()).is_some() {}
+//! loop {
+//!     sys.poll(&mut mixer_stream, Default::default(), &mut None);
+//! }
 //!
 //! ```
 

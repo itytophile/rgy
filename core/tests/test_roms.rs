@@ -35,10 +35,6 @@ impl rgy::Hardware for TestHardware {
         epoch.as_micros() as u64
     }
 
-    fn recv_byte(&mut self) -> Option<u8> {
-        None
-    }
-
     fn save_ram(&mut self, _: &[u8]) {}
 }
 
@@ -52,7 +48,8 @@ fn test_rom(expected: Expected, path: &str) {
     let mut mixer_stream = MixerStream::new();
     let mut display = [DmgColor::White; VRAM_HEIGHT * VRAM_WIDTH];
     let mut index = 0;
-    while let Some(poll_data) = sys.poll(&mut mixer_stream, Default::default()) {
+    loop {
+        let poll_data = sys.poll(&mut mixer_stream, Default::default(), &mut None);
         if now.elapsed() >= TIMEOUT {
             panic!("timeout")
         }

@@ -77,23 +77,22 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     }
 
     /// Run a single step of emulation.
-    /// This function needs to be called repeatedly until it returns `false`.
-    /// Returning `false` indicates the end of emulation, and the functions shouldn't be called again.
+    /// This function needs to be called repeatedly.
+    /// You have to check if the seria_input has been consumed or not (from Some(_) to None)
     pub fn poll(
         &mut self,
         mixer_stream: &mut MixerStream,
         joypad_input: JoypadInput,
-    ) -> Option<PollData<<GB::Gpu as gpu::CgbExt>::Color>> {
+        serial_input: &mut Option<u8>,
+    ) -> PollData<<GB::Gpu as gpu::CgbExt>::Color> {
         // the serial peripheral can send bytes during the serial step or after a write to some memory from the CPU
         self.peripherals.serial.clear_sent_bytes();
-        if !self.peripherals.hw.sched() {
-            return None;
-        }
 
         let mut mmu = Mmu {
             mixer_stream,
             peripherals: &mut self.peripherals,
             joypad_input,
+            serial_input,
         };
 
         let mut cpu = Cpu {
@@ -103,7 +102,7 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
 
         let time = cpu.execute();
 
-        Some(PollData {
+        PollData {
             line_to_draw: self
                 .cpu_state
                 .steps_data
@@ -112,7 +111,7 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
                 .map(|line_to_draw| (line_to_draw.0, &line_to_draw.1)),
             cpu_time: time,
             serial_sent_bytes: self.peripherals.serial.get_sent_bytes(),
-        })
+        }
     }
 }
 

@@ -101,12 +101,12 @@ fn main() {
 
         let mut sys = rgy::System::<_, DmgMode>::new(to_cfg(opt), &rom, hw1, &mut ram);
 
-        let mut max_cycles = 0;
-
-        while let Some(poll_data) = sys.poll(
-            &mut mixer_stream.lock().unwrap(),
-            *joypad_input.lock().unwrap(),
-        ) {
+        loop {
+            let poll_data = sys.poll(
+                &mut mixer_stream.lock().unwrap(),
+                *joypad_input.lock().unwrap(),
+                &mut None,
+            );
             if !poll_data.serial_sent_bytes.is_empty() {
                 print!(
                     "{}",
@@ -115,7 +115,6 @@ fn main() {
                 std::io::stdout().flush().unwrap();
             }
 
-            max_cycles = max_cycles.max(poll_data.cpu_time);
             if let Some((ly, buf)) = poll_data.line_to_draw {
                 let mut vram = vram.lock().unwrap();
                 let base = usize::from(ly) * VRAM_WIDTH;
@@ -128,7 +127,6 @@ fn main() {
                 }
             }
         }
-        dbg!(max_cycles);
     });
 
     hw.run();

@@ -81,6 +81,7 @@ pub struct Mmu<'a, 'b, H, GB: GameboyMode> {
     pub peripherals: &'a mut Peripherals<'b, H, GB>,
     pub mixer_stream: &'a mut MixerStream,
     pub joypad_input: JoypadInput,
+    pub serial_input: &'a mut Option<u8>,
 }
 
 impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
@@ -152,10 +153,7 @@ impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
         match addr {
             0xff00 => self.peripherals.joypad.write(v),
             0xff01 => self.peripherals.serial.set_data(v),
-            0xff02 => self
-                .peripherals
-                .serial
-                .set_ctrl(v, &mut self.peripherals.hw),
+            0xff02 => self.peripherals.serial.set_ctrl(v, self.serial_input),
             0xff03 => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
             0xff04..=0xff07 => self.peripherals.timer.on_write(addr, v),
             0xff08..=0xff0e => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
@@ -316,7 +314,7 @@ impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
             .step(cycles, &mut self.peripherals.irq);
         self.peripherals
             .serial
-            .step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw);
+            .step(cycles, &mut self.peripherals.irq, self.serial_input);
         self.peripherals
             .joypad
             .poll(&mut self.peripherals.irq, self.joypad_input);

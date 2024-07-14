@@ -11,17 +11,6 @@ impl rgy::Hardware for Hardware {
         epoch.as_micros() as u64
     }
 
-    fn recv_byte(&mut self) -> Option<u8> {
-        // Try to read a byte from a serial port.
-        None
-    }
-
-    fn sched(&mut self) -> bool {
-        // `true` to continue, `false` to stop the emulator.
-        println!("It's running!");
-        true
-    }
-
     fn save_ram(&mut self, _ram: &[u8]) {
         // Store save data.
     }
@@ -39,5 +28,7 @@ fn main() {
 
     let mut mixer_stream = MixerStream::new();
 
-    while sys.poll(&mut mixer_stream, Default::default()).is_some() {}
+    loop {
+        sys.poll(&mut mixer_stream, Default::default(), &mut None);
+    }
 }

@@ -137,10 +137,6 @@ impl Hardware {
 }
 
 impl rgy::Hardware for Hardware {
-    fn recv_byte(&mut self) -> Option<u8> {
-        None
-    }
-
     fn clock(&mut self) -> u64 {
         let epoch = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -157,12 +153,7 @@ impl rgy::Hardware for Hardware {
             None => {}
         }
     }
-
-    fn sched(&mut self) -> bool {
-        !self.escape.load(Ordering::Relaxed)
-    }
 }
-
 pub struct Pcm;
 
 impl Pcm {

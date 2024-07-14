@@ -1,4 +1,4 @@
-use crate::{ic::Irq, Hardware};
+use crate::ic::Irq;
 use arrayvec::ArrayVec;
 use log::*;
 
@@ -13,7 +13,7 @@ pub struct Serial {
 }
 
 impl Serial {
-    pub fn step(&mut self, time: usize, irq: &mut Irq, hw: &mut impl Hardware) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq, serial_input: &mut Option<u8>) {
         if self.ctrl & 0x80 == 0 {
             // No transfer
             return;
@@ -30,7 +30,7 @@ impl Serial {
             } else {
                 self.clock -= time;
             }
-        } else if let Some(data) = hw.recv_byte() {
+        } else if let Some(data) = serial_input.take() {
             self.sent_bytes.push(self.data);
             self.data = data;
 
@@ -52,7 +52,7 @@ impl Serial {
         self.data = value;
     }
 
-    pub(crate) fn set_ctrl(&mut self, value: u8, hw: &mut impl Hardware) {
+    pub(crate) fn set_ctrl(&mut self, value: u8, serial_input: &mut Option<u8>) {
         self.ctrl = value;
 
         if self.ctrl & 0x80 != 0 {
@@ -64,7 +64,7 @@ impl Serial {
 
                 // Do transfer one byte at once
                 self.sent_bytes.push(self.data);
-                self.recv = hw.recv_byte().unwrap_or(0xff);
+                self.recv = serial_input.take().unwrap_or(0xff);
             } else {
                 debug!("Serial transfer (External): {:02x}", self.data);
             }
