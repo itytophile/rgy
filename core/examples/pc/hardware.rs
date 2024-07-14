@@ -77,11 +77,11 @@ impl Gui {
             self.escape.store(true, Ordering::Relaxed);
         }
 
-        let mut input = self.keystate.lock().unwrap();
-
-        *input = JoypadInput::default();
-
         if let Some(keys) = self.window.get_keys() {
+            let mut input = self.keystate.lock().unwrap();
+
+            *input = JoypadInput::default();
+
             for k in keys {
                 match k {
                     minifb::Key::Right => input.right = true,

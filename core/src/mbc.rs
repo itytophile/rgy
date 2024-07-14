@@ -249,8 +249,8 @@ impl<'a> Mbc3<'a> {
             rom[base + offset]
         } else if (0xa000..=0xbfff).contains(&addr) {
             match self.select {
-                x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
-                    let base = x as usize * 0x2000;
+                ..=0x03 => {
+                    let base = self.select as usize * 0x2000;
                     let offset = addr as usize - 0xa000;
                     self.ram[base + offset]
                 }
@@ -293,8 +293,8 @@ impl<'a> Mbc3<'a> {
             }
         } else if (0xa000..=0xbfff).contains(&addr) {
             match self.select {
-                x if x == 0x00 || x == 0x01 || x == 0x02 || x == 0x03 => {
-                    let base = x as usize * 0x2000;
+                ..=0x03 => {
+                    let base = self.select as usize * 0x2000;
                     let offset = addr as usize - 0xa000;
                     self.ram[base + offset] = value;
                 }
