@@ -27,16 +27,7 @@ pub struct Opt {
     /// Emulate Gameboy Color
     #[structopt(short = "c", long = "color")]
     color: bool,
-    /// Cpu frequency
-    #[structopt(short = "f", long = "freq", default_value = "4200000")]
-    freq: u64,
-    /// Sampling rate for cpu frequency controller
-    #[structopt(short = "s", long = "sample", default_value = "4200")]
-    sample: u64,
-    /// Delay unit for cpu frequency controller
-    #[structopt(short = "u", long = "delayunit", default_value = "50")]
-    delay_unit: u64,
-    /// Don't adjust cpu frequency
+    /// Don't sleep
     #[structopt(short = "n", long = "native")]
     native_speed: bool,
     /// RAM file name
@@ -48,11 +39,7 @@ pub struct Opt {
 }
 
 fn to_cfg(opt: Opt) -> rgy::Config {
-    rgy::Config::new()
-        .color(opt.color)
-        .freq(opt.freq)
-        .sample(opt.sample)
-        .delay_unit(opt.delay_unit)
+    rgy::Config::new().color(opt.color)
 }
 
 fn main() {

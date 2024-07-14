@@ -6,12 +6,6 @@ use crate::{gpu, VRAM_WIDTH};
 
 /// Configuration of the emulator.
 pub struct Config {
-    /// CPU frequency.
-    pub(crate) freq: u64,
-    /// Cycle sampling count in the CPU frequency controller.
-    pub(crate) sample: u64,
-    /// Delay unit in CPU frequency controller.
-    pub(crate) delay_unit: u64,
     /// Emulate Gameboy Color
     pub(crate) color: bool,
 }
@@ -25,31 +19,7 @@ impl Default for Config {
 impl Config {
     /// Create the default configuration.
     pub fn new() -> Self {
-        let freq = 4194300; // 4.1943 MHz
-        Self {
-            freq,
-            sample: freq / 1000,
-            delay_unit: 10,
-            color: false,
-        }
-    }
-
-    /// Set the CPU frequency.
-    pub fn freq(mut self, freq: u64) -> Self {
-        self.freq = freq;
-        self
-    }
-
-    /// Set the sampling count of the CPU frequency controller.
-    pub fn sample(mut self, sample: u64) -> Self {
-        self.sample = sample;
-        self
-    }
-
-    /// Set the delay unit.
-    pub fn delay_unit(mut self, delay: u64) -> Self {
-        self.delay_unit = delay;
-        self
+        Self { color: false }
     }
 
     /// Set the flag to enable Gameboy Color.
