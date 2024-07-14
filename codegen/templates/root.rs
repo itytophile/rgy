@@ -2,6 +2,7 @@
 
 use crate::cpu::{Cpu, Sys};
 use crate::alu;
+use crate::mmu::GameboyMode;
 use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use log::*;
@@ -16,7 +17,7 @@ lazy_static! {
     };
 }
 
-impl<'a, T: Sys> Cpu<'a, T> {
+impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
 {% for i in insts %}
     /// {{i.operator}} {{i.operands | join(sep=",")}}
     #[allow(unused_variables)]
@@ -207,7 +208,7 @@ pub fn mnem(code: u16) -> &'static str {
 }
 
 /// Decodes the opecode and actually executes one instruction.
-impl<'a, T: Sys> Cpu<'a, T> {
+impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
     /// Execute the instruction returning the expected consumed cycles
     pub fn decode(&mut self, code: u16) -> usize {
         trace!("{:04x}: {:04x}: {}", self.get_pc(), code, mnem(code));
