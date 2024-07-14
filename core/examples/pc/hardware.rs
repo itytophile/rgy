@@ -110,11 +110,10 @@ impl Hardware {
         mixer_stream: Arc<Mutex<MixerStream>>,
         vram: Arc<Mutex<Vec<u32>>>,
         joypad_input: Arc<Mutex<JoypadInput>>,
+        escape: Arc<AtomicBool>,
     ) -> Self {
         let pcm = Pcm;
         pcm.run_forever(mixer_stream);
-
-        let escape = Arc::new(AtomicBool::new(false));
 
         Self {
             color,

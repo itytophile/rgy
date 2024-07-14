@@ -14,7 +14,10 @@ use std::{
     fs::File,
     io::Read,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use structopt::StructOpt;
@@ -72,12 +75,14 @@ fn main() {
 
     let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
     let joypad_input = Arc::new(Mutex::new(JoypadInput::default()));
+    let escape = Arc::new(AtomicBool::new(false));
     let hw = Hardware::new(
         opt.ram.clone(),
         opt.color,
         mixer_stream.clone(),
         vram.clone(),
         joypad_input.clone(),
+        escape.clone(),
     );
     let hw1 = hw.clone();
 
@@ -101,7 +106,7 @@ fn main() {
 
         let mut sys = rgy::System::<_, DmgMode>::new(to_cfg(opt), &rom, hw1, &mut ram);
 
-        loop {
+        while !escape.load(Ordering::Relaxed) {
             let poll_data = sys.poll(
                 &mut mixer_stream.lock().unwrap(),
                 *joypad_input.lock().unwrap(),
