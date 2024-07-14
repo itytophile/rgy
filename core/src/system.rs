@@ -84,6 +84,8 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
         mixer_stream: &mut MixerStream,
         joypad_input: JoypadInput,
     ) -> Option<PollData<<GB::Gpu as gpu::CgbExt>::Color>> {
+        // the serial peripheral can send bytes during the serial step or after a write to some memory from the CPU
+        self.peripherals.serial.clear_sent_bytes();
         if !self.peripherals.hw.sched() {
             return None;
         }
@@ -109,6 +111,7 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
                 .as_ref()
                 .map(|line_to_draw| (line_to_draw.0, &line_to_draw.1)),
             cpu_time: time,
+            serial_sent_bytes: self.peripherals.serial.get_sent_bytes(),
         })
     }
 }
@@ -116,4 +119,5 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
 pub struct PollData<'a, C> {
     pub line_to_draw: Option<(u8, &'a [C; VRAM_WIDTH])>,
     pub cpu_time: usize,
+    pub serial_sent_bytes: &'a [u8],
 }

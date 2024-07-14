@@ -107,6 +107,14 @@ fn main() {
             &mut mixer_stream.lock().unwrap(),
             *joypad_input.lock().unwrap(),
         ) {
+            if !poll_data.serial_sent_bytes.is_empty() {
+                print!(
+                    "{}",
+                    std::str::from_utf8(poll_data.serial_sent_bytes).unwrap()
+                );
+                std::io::stdout().flush().unwrap();
+            }
+
             max_cycles = max_cycles.max(poll_data.cpu_time);
             if let Some((ly, buf)) = poll_data.line_to_draw {
                 let mut vram = vram.lock().unwrap();

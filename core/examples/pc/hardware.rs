@@ -137,11 +137,6 @@ impl Hardware {
 }
 
 impl rgy::Hardware for Hardware {
-    fn send_byte(&mut self, b: u8) {
-        print!("{}", b as char);
-        std::io::stdout().flush().unwrap();
-    }
-
     fn recv_byte(&mut self) -> Option<u8> {
         None
     }

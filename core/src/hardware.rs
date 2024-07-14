@@ -59,9 +59,6 @@ pub trait Hardware {
     /// The return value needs to be epoch time in microseconds.
     fn clock(&mut self) -> u64;
 
-    /// Send one byte to the serial port.
-    fn send_byte(&mut self, b: u8);
-
     /// Try receiving one byte from the serial port.
     fn recv_byte(&mut self) -> Option<u8>;
 

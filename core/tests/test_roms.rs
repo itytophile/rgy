@@ -27,21 +27,7 @@ impl Expected {
     }
 }
 
-struct TestHardware {
-    expected: Expected,
-    index: usize,
-    is_done: bool,
-}
-
-impl TestHardware {
-    fn new(expected: Expected) -> Self {
-        Self {
-            expected,
-            index: 0,
-            is_done: false,
-        }
-    }
-}
+struct TestHardware;
 
 impl rgy::Hardware for TestHardware {
     fn clock(&mut self) -> u64 {
@@ -49,64 +35,63 @@ impl rgy::Hardware for TestHardware {
         epoch.as_micros() as u64
     }
 
-    fn send_byte(&mut self, b: u8) {
-        let Expected::Serial(expected) = self.expected else {
-            return;
-        };
-        if self.is_done {
-            return;
-        }
-        print!("{}", b as char);
-        std::io::stdout().flush().unwrap();
-        assert_eq!(
-            expected.as_bytes()[self.index] as char,
-            b as char,
-            "error at index {}, expected: {:?}",
-            self.index,
-            &expected[0..=self.index]
-        );
-        self.index += 1;
-        if self.index == expected.len() {
-            self.is_done = true;
-        }
-    }
-
     fn recv_byte(&mut self) -> Option<u8> {
         None
     }
 
     fn save_ram(&mut self, _: &[u8]) {}
-
-    fn sched(&mut self) -> bool {
-        !self.is_done
-    }
 }
 
 fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
-    let hw = TestHardware::new(expected.clone());
     let mut cartridge_ram = [0; 0x8000];
-    let mut sys = rgy::System::<_, DmgMode>::new(Default::default(), &rom, hw, &mut cartridge_ram);
+    let mut sys =
+        rgy::System::<_, DmgMode>::new(Default::default(), &rom, TestHardware, &mut cartridge_ram);
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();
     let mut display = [DmgColor::White; VRAM_HEIGHT * VRAM_WIDTH];
+    let mut index = 0;
     while let Some(poll_data) = sys.poll(&mut mixer_stream, Default::default()) {
         if now.elapsed() >= TIMEOUT {
             panic!("timeout")
         }
-        let Expected::Display(expected) = &expected else {
-            continue;
-        };
-        let Some((ly, buf)) = poll_data.line_to_draw else {
-            continue;
-        };
-        for (a, b) in display[usize::from(ly) * VRAM_WIDTH..].iter_mut().zip(buf) {
-            *a = *b;
-        }
+        match &expected {
+            Expected::Serial(expected) => {
+                if poll_data.serial_sent_bytes.is_empty() {
+                    continue;
+                }
+                print!(
+                    "{}",
+                    std::str::from_utf8(poll_data.serial_sent_bytes).unwrap()
+                );
+                std::io::stdout().flush().unwrap();
+                for &b in poll_data.serial_sent_bytes {
+                    assert_eq!(
+                        expected.as_bytes()[index] as char,
+                        b as char,
+                        "error at index {}, expected: {:?}",
+                        index,
+                        &expected[0..=index]
+                    );
+                    index += 1;
+                    if index == expected.len() {
+                        return;
+                    }
+                }
+            }
+            Expected::Display(expected) => {
+                let Some((ly, buf)) = poll_data.line_to_draw else {
+                    continue;
+                };
+                for (a, b) in display[usize::from(ly) * VRAM_WIDTH..].iter_mut().zip(buf) {
+                    *a = *b;
+                }
 
-        if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
-            return;
+                if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
+                    return;
+                }
+            }
         }
 
         // // print display to console

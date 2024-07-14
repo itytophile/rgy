@@ -1,23 +1,18 @@
 use crate::{ic::Irq, Hardware};
+use arrayvec::ArrayVec;
 use log::*;
 
+#[derive(Default)]
 pub struct Serial {
     data: u8,
     recv: u8,
     ctrl: u8,
     clock: usize,
+    // don't know if the gameboy can send more than one byte during the serial step + cpu execution
+    sent_bytes: ArrayVec<u8, 1>,
 }
 
 impl Serial {
-    pub fn new() -> Self {
-        Self {
-            data: 0,
-            recv: 0,
-            ctrl: 0,
-            clock: 0,
-        }
-    }
-
     pub fn step(&mut self, time: usize, irq: &mut Irq, hw: &mut impl Hardware) {
         if self.ctrl & 0x80 == 0 {
             // No transfer
@@ -36,7 +31,7 @@ impl Serial {
                 self.clock -= time;
             }
         } else if let Some(data) = hw.recv_byte() {
-            hw.send_byte(self.data);
+            self.sent_bytes.push(self.data);
             self.data = data;
 
             // End of transfer
@@ -68,11 +63,19 @@ impl Serial {
                 self.clock = 512 * 8;
 
                 // Do transfer one byte at once
-                hw.send_byte(self.data);
+                self.sent_bytes.push(self.data);
                 self.recv = hw.recv_byte().unwrap_or(0xff);
             } else {
                 debug!("Serial transfer (External): {:02x}", self.data);
             }
         }
+    }
+
+    pub fn clear_sent_bytes(&mut self) {
+        self.sent_bytes.clear();
+    }
+
+    pub fn get_sent_bytes(&self) -> &[u8] {
+        &self.sent_bytes
     }
 }

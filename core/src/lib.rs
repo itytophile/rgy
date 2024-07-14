@@ -33,11 +33,6 @@
 //!         epoch.as_micros() as u64
 //!     }
 //!
-//!     // Called when the emulator sends a byte to the serial port.
-//!     fn send_byte(&mut self, _b: u8) {
-//!         // TODO: Send a byte to a serial port.
-//!     }
-//!
 //!     // Called when the emulator peeks a byte from the serial port.
 //!     fn recv_byte(&mut self) -> Option<u8> {
 //!         // TODO: Check the status of the serial port and read a byte if any.

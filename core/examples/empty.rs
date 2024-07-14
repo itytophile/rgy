@@ -11,10 +11,6 @@ impl rgy::Hardware for Hardware {
         epoch.as_micros() as u64
     }
 
-    fn send_byte(&mut self, _b: u8) {
-        // Send a byte to a serial port.
-    }
-
     fn recv_byte(&mut self) -> Option<u8> {
         // Try to read a byte from a serial port.
         None
