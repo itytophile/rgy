@@ -594,7 +594,7 @@ impl ColorPalette {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DmgColor {
     #[default]
     White,
@@ -603,7 +603,7 @@ pub enum DmgColor {
     Black,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Color {
     Dmg(DmgColor),
     Rgb(u8, u8, u8),

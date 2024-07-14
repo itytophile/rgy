@@ -3,22 +3,22 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use rgy::{apu::mixer::MixerStream, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, gpu::DmgColor, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
 
 #[derive(Clone)]
 enum Expected {
     Serial(&'static str),
-    Display(Vec<u32>),
+    Display(Vec<DmgColor>),
 }
 
 impl Expected {
     fn from_file(path: &str) -> Self {
-        let display: Vec<u32> = std::fs::read_to_string(path)
+        let display: Vec<DmgColor> = std::fs::read_to_string(path)
             .unwrap()
             .chars()
             .filter_map(|c| match c {
-                '.' => Some(0xdddddd),
-                '#' => Some(0x555555),
+                '.' => Some(DmgColor::White),
+                '#' => Some(DmgColor::Black),
                 _ => None,
             })
             .collect();
@@ -94,7 +94,7 @@ fn test_rom(expected: Expected, path: &str) {
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();
-    let mut display = [0; VRAM_HEIGHT * VRAM_WIDTH];
+    let mut display = [DmgColor::White; VRAM_HEIGHT * VRAM_WIDTH];
     while let Some(poll_data) = sys.poll(&mut mixer_stream) {
         if now.elapsed() >= TIMEOUT {
             panic!("timeout")
@@ -106,7 +106,7 @@ fn test_rom(expected: Expected, path: &str) {
             continue;
         };
         for (a, b) in display[usize::from(ly) * VRAM_WIDTH..].iter_mut().zip(buf) {
-            *a = u32::from(*b);
+            *a = *b;
         }
 
         if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
@@ -114,10 +114,10 @@ fn test_rom(expected: Expected, path: &str) {
         }
 
         // // print display to console
-        // if ly == VRAM_HEIGHT - 1 {
+        // if usize::from(ly) == VRAM_HEIGHT - 1 {
         //     println!();
-        //     for (index, color) in self.display.iter().enumerate() {
-        //         if *color == 0xdddddd {
+        //     for (index, color) in display.iter().enumerate() {
+        //         if *color == DmgColor::White {
         //             print!(".")
         //         } else {
         //             print!("#")
