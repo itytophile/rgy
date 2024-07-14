@@ -1,6 +1,6 @@
 use minifb::{Scale, Window, WindowOptions};
 use rgy::apu::mixer::MixerStream;
-use std::collections::HashMap;
+use rgy::hardware::JoypadInput;
 use std::fs::File;
 use std::io::prelude::*;
 use std::sync::{
@@ -9,13 +9,13 @@ use std::sync::{
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rgy::{Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{Stream, VRAM_HEIGHT, VRAM_WIDTH};
 
 #[derive(Clone)]
 pub struct Hardware {
     rampath: Option<String>,
     vram: Arc<Mutex<Vec<u32>>>,
-    keystate: Arc<Mutex<HashMap<Key, bool>>>,
+    keystate: Arc<Mutex<JoypadInput>>,
     escape: Arc<AtomicBool>,
     color: bool,
 }
@@ -23,14 +23,14 @@ pub struct Hardware {
 struct Gui {
     window: Window,
     vram: Arc<Mutex<Vec<u32>>>,
-    keystate: Arc<Mutex<HashMap<Key, bool>>>,
+    keystate: Arc<Mutex<JoypadInput>>,
     escape: Arc<AtomicBool>,
 }
 
 impl Gui {
     fn new(
         vram: Arc<Mutex<Vec<u32>>>,
-        keystate: Arc<Mutex<HashMap<Key, bool>>>,
+        joypad_input: Arc<Mutex<JoypadInput>>,
         escape: Arc<AtomicBool>,
         color: bool,
     ) -> Self {
@@ -54,7 +54,7 @@ impl Gui {
         Self {
             window,
             vram,
-            keystate,
+            keystate: joypad_input,
             escape,
         }
     }
@@ -77,32 +77,27 @@ impl Gui {
             self.escape.store(true, Ordering::Relaxed);
         }
 
-        for (_, v) in self.keystate.lock().unwrap().iter_mut() {
-            *v = false;
-        }
+        let mut input = self.keystate.lock().unwrap();
+
+        *input = JoypadInput::default();
 
         if let Some(keys) = self.window.get_keys() {
             for k in keys {
-                let gbk = match k {
-                    minifb::Key::Right => Key::Right,
-                    minifb::Key::Left => Key::Left,
-                    minifb::Key::Up => Key::Up,
-                    minifb::Key::Down => Key::Down,
-                    minifb::Key::Z => Key::A,
-                    minifb::Key::X => Key::B,
-                    minifb::Key::Space => Key::Select,
-                    minifb::Key::Enter => Key::Start,
+                match k {
+                    minifb::Key::Right => input.right = true,
+                    minifb::Key::Left => input.left = true,
+                    minifb::Key::Up => input.up = true,
+                    minifb::Key::Down => input.down = true,
+                    minifb::Key::Z => input.a = true,
+                    minifb::Key::X => input.b = true,
+                    minifb::Key::Space => input.select = true,
+                    minifb::Key::Enter => input.start = true,
                     minifb::Key::Escape => {
                         self.escape.store(true, Ordering::Relaxed);
                         return;
                     }
                     _ => continue,
                 };
-
-                match self.keystate.lock().unwrap().get_mut(&gbk) {
-                    Some(v) => *v = true,
-                    None => unreachable!(),
-                }
             }
         }
     }
@@ -114,20 +109,10 @@ impl Hardware {
         color: bool,
         mixer_stream: Arc<Mutex<MixerStream>>,
         vram: Arc<Mutex<Vec<u32>>>,
+        joypad_input: Arc<Mutex<JoypadInput>>,
     ) -> Self {
         let pcm = Pcm;
         pcm.run_forever(mixer_stream);
-
-        let mut keystate = HashMap::new();
-        keystate.insert(Key::Right, false);
-        keystate.insert(Key::Left, false);
-        keystate.insert(Key::Up, false);
-        keystate.insert(Key::Down, false);
-        keystate.insert(Key::A, false);
-        keystate.insert(Key::B, false);
-        keystate.insert(Key::Select, false);
-        keystate.insert(Key::Start, false);
-        let keystate = Arc::new(Mutex::new(keystate));
 
         let escape = Arc::new(AtomicBool::new(false));
 
@@ -135,7 +120,7 @@ impl Hardware {
             color,
             rampath,
             vram,
-            keystate,
+            keystate: joypad_input,
             escape,
         }
     }
@@ -152,15 +137,6 @@ impl Hardware {
 }
 
 impl rgy::Hardware for Hardware {
-    fn joypad_pressed(&mut self, key: Key) -> bool {
-        *self
-            .keystate
-            .lock()
-            .unwrap()
-            .get(&key)
-            .expect("Logic error in keystate map")
-    }
-
     fn send_byte(&mut self, b: u8) {
         print!("{}", b as char);
         std::io::stdout().flush().unwrap();

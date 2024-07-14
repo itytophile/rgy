@@ -1,6 +1,5 @@
-use crate::hardware::Key;
+use crate::hardware::JoypadInput;
 use crate::ic::Irq;
-use crate::Hardware;
 use log::*;
 
 pub struct Joypad {
@@ -16,8 +15,8 @@ impl Joypad {
         }
     }
 
-    pub fn poll(&mut self, irq: &mut Irq, hw: &mut impl Hardware) {
-        let pressed = self.check(hw);
+    pub fn poll(&mut self, irq: &mut Irq, joypad_input: JoypadInput) {
+        let pressed = self.check(joypad_input);
 
         for i in 0..4 {
             let bit = 1 << i;
@@ -30,21 +29,19 @@ impl Joypad {
         self.pressed = pressed;
     }
 
-    fn check(&self, hw: &mut impl Hardware) -> u8 {
-        let mut p = |key| hw.joypad_pressed(key);
-
+    fn check(&self, joypad_input: JoypadInput) -> u8 {
         let mut value = 0;
 
         if self.select & 0x10 == 0 {
-            value |= if p(Key::Right) { 0x00 } else { 0x01 };
-            value |= if p(Key::Left) { 0x00 } else { 0x02 };
-            value |= if p(Key::Up) { 0x00 } else { 0x04 };
-            value |= if p(Key::Down) { 0x00 } else { 0x08 };
+            value |= if joypad_input.right { 0x00 } else { 0x01 };
+            value |= if joypad_input.left { 0x00 } else { 0x02 };
+            value |= if joypad_input.up { 0x00 } else { 0x04 };
+            value |= if joypad_input.down { 0x00 } else { 0x08 };
         } else if self.select & 0x20 == 0 {
-            value |= if p(Key::A) { 0x00 } else { 0x01 };
-            value |= if p(Key::B) { 0x00 } else { 0x02 };
-            value |= if p(Key::Select) { 0x00 } else { 0x04 };
-            value |= if p(Key::Start) { 0x0 } else { 0x08 };
+            value |= if joypad_input.a { 0x00 } else { 0x01 };
+            value |= if joypad_input.b { 0x00 } else { 0x02 };
+            value |= if joypad_input.select { 0x00 } else { 0x04 };
+            value |= if joypad_input.start { 0x0 } else { 0x08 };
         } else {
             value = 0x0f;
         }
@@ -52,9 +49,9 @@ impl Joypad {
         value
     }
 
-    pub(crate) fn read(&self, hw: &mut impl Hardware) -> u8 {
+    pub(crate) fn read(&self, joypad_input: JoypadInput) -> u8 {
         debug!("Joypad read: dir: {:02x}", self.select);
-        self.check(hw)
+        self.check(joypad_input)
     }
 
     pub(crate) fn write(&mut self, value: u8) {

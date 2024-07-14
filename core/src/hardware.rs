@@ -25,6 +25,18 @@ pub enum Key {
     Start,
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct JoypadInput {
+    pub right: bool,
+    pub left: bool,
+    pub up: bool,
+    pub down: bool,
+    pub a: bool,
+    pub b: bool,
+    pub select: bool,
+    pub start: bool,
+}
+
 /// Sound wave stream which generates the wave to be played by the sound device.
 pub trait Stream: Send + 'static {
     /// The maximum value of the amplitude returned by this stream.
@@ -43,9 +55,6 @@ pub trait Stream: Send + 'static {
 /// The users of this emulator library need to implement this trait,
 /// providing OS-specific functions.
 pub trait Hardware {
-    /// Called when the emulator checks if the key is pressed.
-    fn joypad_pressed(&mut self, key: Key) -> bool;
-
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.
     fn clock(&mut self) -> u64;

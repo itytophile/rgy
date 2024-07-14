@@ -1,14 +1,8 @@
-use rgy::{apu::mixer::MixerStream, mmu::DmgMode, Config, Key};
+use rgy::{apu::mixer::MixerStream, mmu::DmgMode, Config};
 
 struct Hardware;
 
 impl rgy::Hardware for Hardware {
-    fn joypad_pressed(&mut self, key: Key) -> bool {
-        // Read a keyboard device and check if the `key` is pressed or not.
-        println!("Check if {:?} is pressed", key);
-        false
-    }
-
     fn clock(&mut self) -> u64 {
         // Return the epoch in microseconds.
         let epoch = std::time::SystemTime::now()
@@ -49,5 +43,5 @@ fn main() {
 
     let mut mixer_stream = MixerStream::new();
 
-    while sys.poll(&mut mixer_stream).is_some() {}
+    while sys.poll(&mut mixer_stream, Default::default()).is_some() {}
 }

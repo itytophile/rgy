@@ -1,6 +1,6 @@
 use crate::apu::mixer::MixerStream;
 use crate::cpu::{Cpu, CpuState};
-use crate::hardware::Hardware;
+use crate::hardware::{Hardware, JoypadInput};
 use crate::mmu::{GameboyMode, Mmu, Peripherals};
 use crate::{gpu, VRAM_WIDTH};
 
@@ -82,6 +82,7 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
     pub fn poll(
         &mut self,
         mixer_stream: &mut MixerStream,
+        joypad_input: JoypadInput,
     ) -> Option<PollData<<GB::Gpu as gpu::CgbExt>::Color>> {
         if !self.peripherals.hw.sched() {
             return None;
@@ -90,6 +91,7 @@ impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
         let mut mmu = Mmu {
             mixer_stream,
             peripherals: &mut self.peripherals,
+            joypad_input,
         };
 
         let mut cpu = Cpu {

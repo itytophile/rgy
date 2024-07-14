@@ -24,15 +24,6 @@
 //! }
 //!
 //! impl rgy::Hardware for Hardware {
-//!     // Called when the emulator checks if a key is pressed or not.
-//!     fn joypad_pressed(&mut self, key: Key) -> bool {
-//!         println!("Is {:?} pressed?", key);
-//!
-//!         // TODO: Read a keyboard device and check if the `key` is pressed or not.
-//!
-//!         false
-//!     }
-//!
 //!     // Provides clock for the emulator.
 //!     fn clock(&mut self) -> u64 {
 //!         // TODO: Return the epoch in microseconds.
@@ -82,7 +73,7 @@
 //! let mut mixer_stream = rgy::apu::mixer::MixerStream::new();
 //!
 //! // Run the emulator.
-//! while sys.poll(&mut mixer_stream).is_some() {}
+//! while sys.poll(&mut mixer_stream, Default::default()).is_some() {}
 //!
 //! ```
 
@@ -116,7 +107,7 @@ pub mod inst;
 pub mod mmu;
 
 /// Hardware interface, which abstracts OS-specific functions.
-mod hardware;
+pub mod hardware;
 
 pub use crate::hardware::{Hardware, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 pub use crate::system::{Config, System};

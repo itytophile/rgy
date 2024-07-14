@@ -4,6 +4,7 @@ use crate::cgb::Cgb;
 use crate::cpu::Sys;
 use crate::dma::{Dma, DmaRequest};
 use crate::gpu::{self, Gpu};
+use crate::hardware::JoypadInput;
 use crate::hram::Hram;
 use crate::ic::{Ic, Irq};
 use crate::joypad::Joypad;
@@ -79,12 +80,13 @@ impl<'a, H: Hardware, GB: GameboyMode> Peripherals<'a, H, GB> {
 pub struct Mmu<'a, 'b, H, GB: GameboyMode> {
     pub peripherals: &'a mut Peripherals<'b, H, GB>,
     pub mixer_stream: &'a mut MixerStream,
+    pub joypad_input: JoypadInput,
 }
 
 impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
     fn io_read(&mut self, addr: u16) -> u8 {
         match addr {
-            0xff00 => self.peripherals.joypad.read(&mut self.peripherals.hw),
+            0xff00 => self.peripherals.joypad.read(self.joypad_input),
             0xff01 => self.peripherals.serial.get_data(),
             0xff02 => self.peripherals.serial.get_ctrl(),
             0xff03 => todo!("i/o write: addr={:04x}", addr),
@@ -317,7 +319,7 @@ impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
             .step(cycles, &mut self.peripherals.irq, &mut self.peripherals.hw);
         self.peripherals
             .joypad
-            .poll(&mut self.peripherals.irq, &mut self.peripherals.hw);
+            .poll(&mut self.peripherals.irq, self.joypad_input);
 
         StepData { line_to_draw }
     }

@@ -5,11 +5,11 @@ mod loader;
 use crate::{
     // debug::Debugger,
     hardware::Hardware,
-    loader::{load_rom, Loader},
+    loader::load_rom,
 };
 
 use log::*;
-use rgy::{apu::mixer::MixerStream, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
+use rgy::{apu::mixer::MixerStream, hardware::JoypadInput, mmu::DmgMode, VRAM_HEIGHT, VRAM_WIDTH};
 use std::{
     fs::File,
     io::Read,
@@ -71,22 +71,18 @@ fn main() {
     let mixer_stream = Arc::new(Mutex::new(MixerStream::new()));
 
     let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
+    let joypad_input = Arc::new(Mutex::new(JoypadInput::default()));
     let hw = Hardware::new(
         opt.ram.clone(),
         opt.color,
         mixer_stream.clone(),
         vram.clone(),
+        joypad_input.clone(),
     );
     let hw1 = hw.clone();
 
     let handle = std::thread::spawn(move || {
-        let (rom, hw1) = if opt.rom.is_dir() {
-            let mut ldr = Loader::new(&opt.rom);
-
-            utils::select(&mut ldr, hw1)
-        } else {
-            (load_rom(&opt.rom), hw1)
-        };
+        let rom = load_rom(&opt.rom);
 
         let mut ram = vec![0; 0x20000];
 
@@ -107,7 +103,10 @@ fn main() {
 
         let mut max_cycles = 0;
 
-        while let Some(poll_data) = sys.poll(&mut mixer_stream.lock().unwrap()) {
+        while let Some(poll_data) = sys.poll(
+            &mut mixer_stream.lock().unwrap(),
+            *joypad_input.lock().unwrap(),
+        ) {
             max_cycles = max_cycles.max(poll_data.cpu_time);
             if let Some((ly, buf)) = poll_data.line_to_draw {
                 let mut vram = vram.lock().unwrap();
@@ -117,7 +116,7 @@ fn main() {
                 }
                 drop(vram);
                 if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
-                    std::thread::sleep(Duration::from_micros(16740))
+                    std::thread::sleep(Duration::from_millis(16))
                 }
             }
         }

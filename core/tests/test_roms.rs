@@ -44,10 +44,6 @@ impl TestHardware {
 }
 
 impl rgy::Hardware for TestHardware {
-    fn joypad_pressed(&mut self, _: rgy::Key) -> bool {
-        false
-    }
-
     fn clock(&mut self) -> u64 {
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         epoch.as_micros() as u64
@@ -95,7 +91,7 @@ fn test_rom(expected: Expected, path: &str) {
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();
     let mut display = [DmgColor::White; VRAM_HEIGHT * VRAM_WIDTH];
-    while let Some(poll_data) = sys.poll(&mut mixer_stream) {
+    while let Some(poll_data) = sys.poll(&mut mixer_stream, Default::default()) {
         if now.elapsed() >= TIMEOUT {
             panic!("timeout")
         }
