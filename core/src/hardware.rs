@@ -54,8 +54,8 @@ pub trait Stream: Send + 'static {
 ///
 /// The users of this emulator library need to implement this trait,
 /// providing OS-specific functions.
-pub trait Hardware {
+pub trait Clock {
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.
-    fn clock(&mut self) -> u64;
+    fn clock(&self) -> u64;
 }

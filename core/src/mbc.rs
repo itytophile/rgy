@@ -2,7 +2,7 @@ use core::convert::TryInto;
 
 use log::*;
 
-use crate::Hardware;
+use crate::Clock;
 
 const BOOT_ROM: &[u8] = include_bytes!("dmg.bin");
 const BOOT_ROM_COLOR: &[u8] = include_bytes!("cgb.bin");
@@ -209,7 +209,7 @@ struct Mbc3<'a> {
 }
 
 impl<'a> Mbc3<'a> {
-    fn new(hw: &mut impl Hardware, ram: &'a mut [u8]) -> Self {
+    fn new(hw: &mut impl Clock, ram: &'a mut [u8]) -> Self {
         let mut s = Self {
             ram: (&mut ram[0..0x8000]).try_into().unwrap(),
             rom_bank: 0,
@@ -227,7 +227,7 @@ impl<'a> Mbc3<'a> {
         s
     }
 
-    fn epoch(&self, hw: &mut impl Hardware) -> u64 {
+    fn epoch(&self, hw: &mut impl Clock) -> u64 {
         hw.clock() / 1_000_000
     }
 
@@ -258,7 +258,7 @@ impl<'a> Mbc3<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Clock) {
         if addr <= 0x1fff {
             if value == 0x00 {
                 info!("External RAM/RTC disabled");
@@ -316,7 +316,7 @@ impl<'a> Mbc3<'a> {
         }
     }
 
-    fn update_epoch(&mut self, hw: &mut impl Hardware) {
+    fn update_epoch(&mut self, hw: &mut impl Clock) {
         self.epoch = self.epoch(hw);
     }
 
@@ -344,7 +344,7 @@ impl<'a> Mbc3<'a> {
         self.rtc_day_high = (self.rtc_day_high & !1) | ((d >> 8) & 1) as u8;
     }
 
-    fn latch(&mut self, hw: &mut impl Hardware) {
+    fn latch(&mut self, hw: &mut impl Clock) {
         let new_epoch = if self.rtc_day_high & 0x40 == 0 {
             self.epoch(hw)
         } else {
@@ -474,7 +474,7 @@ enum MbcTypeInner<'a> {
 }
 
 impl<'a> MbcType<'a> {
-    fn new(hw: &mut impl Hardware, code: u8, rom: &'a [u8], ram: &'a mut [u8]) -> Self {
+    fn new(hw: &mut impl Clock, code: u8, rom: &'a [u8], ram: &'a mut [u8]) -> Self {
         let mbc_type = match code {
             0x00 => MbcTypeInner::None(MbcNone::new(ram)),
             0x01..=0x03 => MbcTypeInner::Mbc1(Mbc1::new(ram)),
@@ -505,7 +505,7 @@ impl<'a> MbcType<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Clock) {
         match &mut self.mbc_type {
             MbcTypeInner::None(c) => c.on_write(addr, value),
             MbcTypeInner::Mbc1(c) => c.on_write(addr, value),
@@ -548,7 +548,7 @@ fn verify(rom: &[u8], checksum: u16) {
 }
 
 impl<'a> Cartridge<'a> {
-    fn new(hw: &mut impl Hardware, rom: &'a [u8], ram: &'a mut [u8]) -> Self {
+    fn new(hw: &mut impl Clock, rom: &'a [u8], ram: &'a mut [u8]) -> Self {
         let checksum = (rom[0x14e] as u16) << 8 | (rom[0x14f] as u16);
 
         verify(rom, checksum);
@@ -606,7 +606,7 @@ impl<'a> Cartridge<'a> {
         self.mbc.on_read(addr)
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Clock) {
         self.mbc.on_write(addr, value, hw)
     }
 }
@@ -618,7 +618,7 @@ pub struct Mbc<'a> {
 }
 
 impl<'a> Mbc<'a> {
-    pub fn new(hw: &mut impl Hardware, rom: &'a [u8], color: bool, ram: &'a mut [u8]) -> Self {
+    pub fn new(hw: &mut impl Clock, rom: &'a [u8], color: bool, ram: &'a mut [u8]) -> Self {
         let cartridge = Cartridge::new(hw, rom, ram);
 
         cartridge.show_info();
@@ -655,7 +655,7 @@ impl<'a> Mbc<'a> {
         self.use_boot_rom = false;
     }
 
-    pub(crate) fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    pub(crate) fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Clock) {
         if self.use_boot_rom && addr < 0x100 {
             unreachable!("Writing to boot ROM")
         } else if addr == 0xff50 {

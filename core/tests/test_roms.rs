@@ -27,11 +27,13 @@ impl Expected {
     }
 }
 
-struct TestHardware;
+struct Clock;
 
-impl rgy::Hardware for TestHardware {
-    fn clock(&mut self) -> u64 {
-        let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+impl rgy::Clock for Clock {
+    fn clock(&self) -> u64 {
+        let epoch = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Couldn't get epoch");
         epoch.as_micros() as u64
     }
 }
@@ -40,7 +42,7 @@ fn test_rom(expected: Expected, path: &str) {
     let rom = std::fs::read(path).unwrap();
     let mut cartridge_ram = [0; 0x8000];
     let mut sys =
-        rgy::System::<_, DmgMode>::new(Default::default(), &rom, TestHardware, &mut cartridge_ram);
+        rgy::System::<_, DmgMode>::new(Default::default(), &rom, Clock, &mut cartridge_ram);
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();

@@ -1,6 +1,6 @@
 use crate::apu::mixer::MixerStream;
 use crate::cpu::{Cpu, CpuState};
-use crate::hardware::{Hardware, JoypadInput};
+use crate::hardware::{Clock, JoypadInput};
 use crate::mmu::{GameboyMode, Mmu, Peripherals};
 use crate::{gpu, VRAM_WIDTH};
 
@@ -60,12 +60,12 @@ impl Config {
 }
 
 /// Represents the entire emulator context.
-pub struct System<'a, H: Hardware, GB: GameboyMode> {
+pub struct System<'a, H: Clock, GB: GameboyMode> {
     cpu_state: CpuState<GB>,
     peripherals: Peripherals<'a, H, GB>,
 }
 
-impl<'a, H: Hardware + 'static, GB: GameboyMode> System<'a, H, GB> {
+impl<'a, H: Clock + 'static, GB: GameboyMode> System<'a, H, GB> {
     /// Create a new emulator context.
     pub fn new(cfg: Config, rom: &'a [u8], hw: H, cartridge_ram: &'a mut [u8]) -> Self {
         let peripherals = Peripherals::new(hw, rom, cfg.color, cartridge_ram);

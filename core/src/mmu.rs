@@ -12,7 +12,7 @@ use crate::mbc::Mbc;
 use crate::serial::Serial;
 use crate::timer::Timer;
 use crate::wram::{self, Wram};
-use crate::{Hardware, VRAM_WIDTH};
+use crate::{Clock, VRAM_WIDTH};
 use log::*;
 
 pub enum DmgMode {}
@@ -51,7 +51,7 @@ pub struct Peripherals<'a, H, GB: GameboyMode> {
     pub hw: H,
 }
 
-impl<'a, H: Hardware, GB: GameboyMode> Peripherals<'a, H, GB> {
+impl<'a, H: Clock, GB: GameboyMode> Peripherals<'a, H, GB> {
     /// Create a new MMU instance.
     pub fn new(mut hw: H, rom: &'a [u8], color: bool, cartridge_ram: &'a mut [u8]) -> Self {
         Self {
@@ -84,7 +84,7 @@ pub struct Mmu<'a, 'b, H, GB: GameboyMode> {
     pub serial_input: &'a mut Option<u8>,
 }
 
-impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
+impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
     fn io_read(&mut self, addr: u16) -> u8 {
         match addr {
             0xff00 => self.peripherals.joypad.read(self.joypad_input),
@@ -246,7 +246,7 @@ impl<'a, 'b, H: Hardware, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
     }
 }
 
-impl<'a, 'b, T: Hardware, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
+impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.peripherals.ic.peek(&mut self.peripherals.irq)

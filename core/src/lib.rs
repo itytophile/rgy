@@ -23,10 +23,9 @@
 //!     }
 //! }
 //!
-//! impl rgy::Hardware for Hardware {
+//! impl rgy::Clock for Hardware {
 //!     // Provides clock for the emulator.
-//!     fn clock(&mut self) -> u64 {
-//!         // TODO: Return the epoch in microseconds.
+//!     fn clock(&self) -> u64 {
 //!         let epoch = std::time::SystemTime::now()
 //!             .duration_since(std::time::UNIX_EPOCH)
 //!             .expect("Couldn't get epoch");
@@ -88,5 +87,5 @@ pub mod mmu;
 /// Hardware interface, which abstracts OS-specific functions.
 pub mod hardware;
 
-pub use crate::hardware::{Hardware, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
+pub use crate::hardware::{Clock, Key, Stream, VRAM_HEIGHT, VRAM_WIDTH};
 pub use crate::system::{Config, System};

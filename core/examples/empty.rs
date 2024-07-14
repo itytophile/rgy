@@ -2,8 +2,8 @@ use rgy::{apu::mixer::MixerStream, mmu::DmgMode, Config};
 
 struct Hardware;
 
-impl rgy::Hardware for Hardware {
-    fn clock(&mut self) -> u64 {
+impl rgy::Clock for Hardware {
+    fn clock(&self) -> u64 {
         // Return the epoch in microseconds.
         let epoch = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

@@ -10,12 +10,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rgy::{Stream, VRAM_HEIGHT, VRAM_WIDTH};
 
 #[derive(Clone)]
-pub struct Hardware {
-    vram: Arc<Mutex<Vec<u32>>>,
-    keystate: Arc<Mutex<JoypadInput>>,
-    escape: Arc<AtomicBool>,
-    color: bool,
-}
+pub struct Hardware;
 
 struct Gui {
     window: Window,
@@ -100,38 +95,22 @@ impl Gui {
     }
 }
 
-impl Hardware {
-    pub fn new(
-        color: bool,
-        mixer_stream: Arc<Mutex<MixerStream>>,
-        vram: Arc<Mutex<Vec<u32>>>,
-        joypad_input: Arc<Mutex<JoypadInput>>,
-        escape: Arc<AtomicBool>,
-    ) -> Self {
-        let pcm = Pcm;
-        pcm.run_forever(mixer_stream);
+pub fn run(
+    color: bool,
+    mixer_stream: Arc<Mutex<MixerStream>>,
+    vram: Arc<Mutex<Vec<u32>>>,
+    joypad_input: Arc<Mutex<JoypadInput>>,
+    escape: Arc<AtomicBool>,
+) {
+    let pcm = Pcm;
+    pcm.run_forever(mixer_stream);
 
-        Self {
-            color,
-            vram,
-            keystate: joypad_input,
-            escape,
-        }
-    }
-
-    pub fn run(self) {
-        let bg = Gui::new(
-            self.vram.clone(),
-            self.keystate.clone(),
-            self.escape.clone(),
-            self.color,
-        );
-        bg.run();
-    }
+    let bg = Gui::new(vram, joypad_input, escape, color);
+    bg.run()
 }
 
-impl rgy::Hardware for Hardware {
-    fn clock(&mut self) -> u64 {
+impl rgy::Clock for Hardware {
+    fn clock(&self) -> u64 {
         let epoch = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Couldn't get epoch");
