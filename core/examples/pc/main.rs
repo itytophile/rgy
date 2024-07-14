@@ -77,7 +77,6 @@ fn main() {
     let joypad_input = Arc::new(Mutex::new(JoypadInput::default()));
     let escape = Arc::new(AtomicBool::new(false));
     let hw = Hardware::new(
-        opt.ram.clone(),
         opt.color,
         mixer_stream.clone(),
         vram.clone(),

@@ -58,7 +58,4 @@ pub trait Hardware {
     /// Clock source used by the emulator.
     /// The return value needs to be epoch time in microseconds.
     fn clock(&mut self) -> u64;
-
-    /// Called when the CPU attempts to read save data from the cartridge battery-backed RAM.
-    fn save_ram(&mut self, ram: &[u8]);
 }

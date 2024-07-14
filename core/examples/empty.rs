@@ -10,10 +10,6 @@ impl rgy::Hardware for Hardware {
             .expect("Couldn't get epoch");
         epoch.as_micros() as u64
     }
-
-    fn save_ram(&mut self, _ram: &[u8]) {
-        // Store save data.
-    }
 }
 
 fn main() {

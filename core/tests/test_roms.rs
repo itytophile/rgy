@@ -34,8 +34,6 @@ impl rgy::Hardware for TestHardware {
         let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         epoch.as_micros() as u64
     }
-
-    fn save_ram(&mut self, _: &[u8]) {}
 }
 
 fn test_rom(expected: Expected, path: &str) {

@@ -87,7 +87,7 @@ impl<'a> Mbc1<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    fn on_write(&mut self, addr: u16, value: u8) {
         if addr <= 0x1fff {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
@@ -95,7 +95,6 @@ impl<'a> Mbc1<'a> {
             } else {
                 info!("External RAM disabled");
                 self.ram_enable = false;
-                hw.save_ram(self.ram);
             }
         } else if (0x2000..=0x3fff).contains(&addr) {
             self.rom_bank = (self.rom_bank & !0x1f) | (value as usize & 0x1f);
@@ -162,7 +161,7 @@ impl<'a> Mbc2<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    fn on_write(&mut self, addr: u16, value: u8) {
         if addr <= 0x1fff {
             if addr & 0x100 == 0 {
                 self.ram_enable = (value & 0x0f) == 0x0a;
@@ -175,9 +174,6 @@ impl<'a> Mbc2<'a> {
                     },
                     value
                 );
-                if !self.ram_enable {
-                    hw.save_ram(self.ram);
-                }
             }
         } else if (0x2000..=0x3fff).contains(&addr) {
             if addr & 0x100 != 0 {
@@ -231,10 +227,6 @@ impl<'a> Mbc3<'a> {
         s
     }
 
-    fn save(&mut self, hw: &mut impl Hardware) {
-        hw.save_ram(self.ram);
-    }
-
     fn epoch(&self, hw: &mut impl Hardware) -> u64 {
         hw.clock() / 1_000_000
     }
@@ -280,7 +272,6 @@ impl<'a> Mbc3<'a> {
             trace!("Switch ROM bank to {}", self.rom_bank);
         } else if (0x4000..=0x5fff).contains(&addr) {
             self.select = value;
-            self.save(hw);
             debug!("Select RAM bank/RTC: {:02x}", self.select);
         } else if (0x6000..=0x7fff).contains(&addr) {
             if self.prelatch {
@@ -422,7 +413,7 @@ impl<'a> Mbc5<'a> {
         }
     }
 
-    fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
+    fn on_write(&mut self, addr: u16, value: u8) {
         if addr <= 0x1fff {
             if value & 0xf == 0x0a {
                 info!("External RAM enabled");
@@ -430,7 +421,6 @@ impl<'a> Mbc5<'a> {
             } else {
                 info!("External RAM disabled");
                 self.ram_enable = false;
-                hw.save_ram(self.ram);
             }
         } else if (0x2000..=0x2fff).contains(&addr) {
             self.rom_bank = (self.rom_bank & !0xff) | value as usize;
@@ -518,10 +508,10 @@ impl<'a> MbcType<'a> {
     fn on_write(&mut self, addr: u16, value: u8, hw: &mut impl Hardware) {
         match &mut self.mbc_type {
             MbcTypeInner::None(c) => c.on_write(addr, value),
-            MbcTypeInner::Mbc1(c) => c.on_write(addr, value, hw),
-            MbcTypeInner::Mbc2(c) => c.on_write(addr, value, hw),
+            MbcTypeInner::Mbc1(c) => c.on_write(addr, value),
+            MbcTypeInner::Mbc2(c) => c.on_write(addr, value),
             MbcTypeInner::Mbc3(c) => c.on_write(addr, value, hw),
-            MbcTypeInner::Mbc5(c) => c.on_write(addr, value, hw),
+            MbcTypeInner::Mbc5(c) => c.on_write(addr, value),
             MbcTypeInner::HuC1(c) => c.on_write(addr, value),
         }
     }

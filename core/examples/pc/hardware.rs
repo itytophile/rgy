@@ -1,8 +1,6 @@
 use minifb::{Scale, Window, WindowOptions};
 use rgy::apu::mixer::MixerStream;
 use rgy::hardware::JoypadInput;
-use std::fs::File;
-use std::io::prelude::*;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -13,7 +11,6 @@ use rgy::{Stream, VRAM_HEIGHT, VRAM_WIDTH};
 
 #[derive(Clone)]
 pub struct Hardware {
-    rampath: Option<String>,
     vram: Arc<Mutex<Vec<u32>>>,
     keystate: Arc<Mutex<JoypadInput>>,
     escape: Arc<AtomicBool>,
@@ -105,7 +102,6 @@ impl Gui {
 
 impl Hardware {
     pub fn new(
-        rampath: Option<String>,
         color: bool,
         mixer_stream: Arc<Mutex<MixerStream>>,
         vram: Arc<Mutex<Vec<u32>>>,
@@ -117,7 +113,6 @@ impl Hardware {
 
         Self {
             color,
-            rampath,
             vram,
             keystate: joypad_input,
             escape,
@@ -141,16 +136,6 @@ impl rgy::Hardware for Hardware {
             .duration_since(UNIX_EPOCH)
             .expect("Couldn't get epoch");
         epoch.as_micros() as u64
-    }
-
-    fn save_ram(&mut self, ram: &[u8]) {
-        match &self.rampath {
-            Some(path) => {
-                let mut fs = File::create(path).expect("Couldn't open file");
-                fs.write_all(ram).expect("Couldn't write file");
-            }
-            None => {}
-        }
     }
 }
 pub struct Pcm;

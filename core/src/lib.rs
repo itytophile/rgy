@@ -32,11 +32,6 @@
 //!             .expect("Couldn't get epoch");
 //!         epoch.as_micros() as u64
 //!     }
-//!
-//!     // Called when the emulator loads the save data from the battery-backed RAM.
-//!     fn save_ram(&mut self, _ram: &[u8]) {
-//!         // TODO: Store save data.
-//!     }
 //! }
 //!
 //! // Create the default config.
