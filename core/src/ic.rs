@@ -57,9 +57,7 @@ impl Irq {
     }
 }
 
-// The `bitflags!` macro generates `struct`s that manage a set of flags.
 bitflags::bitflags! {
-    /// Represents a set of flags.
     #[derive(Debug, Clone, Default, Copy,  PartialEq, Eq)]
     struct Ints: u8 {
         const VBLANK = 1;

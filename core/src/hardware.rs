@@ -25,16 +25,19 @@ pub enum Key {
     Start,
 }
 
-#[derive(Clone, Copy, Default)]
-pub struct JoypadInput {
-    pub right: bool,
-    pub left: bool,
-    pub up: bool,
-    pub down: bool,
-    pub a: bool,
-    pub b: bool,
-    pub select: bool,
-    pub start: bool,
+bitflags::bitflags! {
+    /// The flags order is important. We can easily change the joypad state with bit operations.
+    #[derive(Debug, Clone, Copy,  PartialEq, Eq, Default)]
+    pub struct JoypadInput: u8 {
+        const A = 1;
+        const B = 1 << 1;
+        const SELECT = 1 << 2;
+        const START = 1 << 3;
+        const RIGHT = 1 << 4;
+        const LEFT = 1 << 5;
+        const UP = 1 << 6;
+        const DOWN = 1 << 7;
+    }
 }
 
 /// Sound wave stream which generates the wave to be played by the sound device.

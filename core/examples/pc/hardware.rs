@@ -76,14 +76,14 @@ impl Gui {
 
             for k in keys {
                 match k {
-                    minifb::Key::Right => input.right = true,
-                    minifb::Key::Left => input.left = true,
-                    minifb::Key::Up => input.up = true,
-                    minifb::Key::Down => input.down = true,
-                    minifb::Key::Z => input.a = true,
-                    minifb::Key::X => input.b = true,
-                    minifb::Key::Space => input.select = true,
-                    minifb::Key::Enter => input.start = true,
+                    minifb::Key::Right => *input |= JoypadInput::RIGHT,
+                    minifb::Key::Left => *input |= JoypadInput::LEFT,
+                    minifb::Key::Up => *input |= JoypadInput::UP,
+                    minifb::Key::Down => *input |= JoypadInput::DOWN,
+                    minifb::Key::Z => *input |= JoypadInput::A,
+                    minifb::Key::X => *input |= JoypadInput::B,
+                    minifb::Key::Space => *input |= JoypadInput::SELECT,
+                    minifb::Key::Enter => *input |= JoypadInput::START,
                     minifb::Key::Escape => {
                         self.escape.store(true, Ordering::Relaxed);
                         return;

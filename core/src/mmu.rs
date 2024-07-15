@@ -60,7 +60,7 @@ impl<'a, H: Clock, GB: GameboyMode> Peripherals<'a, H, GB> {
             mbc: Mbc::new(&mut hw, rom, color, cartridge_ram),
             timer: Timer::new(),
             serial: Serial::default(),
-            joypad: Joypad::new(),
+            joypad: Joypad::default(),
             apu: Apu::new(),
             dma: Dma::new(),
             cgb: Cgb::new(color),

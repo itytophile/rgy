@@ -1,64 +1,73 @@
+use log::debug;
+
 use crate::hardware::JoypadInput;
 use crate::ic::Irq;
-use log::*;
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy,  PartialEq, Eq)]
+    struct JoypadFlags: u8 {
+        const NOT_DPAD = 1 << 4;
+        const NOT_BUTTONS = 1 << 5;
+    }
+}
+
+impl Default for JoypadFlags {
+    fn default() -> Self {
+        Self::all()
+    }
+}
+
+impl Default for Joypad {
+    fn default() -> Self {
+        Self {
+            flags: Default::default(),
+            pressed: 0xf,
+        }
+    }
+}
 
 pub struct Joypad {
-    select: u8,
-    pressed: u8,
+    flags: JoypadFlags,
+    pressed: u8, // what was pressed before the new input
 }
 
 impl Joypad {
-    pub fn new() -> Self {
-        Self {
-            select: 0xff,
-            pressed: 0x0f,
-        }
-    }
-
     pub fn poll(&mut self, irq: &mut Irq, joypad_input: JoypadInput) {
         let pressed = self.check(joypad_input);
 
-        for i in 0..4 {
-            let bit = 1 << i;
-            if self.pressed & bit != 0 && pressed & bit == 0 {
-                irq.joypad(true);
-                break;
-            }
+        // if pressed has different 0 than self.pressed then the intersection will be lower than self.pressed
+        // it means that some 1s have been turned to 0 (1 -> 0 = button pressed)
+        if self.pressed & pressed < self.pressed {
+            irq.joypad(true);
         }
 
         self.pressed = pressed;
     }
 
     fn check(&self, joypad_input: JoypadInput) -> u8 {
-        let mut value = 0;
-
-        if self.select & 0x10 == 0 {
-            value |= if joypad_input.right { 0x00 } else { 0x01 };
-            value |= if joypad_input.left { 0x00 } else { 0x02 };
-            value |= if joypad_input.up { 0x00 } else { 0x04 };
-            value |= if joypad_input.down { 0x00 } else { 0x08 };
-        } else if self.select & 0x20 == 0 {
-            value |= if joypad_input.a { 0x00 } else { 0x01 };
-            value |= if joypad_input.b { 0x00 } else { 0x02 };
-            value |= if joypad_input.select { 0x00 } else { 0x04 };
-            value |= if joypad_input.start { 0x0 } else { 0x08 };
+        if !self.flags.contains(JoypadFlags::NOT_DPAD) {
+            // we can shift bits by 4 because JoypadInput's flags have a special order
+            self.flags.bits() | (joypad_input.complement().bits() >> 4)
+        } else if !self.flags.contains(JoypadFlags::NOT_BUTTONS) {
+            self.flags.bits()
+                | (joypad_input.complement()
+                    & (JoypadInput::A | JoypadInput::B | JoypadInput::SELECT | JoypadInput::START))
+                    .bits()
         } else {
-            value = 0x0f;
+            0xff
         }
-
-        value
     }
 
     pub(crate) fn read(&self, joypad_input: JoypadInput) -> u8 {
-        debug!("Joypad read: dir: {:02x}", self.select);
+        debug!("Joypad read: dir: {:x}", self.flags);
         self.check(joypad_input)
     }
 
     pub(crate) fn write(&mut self, value: u8) {
         debug!(
-            "Joypad write: dir: select={:02x}, value={:02x}",
-            self.select, value
+            "Joypad write: dir: select={:x}, value={:x}",
+            self.flags, value
         );
-        self.select = value & 0xf0;
+        self.flags = JoypadFlags::from_bits_truncate(value);
     }
 }
