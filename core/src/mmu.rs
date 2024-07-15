@@ -6,7 +6,7 @@ use crate::dma::{Dma, DmaRequest};
 use crate::gpu::{self, Gpu};
 use crate::hardware::JoypadInput;
 use crate::hram::Hram;
-use crate::ic::{Ic, Irq};
+use crate::ic::{self, Irq};
 use crate::joypad::Joypad;
 use crate::mbc::Mbc;
 use crate::serial::Serial;
@@ -41,7 +41,6 @@ pub struct Peripherals<'a, H, GB: GameboyMode> {
     gpu: Gpu<GB::Gpu>,
     mbc: Mbc<'a>,
     timer: Timer,
-    ic: Ic,
     pub serial: Serial,
     joypad: Joypad,
     apu: Apu,
@@ -60,7 +59,6 @@ impl<'a, H: Clock, GB: GameboyMode> Peripherals<'a, H, GB> {
             gpu: Gpu::new(),
             mbc: Mbc::new(&mut hw, rom, color, cartridge_ram),
             timer: Timer::new(),
-            ic: Ic::new(),
             serial: Serial::default(),
             joypad: Joypad::new(),
             apu: Apu::new(),
@@ -93,7 +91,7 @@ impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
             0xff03 => todo!("i/o write: addr={:04x}", addr),
             0xff04..=0xff07 => self.peripherals.timer.on_read(addr),
             0xff08..=0xff0e => todo!("i/o read: addr={:04x}", addr),
-            0xff0f => self.peripherals.ic.read_flags(&self.peripherals.irq),
+            0xff0f => ic::read_flags(&self.peripherals.irq),
             0xff10 => self.peripherals.apu.read_tone_sweep(),
             0xff11 => self.peripherals.apu.read_tone_wave(0),
             0xff12 => self.peripherals.apu.read_tone_envelop(0),
@@ -157,10 +155,7 @@ impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
             0xff03 => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
             0xff04..=0xff07 => self.peripherals.timer.on_write(addr, v),
             0xff08..=0xff0e => todo!("i/o write: addr={:04x}, v={:02x}", addr, v),
-            0xff0f => self
-                .peripherals
-                .ic
-                .write_flags(v, &mut self.peripherals.irq),
+            0xff0f => ic::write_flags(v, &mut self.peripherals.irq),
             0xff10 => self.peripherals.apu.write_tone_sweep(v),
             0xff11 => self.peripherals.apu.write_tone_wave(0, v),
             0xff12 => self.peripherals.apu.write_tone_envelop(0, v),
@@ -249,12 +244,12 @@ impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
 impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
-        self.peripherals.ic.peek(&mut self.peripherals.irq)
+        ic::peek(&mut self.peripherals.irq)
     }
 
     /// Get the interrupt vector address clearing the interrupt flag state
     fn pop_int_vec(&mut self) -> Option<u8> {
-        self.peripherals.ic.pop(&mut self.peripherals.irq)
+        ic::pop(&mut self.peripherals.irq)
     }
 
     /// Reads one byte from the given address in the memory.
@@ -268,7 +263,7 @@ impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
             0xfea0..=0xfeff => 0, // Unusable range
             0xff00..=0xff7f => self.io_read(addr),
             0xff80..=0xfffe => self.peripherals.hram.get8(addr),
-            0xffff..=0xffff => self.peripherals.ic.read_enabled(&self.peripherals.irq),
+            0xffff..=0xffff => ic::read_enabled(&self.peripherals.irq),
         }
     }
 
@@ -289,10 +284,7 @@ impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
             0xfea0..=0xfeff => {} // Unusable range
             0xff00..=0xff7f => self.io_write(addr, v),
             0xff80..=0xfffe => self.peripherals.hram.set8(addr, v),
-            0xffff..=0xffff => self
-                .peripherals
-                .ic
-                .write_enabled(v, &mut self.peripherals.irq),
+            0xffff..=0xffff => ic::write_enabled(v, &mut self.peripherals.irq),
         }
     }
 

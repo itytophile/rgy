@@ -13,6 +13,7 @@ readme = "../README.md"
 
 [dependencies]
 arrayvec = { version = "0.7.4", default-features = false }
+bitflags = "2.6.0"
 log = "0.4"
 
 [dev-dependencies]
