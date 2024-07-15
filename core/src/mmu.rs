@@ -244,12 +244,12 @@ impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
 impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
-        ic::peek(&mut self.peripherals.irq)
+        self.peripherals.irq.peek()
     }
 
     /// Get the interrupt vector address clearing the interrupt flag state
     fn pop_int_vec(&mut self) -> Option<u8> {
-        ic::pop(&mut self.peripherals.irq)
+        self.peripherals.irq.pop()
     }
 
     /// Reads one byte from the given address in the memory.

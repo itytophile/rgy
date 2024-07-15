@@ -32,6 +32,29 @@ impl Irq {
     pub fn joypad(&mut self, v: bool) {
         self.request.set(Ints::JOYPAD, v);
     }
+
+    fn get_first_ready_interrupt(&self) -> Option<(Ints, u8)> {
+        let flag = self.enable.intersection(self.request).iter().next()?;
+        let pc = match flag {
+            Ints::VBLANK => 0x40,
+            Ints::LCD => 0x48,
+            Ints::TIMER => 0x50,
+            Ints::SERIAL => 0x58,
+            Ints::JOYPAD => 0x60,
+            _ => return None,
+        };
+        Some((flag, pc))
+    }
+
+    pub fn peek(&self) -> Option<u8> {
+        self.get_first_ready_interrupt().map(|(_, pc)| pc)
+    }
+
+    pub fn pop(&mut self) -> Option<u8> {
+        let (flag, pc) = self.get_first_ready_interrupt()?;
+        self.request -= flag;
+        Some(pc)
+    }
 }
 
 // The `bitflags!` macro generates `struct`s that manage a set of flags.
@@ -45,35 +68,6 @@ bitflags::bitflags! {
         const SERIAL = 1 << 3;
         const JOYPAD = 1 << 4;
     }
-}
-
-/// Get the interrupt vector address without clearing the interrupt flag state
-pub fn peek(irq: &mut Irq) -> Option<u8> {
-    check(false, irq)
-}
-
-/// Get the interrupt vector address clearing the interrupt flag state
-pub fn pop(irq: &mut Irq) -> Option<u8> {
-    check(true, irq)
-}
-
-fn check(consume: bool, irq: &mut Irq) -> Option<u8> {
-    let e = &irq.enable;
-    let r = &mut irq.request;
-
-    for (flag, value) in [
-        (Ints::VBLANK, 0x40),
-        (Ints::LCD, 0x48),
-        (Ints::TIMER, 0x50),
-        (Ints::SERIAL, 0x58),
-        (Ints::JOYPAD, 0x60),
-    ] {
-        if e.contains(flag) && r.contains(flag) {
-            r.set(flag, !consume);
-            return Some(value);
-        }
-    }
-    None
 }
 
 /// Read IE register (0xffff)
