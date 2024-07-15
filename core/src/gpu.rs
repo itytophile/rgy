@@ -3,7 +3,7 @@ use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::Irq;
 use log::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Oam,
     Vram,
@@ -869,71 +869,54 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
         let mut draw_line = None;
 
-        let (clocks, mode) = match &self.mode {
-            Mode::Oam => {
-                if clocks >= 80 {
-                    (clocks - 80, Mode::Vram)
-                } else {
-                    (clocks, Mode::Oam)
-                }
-            }
-            Mode::Vram => {
-                if clocks >= 172 {
-                    draw_line = self.draw();
+        let (clocks, mode) = match (self.mode, clocks) {
+            (Mode::Oam, 80..) => (clocks - 80, Mode::Vram),
+            (Mode::Vram, 172..) => {
+                draw_line = self.draw();
 
-                    if self.hblank_interrupt {
+                if self.hblank_interrupt {
+                    irq.lcd(true);
+                }
+
+                (clocks - 172, Mode::HBlank)
+            }
+            (Mode::HBlank, 204..) => {
+                self.ly += 1;
+
+                // ly becomes 144 before vblank interrupt
+                if self.ly > 143 {
+                    irq.vblank(true);
+
+                    if self.vblank_interrupt {
                         irq.lcd(true);
                     }
 
-                    (clocks - 172, Mode::HBlank)
+                    (clocks - 204, Mode::VBlank)
                 } else {
-                    (clocks, Mode::Vram)
-                }
-            }
-            Mode::HBlank => {
-                if clocks >= 204 {
-                    self.ly += 1;
-
-                    // ly becomes 144 before vblank interrupt
-                    if self.ly > 143 {
-                        irq.vblank(true);
-
-                        if self.vblank_interrupt {
-                            irq.lcd(true);
-                        }
-
-                        (clocks - 204, Mode::VBlank)
-                    } else {
-                        if self.oam_interrupt {
-                            irq.lcd(true);
-                        }
-
-                        (clocks - 204, Mode::Oam)
+                    if self.oam_interrupt {
+                        irq.lcd(true);
                     }
-                } else {
-                    (clocks, Mode::HBlank)
+
+                    (clocks - 204, Mode::Oam)
                 }
             }
-            Mode::VBlank => {
-                if clocks >= 456 {
-                    self.ly += 1;
+            (Mode::VBlank, 456..) => {
+                self.ly += 1;
 
-                    if self.ly > 153 {
-                        self.ly = 0;
+                if self.ly > 153 {
+                    self.ly = 0;
 
-                        if self.oam_interrupt {
-                            irq.lcd(true);
-                        }
-
-                        (clocks - 456, Mode::Oam)
-                    } else {
-                        (clocks - 456, Mode::VBlank)
+                    if self.oam_interrupt {
+                        irq.lcd(true);
                     }
+
+                    (clocks - 456, Mode::Oam)
                 } else {
-                    (clocks, Mode::VBlank)
+                    (clocks - 456, Mode::VBlank)
                 }
             }
-            Mode::None => (0, Mode::None),
+            (Mode::None, _) => (0, Mode::None),
+            (mode, clock) => (clock, mode),
         };
 
         if self.lyc_interrupt && self.lyc == self.ly {
@@ -1152,7 +1135,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         v |= if self.hblank_interrupt { 0x08 } else { 0x00 };
         v |= if self.ly == self.lyc { 0x04 } else { 0x00 };
         v |= {
-            let p: u8 = self.mode.clone().into();
+            let p: u8 = self.mode.into();
             p
         };
         trace!("Read Status: {:02x}", v);
