@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 use crate::dma::DmaRequest;
 use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::{Ints, Irq};
@@ -56,7 +58,7 @@ pub struct Point {
 pub trait CgbExt: Default {
     type Color: Default + Copy;
 
-    fn get_col_coli(
+    fn get_color_and_color_id(
         &self,
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
@@ -149,7 +151,7 @@ impl Default for GpuCgbExtension {
 
 impl CgbExt for GpuCgbExtension {
     type Color = Color;
-    fn get_col_coli(
+    fn get_color_and_color_id(
         &self,
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
@@ -180,15 +182,16 @@ impl CgbExt for GpuCgbExtension {
 
         assert!(!priority);
 
-        let coli = get_tile_byte(
+        let line = get_tile_line(
             tbase,
-            Point { x: txoff, y: tyoff },
+            tyoff,
             if vram_bank == 0 {
                 vram_bank0
             } else {
                 &self.vram
             },
         );
+        let coli = get_color_id_from_tile_line(line, txoff);
         (palette[usize::from(coli)], coli)
     }
 
@@ -207,15 +210,17 @@ impl CgbExt for GpuCgbExtension {
         let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
         let vram_bank = (attr >> 3) & 1;
 
-        let coli = get_tile_byte(
+        let line = get_tile_line(
             tbase,
-            tile_offset,
+            tile_offset.y,
             if vram_bank == 0 {
                 vram_bank0
             } else {
                 &self.vram
             },
         );
+
+        let coli = get_color_id_from_tile_line(line, tile_offset.x);
         palette[usize::from(coli)]
     }
 
@@ -365,7 +370,7 @@ impl Default for Dmg {
 impl CgbExt for Dmg {
     type Color = DmgColor;
 
-    fn get_col_coli(
+    fn get_color_and_color_id(
         &self,
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
@@ -374,7 +379,8 @@ impl CgbExt for Dmg {
         mapbase: u16,
     ) -> (Self::Color, u8) {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let coli = get_tile_byte(tbase, tile_offset, vram_bank0);
+        let line = get_tile_line(tbase, tile_offset.y, vram_bank0);
+        let coli = get_color_id_from_tile_line(line, tile_offset.x);
 
         (self.bg_palette[usize::from(coli)], coli)
     }
@@ -388,7 +394,8 @@ impl CgbExt for Dmg {
         mapbase: u16,
     ) -> Self::Color {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let coli = get_tile_byte(tbase, tile_offset, vram_bank0);
+        let line = get_tile_line(tbase, tile_offset.y, vram_bank0);
+        let coli = get_color_id_from_tile_line(line, tile_offset.x);
 
         self.bg_palette[usize::from(coli)]
     }
@@ -521,7 +528,7 @@ impl LcdControl {
         }
     }
 
-    fn get_tiles(self) -> u16 {
+    fn get_bg_and_window_tile_area(self) -> u16 {
         if self.contains(Self::BG_AND_WINDOW_TILES) {
             0x8000
         } else {
@@ -1010,9 +1017,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
             let tx = xx / 8;
             let txoff = xx % 8;
 
-            let (col, coli) = self.cgb_ext.get_col_coli(
+            let (col, coli) = self.cgb_ext.get_color_and_color_id(
                 &self.vram,
-                self.lcd_control.get_tiles(),
+                self.lcd_control.get_bg_and_window_tile_area(),
                 Point { x: tx, y: ty },
                 Point { x: txoff, y: tyoff },
                 mapbase,
@@ -1037,7 +1044,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                 buf[usize::from(x)] = self.cgb_ext.get_window_col(
                     &self.vram,
-                    self.lcd_control.get_tiles(),
+                    self.lcd_control.get_bg_and_window_tile_area(),
                     Point { x: tx, y: ty },
                     Point { x: txoff, y: tyoff },
                     mapbase,
@@ -1099,7 +1106,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                 let tbase = tiles + u16::from(ti) * 16;
 
-                let coli = get_tile_byte(tbase, Point { x: txoff, y: tyoff }, attr.vram_bank);
+                let line = get_tile_line(tbase, tyoff, attr.vram_bank);
+
+                let coli = get_color_id_from_tile_line(line, txoff);
 
                 if coli == 0 {
                     // Color index 0 means transparent
@@ -1367,15 +1376,20 @@ fn get_tile_base(tiles: u16, mapbase: u16, tile: Point, vram_bank0: &[u8; 0x2000
     }
 }
 
-fn get_tile_byte(tilebase: u16, tile_offset: Point, bank: &[u8; 0x2000]) -> u8 {
-    let l = read_vram_bank(tilebase + u16::from(tile_offset.y) * 2, bank);
-    let h = read_vram_bank(tilebase + u16::from(tile_offset.y) * 2 + 1, bank);
+/// https://gbdev.io/pandocs/Tile_Data.html#vram-tile-data
+///
+/// Each tile occupies 16 bytes, where each line is represented by 2 bytes
+fn get_tile_line(tilebase: u16, y_offset: u8, bank: &[u8; 0x2000]) -> [u8; 2] {
+    let off = usize::from(tilebase + u16::from(y_offset) * 2 - 0x8000);
+    bank[off..=off + 1].try_into().unwrap()
+}
 
-    let l = (l >> (7 - tile_offset.x)) & 1;
-    let h = ((h >> (7 - tile_offset.x)) & 1) << 1;
-
+fn get_color_id_from_tile_line(line: [u8; 2], x_offset: u8) -> u8 {
+    let l = (line[0] >> (7 - x_offset)) & 1;
+    let h = ((line[1] >> (7 - x_offset)) & 1) << 1;
     h | l
 }
+
 fn read_vram_bank(addr: u16, bank: &[u8; 0x2000]) -> u8 {
     let off = addr - 0x8000;
     bank[usize::from(off)]
