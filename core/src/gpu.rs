@@ -977,51 +977,11 @@ impl<Ext: CgbExt> Gpu<Ext> {
         let mut bgbuf = [0u8; VRAM_WIDTH as usize];
 
         if self.lcd_control.contains(LcdControl::BGENABLE) {
-            let mapbase = self.lcd_control.get_bgmap();
-
-            let yy = self.ly.wrapping_add(self.scy);
-            let ty = yy / 8;
-            let tyoff = yy % 8;
-
-            for x in 0..VRAM_WIDTH {
-                let xx = x.wrapping_add(self.scx);
-                let tx = xx / 8;
-                let txoff = xx % 8;
-
-                let (col, coli) = self.cgb_ext.get_col_coli(
-                    &self.vram,
-                    self.lcd_control.get_tiles(),
-                    Point { x: tx, y: ty },
-                    Point { x: txoff, y: tyoff },
-                    mapbase,
-                );
-                buf[usize::from(x)] = col;
-                bgbuf[usize::from(x)] = coli;
-            }
+            self.when_bg_and_window_enable(&mut buf, &mut bgbuf);
         }
 
         if self.lcd_control.contains(LcdControl::WINDOW_ENABLE) {
-            let mapbase = self.lcd_control.get_winmap();
-
-            if self.ly >= self.wy {
-                let yy = self.ly - self.wy;
-                let ty = yy / 8;
-                let tyoff = yy % 8;
-
-                for x in self.wx.saturating_sub(7)..VRAM_WIDTH {
-                    let xx = x + 7 - self.wx; // x - (wx - 7)
-                    let tx = xx / 8;
-                    let txoff = xx % 8;
-
-                    buf[usize::from(x)] = self.cgb_ext.get_window_col(
-                        &self.vram,
-                        self.lcd_control.get_tiles(),
-                        Point { x: tx, y: ty },
-                        Point { x: txoff, y: tyoff },
-                        mapbase,
-                    );
-                }
-            }
+            self.when_window_enable(&mut buf);
         }
 
         if self.lcd_control.contains(LcdControl::OBJ_ENABLE) {
@@ -1029,6 +989,58 @@ impl<Ext: CgbExt> Gpu<Ext> {
         }
 
         Some((self.ly, buf))
+    }
+
+    fn when_bg_and_window_enable(
+        &self,
+        buf: &mut [<Ext as CgbExt>::Color; 160],
+        bgbuf: &mut [u8; 160],
+    ) {
+        let mapbase = self.lcd_control.get_bgmap();
+
+        let yy = self.ly.wrapping_add(self.scy);
+        let ty = yy / 8;
+        let tyoff = yy % 8;
+
+        for x in 0..VRAM_WIDTH {
+            let xx = x.wrapping_add(self.scx);
+            let tx = xx / 8;
+            let txoff = xx % 8;
+
+            let (col, coli) = self.cgb_ext.get_col_coli(
+                &self.vram,
+                self.lcd_control.get_tiles(),
+                Point { x: tx, y: ty },
+                Point { x: txoff, y: tyoff },
+                mapbase,
+            );
+            buf[usize::from(x)] = col;
+            bgbuf[usize::from(x)] = coli;
+        }
+    }
+
+    fn when_window_enable(&self, buf: &mut [<Ext as CgbExt>::Color; 160]) {
+        let mapbase = self.lcd_control.get_winmap();
+
+        if self.ly >= self.wy {
+            let yy = self.ly - self.wy;
+            let ty = yy / 8;
+            let tyoff = yy % 8;
+
+            for x in self.wx.saturating_sub(7)..VRAM_WIDTH {
+                let xx = x + 7 - self.wx; // x - (wx - 7)
+                let tx = xx / 8;
+                let txoff = xx % 8;
+
+                buf[usize::from(x)] = self.cgb_ext.get_window_col(
+                    &self.vram,
+                    self.lcd_control.get_tiles(),
+                    Point { x: tx, y: ty },
+                    Point { x: txoff, y: tyoff },
+                    mapbase,
+                );
+            }
+        }
     }
 
     fn when_obj_enable(&self, bgbuf: &[u8; 160], buf: &mut [<Ext as CgbExt>::Color; 160]) {
