@@ -913,6 +913,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (Mode::Drawing, 172..) => {
                 draw_line = self.draw();
 
+                // replace LCD bit by one if self.lcd_status contains HBLANK_INT
                 irq.request |= Ints::from_bits_retain(u8::from(
                     self.lcd_status.contains(LcdStatus::HBLANK_INT),
                 )) & Ints::LCD;
