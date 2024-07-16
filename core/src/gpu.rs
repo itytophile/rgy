@@ -508,7 +508,7 @@ bitflags::bitflags! {
         const BG_TILE_MAP = 1 << 3;
         const OBJ_SIZE = 1 << 2;
         const OBJ_ENABLE = 1 << 1;
-        const BGENABLE = 1;
+        const BG_AND_WINDOW_ENABLE = 1;
     }
 }
 
@@ -976,12 +976,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
         let mut buf = [Ext::Color::default(); VRAM_WIDTH as usize];
         let mut bgbuf = [0u8; VRAM_WIDTH as usize];
 
-        if self.lcd_control.contains(LcdControl::BGENABLE) {
+        if self.lcd_control.contains(LcdControl::BG_AND_WINDOW_ENABLE) {
             self.when_bg_and_window_enable(&mut buf, &mut bgbuf);
-        }
-
-        if self.lcd_control.contains(LcdControl::WINDOW_ENABLE) {
-            self.when_window_enable(&mut buf);
+            // https://gbdev.io/pandocs/LCDC.html#non-cgb-mode-dmg-sgb-and-cgb-in-compatibility-mode-bg-and-window-display
+            // When Bit 0 [LcdControl::BG_AND_WINDOW_ENABLE] is cleared, both background and window become blank (white),
+            // and the Window Display Bit [LcdControl::WINDOW_ENABLE] is ignored in that case.
+            // Only objects may still be displayed (if enabled in Bit 1).
+            if self.lcd_control.contains(LcdControl::WINDOW_ENABLE) {
+                self.when_window_enable(&mut buf);
+            }
         }
 
         if self.lcd_control.contains(LcdControl::OBJ_ENABLE) {
