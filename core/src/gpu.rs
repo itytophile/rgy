@@ -3,6 +3,16 @@ use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::{Ints, Irq};
 use log::*;
 
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy,  PartialEq, Eq, Default)]
+    struct LcdStatus: u8 {
+        const LYC_INT = 1 << 6;
+        const OAM_INT = 1 << 5;
+        const VBLAN_INT = 1 << 4;
+        const HBLANK_INT = 1 << 3;
+    }
+}
+
 // https://gbdev.io/pandocs/Rendering.html#ppu-modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -541,10 +551,7 @@ impl LcdControl {
 pub struct Gpu<Ext: CgbExt> {
     clocks: usize,
 
-    lyc_interrupt: bool,
-    oam_interrupt: bool,
-    vblank_interrupt: bool,
-    hblank_interrupt: bool,
+    lcd_status: LcdStatus,
     mode: Mode,
 
     ly: u8,
@@ -874,10 +881,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
     pub fn new() -> Self {
         Self {
             clocks: 0,
-            lyc_interrupt: false,
-            oam_interrupt: false,
-            vblank_interrupt: false,
-            hblank_interrupt: false,
+            lcd_status: LcdStatus::empty(),
             mode: Mode::None,
             ly: 0,
             lyc: 0,
@@ -909,7 +913,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (Mode::Drawing, 172..) => {
                 draw_line = self.draw();
 
-                irq.request |= Ints::from_bits_retain(u8::from(self.hblank_interrupt)) & Ints::LCD;
+                irq.request |= Ints::from_bits_retain(u8::from(
+                    self.lcd_status.contains(LcdStatus::HBLANK_INT),
+                )) & Ints::LCD;
 
                 (clocks - 172, Mode::HBlank)
             }
@@ -919,12 +925,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 // ly becomes 144 before vblank interrupt
                 if self.ly > 143 {
                     irq.request |= Ints::VBLANK;
-                    irq.request |=
-                        Ints::from_bits_retain(u8::from(self.vblank_interrupt)) & Ints::LCD;
+                    irq.request |= Ints::from_bits_retain(u8::from(
+                        self.lcd_status.contains(LcdStatus::VBLAN_INT),
+                    )) & Ints::LCD;
 
                     (clocks - 204, Mode::VBlank)
                 } else {
-                    irq.request |= Ints::from_bits_retain(u8::from(self.oam_interrupt)) & Ints::LCD;
+                    irq.request |= Ints::from_bits_retain(u8::from(
+                        self.lcd_status.contains(LcdStatus::OAM_INT),
+                    )) & Ints::LCD;
 
                     (clocks - 204, Mode::OamScan)
                 }
@@ -935,7 +944,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 if self.ly > 153 {
                     self.ly = 0;
 
-                    irq.request |= Ints::from_bits_retain(u8::from(self.oam_interrupt)) & Ints::LCD;
+                    irq.request |= Ints::from_bits_retain(u8::from(
+                        self.lcd_status.contains(LcdStatus::OAM_INT),
+                    )) & Ints::LCD;
 
                     (clocks - 456, Mode::OamScan)
                 } else {
@@ -946,8 +957,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (mode, clock) => (clock, mode),
         };
 
-        irq.request |=
-            Ints::from_bits_retain(u8::from(self.lyc_interrupt && self.lyc == self.ly)) & Ints::LCD;
+        irq.request |= Ints::from_bits_retain(u8::from(
+            self.lcd_status.contains(LcdStatus::LYC_INT) && self.lyc == self.ly,
+        )) & Ints::LCD;
 
         let enter_hblank = self.mode != Mode::HBlank && mode == Mode::HBlank;
 
@@ -1113,15 +1125,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
     /// Write STAT register (0xff41)
     pub(crate) fn write_status(&mut self, value: u8) {
-        self.lyc_interrupt = value & 0x40 != 0;
-        self.oam_interrupt = value & 0x20 != 0;
-        self.vblank_interrupt = value & 0x10 != 0;
-        self.hblank_interrupt = value & 0x08 != 0;
-
-        debug!("LYC interrupt: {}", self.lyc_interrupt);
-        debug!("OAM interrupt: {}", self.oam_interrupt);
-        debug!("VBlank interrupt: {}", self.vblank_interrupt);
-        debug!("HBlank interrupt: {}", self.hblank_interrupt);
+        self.lcd_status = LcdStatus::from_bits_truncate(value);
     }
 
     // Read CTRL register (0xff40)
@@ -1131,18 +1135,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
     // Write STAT register (0xff41)
     pub(crate) fn read_status(&self) -> u8 {
-        let mut v = 0;
-        v |= if self.lyc_interrupt { 0x40 } else { 0x00 };
-        v |= if self.oam_interrupt { 0x20 } else { 0x00 };
-        v |= if self.vblank_interrupt { 0x10 } else { 0x00 };
-        v |= if self.hblank_interrupt { 0x08 } else { 0x00 };
-        v |= if self.ly == self.lyc { 0x04 } else { 0x00 };
-        v |= {
-            let p: u8 = self.mode.into();
-            p
-        };
-        trace!("Read Status: {:02x}", v);
-        v
+        self.lcd_status.bits() | u8::from(self.mode)
     }
 
     /// Read OAM region (0xfe00 - 0xfe9f)
