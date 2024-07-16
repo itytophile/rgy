@@ -489,6 +489,54 @@ impl CgbExt for Dmg {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy,  PartialEq, Eq, Default)]
+    struct LcdControl: u8 {
+        const ENABLE = 1 << 7;
+        const WINMAP = 1 << 6;
+        const WINENABLE = 1 << 5;
+        const TILES = 1 << 4;
+        const BGMAP = 1 << 3;
+        const SPSIZE = 1 << 2;
+        const SPENABLE = 1 << 1;
+        const BGENABLE = 1;
+    }
+}
+
+impl LcdControl {
+    fn get_bgmap(self) -> u16 {
+        if self.contains(Self::BGMAP) {
+            0x9c00
+        } else {
+            0x9800
+        }
+    }
+
+    fn get_tiles(self) -> u16 {
+        if self.contains(Self::TILES) {
+            0x8000
+        } else {
+            0x8800
+        }
+    }
+
+    fn get_winmap(self) -> u16 {
+        if self.contains(Self::WINMAP) {
+            0x9c00
+        } else {
+            0x9800
+        }
+    }
+
+    fn get_spsize(self) -> u8 {
+        if self.contains(Self::SPSIZE) {
+            16
+        } else {
+            8
+        }
+    }
+}
+
 pub struct Gpu<Ext: CgbExt> {
     clocks: usize,
 
@@ -506,14 +554,7 @@ pub struct Gpu<Ext: CgbExt> {
     wx: u8,
     wy: u8,
 
-    enable: bool,
-    winmap: u16,
-    winenable: bool,
-    tiles: u16,
-    bgmap: u16,
-    spsize: u16,
-    spenable: bool,
-    bgenable: bool,
+    lcd_control: LcdControl,
 
     vram: [u8; 0x2000],
 
@@ -843,14 +884,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             scx: 0,
             wx: 0,
             wy: 0,
-            enable: false,
-            winmap: 0x9800,
-            winenable: false,
-            tiles: 0x8800,
-            bgmap: 0x9800,
-            spsize: 8,
-            spenable: false,
-            bgenable: false,
+            lcd_control: Default::default(),
 
             vram: [0; 0x2000],
 
@@ -933,8 +967,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
         let mut buf = [Ext::Color::default(); VRAM_WIDTH];
         let mut bgbuf = [0; VRAM_WIDTH];
 
-        if self.bgenable {
-            let mapbase = self.bgmap;
+        if self.lcd_control.contains(LcdControl::BGENABLE) {
+            let mapbase = self.lcd_control.get_bgmap();
 
             let yy = (self.ly as u16 + self.scy as u16) % 256;
             let ty = yy / 8;
@@ -947,7 +981,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                 let (col, coli) = self.cgb_ext.get_col_coli(
                     &self.vram,
-                    self.tiles,
+                    self.lcd_control.get_tiles(),
                     Point { x: tx, y: ty },
                     Point { x: txoff, y: tyoff },
                     mapbase,
@@ -957,8 +991,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
             }
         }
 
-        if self.winenable {
-            let mapbase = self.winmap;
+        if self.lcd_control.contains(LcdControl::WINENABLE) {
+            let mapbase = self.lcd_control.get_winmap();
 
             if self.ly >= self.wy {
                 let yy = (self.ly - self.wy) as u16;
@@ -975,7 +1009,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                     buf[x as usize] = self.cgb_ext.get_window_col(
                         &self.vram,
-                        self.tiles,
+                        self.lcd_control.get_tiles(),
                         Point { x: tx, y: ty },
                         Point { x: txoff, y: tyoff },
                         mapbase,
@@ -984,7 +1018,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             }
         }
 
-        if self.spenable {
+        if self.lcd_control.contains(LcdControl::SPENABLE) {
             for i in 0..40 {
                 let oam = i * 4;
                 let ypos = self.oam[oam] as u16;
@@ -998,16 +1032,16 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     continue;
                 }
                 let tyoff = ly + 16 - ypos; // ly - (ypos - 16)
-                if tyoff >= self.spsize {
+                if tyoff >= u16::from(self.lcd_control.get_spsize()) {
                     // This sprite doesn't hit the current ly
                     continue;
                 }
                 let tyoff = if attr.yflip {
-                    self.spsize - 1 - tyoff
+                    u16::from(self.lcd_control.get_spsize()) - 1 - tyoff
                 } else {
                     tyoff
                 };
-                let ti = if self.spsize == 16 {
+                let ti = if self.lcd_control.get_spsize() == 16 {
                     if tyoff >= 8 {
                         ti | 1
                     } else {
@@ -1058,36 +1092,22 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
     /// Write CTRL register (0xff40)
     pub(crate) fn write_ctrl(&mut self, value: u8, irq: &mut Irq) {
-        let old_enable = self.enable;
+        let value = LcdControl::from_bits_retain(value);
 
-        self.enable = value & 0x80 != 0;
-        self.winmap = if value & 0x40 != 0 { 0x9c00 } else { 0x9800 };
-        self.winenable = value & 0x20 != 0;
-        self.tiles = if value & 0x10 != 0 { 0x8000 } else { 0x8800 };
-        self.bgmap = if value & 0x08 != 0 { 0x9c00 } else { 0x9800 };
-        self.spsize = if value & 0x04 != 0 { 16 } else { 8 };
-        self.spenable = value & 0x02 != 0;
-        self.bgenable = value & 0x01 != 0;
-
-        if !old_enable && self.enable {
+        if !self.lcd_control.contains(LcdControl::ENABLE) && value.contains(LcdControl::ENABLE) {
             info!("LCD enabled");
             self.clocks = 0;
             self.mode = Mode::HBlank;
-        } else if old_enable && !self.enable {
+        } else if self.lcd_control.contains(LcdControl::ENABLE)
+            && !value.contains(LcdControl::ENABLE)
+        {
             info!("LCD disabled");
             self.mode = Mode::None;
         }
 
-        irq.request.remove(Ints::VBLANK);
+        self.lcd_control = value;
 
-        debug!("Write ctrl: {:02x}", value);
-        debug!("Window base: {:04x}", self.winmap);
-        debug!("Window enable: {}", self.winenable);
-        debug!("Bg/window base: {:04x}", self.tiles);
-        debug!("Background base: {:04x}", self.bgmap);
-        debug!("Sprite size: 8x{}", self.spsize);
-        debug!("Sprite enable: {}", self.spenable);
-        debug!("Background enable: {}", self.bgenable);
+        irq.request.remove(Ints::VBLANK);
     }
 
     /// Write STAT register (0xff41)
@@ -1105,16 +1125,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
     // Read CTRL register (0xff40)
     pub(crate) fn read_ctrl(&self) -> u8 {
-        let mut v = 0;
-        v |= if self.enable { 0x80 } else { 0x00 };
-        v |= if self.winmap == 0x9c00 { 0x40 } else { 0x00 };
-        v |= if self.winenable { 0x20 } else { 0x00 };
-        v |= if self.tiles == 0x8000 { 0x10 } else { 0x00 };
-        v |= if self.bgmap == 0x9c00 { 0x08 } else { 0x00 };
-        v |= if self.spsize == 16 { 0x04 } else { 0x00 };
-        v |= if self.spenable { 0x02 } else { 0x00 };
-        v |= if self.bgenable { 0x01 } else { 0x00 };
-        v
+        self.lcd_control.bits()
     }
 
     // Write STAT register (0xff41)
