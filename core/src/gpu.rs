@@ -1,6 +1,6 @@
 use crate::dma::DmaRequest;
 use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
-use crate::ic::Irq;
+use crate::ic::{Ints, Irq};
 use log::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -874,9 +874,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (Mode::Vram, 172..) => {
                 draw_line = self.draw();
 
-                if self.hblank_interrupt {
-                    irq.lcd(true);
-                }
+                irq.request |= Ints::from_bits_retain(u8::from(self.hblank_interrupt)) & Ints::LCD;
 
                 (clocks - 172, Mode::HBlank)
             }
@@ -885,17 +883,13 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                 // ly becomes 144 before vblank interrupt
                 if self.ly > 143 {
-                    irq.vblank(true);
-
-                    if self.vblank_interrupt {
-                        irq.lcd(true);
-                    }
+                    irq.request |= Ints::VBLANK;
+                    irq.request |=
+                        Ints::from_bits_retain(u8::from(self.vblank_interrupt)) & Ints::LCD;
 
                     (clocks - 204, Mode::VBlank)
                 } else {
-                    if self.oam_interrupt {
-                        irq.lcd(true);
-                    }
+                    irq.request |= Ints::from_bits_retain(u8::from(self.oam_interrupt)) & Ints::LCD;
 
                     (clocks - 204, Mode::Oam)
                 }
@@ -906,9 +900,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 if self.ly > 153 {
                     self.ly = 0;
 
-                    if self.oam_interrupt {
-                        irq.lcd(true);
-                    }
+                    irq.request |= Ints::from_bits_retain(u8::from(self.oam_interrupt)) & Ints::LCD;
 
                     (clocks - 456, Mode::Oam)
                 } else {
@@ -919,9 +911,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (mode, clock) => (clock, mode),
         };
 
-        if self.lyc_interrupt && self.lyc == self.ly {
-            irq.lcd(true);
-        }
+        irq.request |=
+            Ints::from_bits_retain(u8::from(self.lyc_interrupt && self.lyc == self.ly)) & Ints::LCD;
 
         let enter_hblank = self.mode != Mode::HBlank && mode == Mode::HBlank;
 
@@ -931,7 +922,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         (self.hdma.run(enter_hblank), draw_line)
     }
 
-    fn draw(&mut self) -> Option<(u8, [Ext::Color; VRAM_WIDTH])> {
+    fn draw(&self) -> Option<(u8, [Ext::Color; VRAM_WIDTH])> {
         let height = VRAM_HEIGHT;
         let width = VRAM_WIDTH;
 
@@ -1082,12 +1073,12 @@ impl<Ext: CgbExt> Gpu<Ext> {
             info!("LCD enabled");
             self.clocks = 0;
             self.mode = Mode::HBlank;
-            irq.vblank(false);
         } else if old_enable && !self.enable {
             info!("LCD disabled");
             self.mode = Mode::None;
-            irq.vblank(false);
         }
+
+        irq.request.remove(Ints::VBLANK);
 
         debug!("Write ctrl: {:02x}", value);
         debug!("Window base: {:04x}", self.winmap);

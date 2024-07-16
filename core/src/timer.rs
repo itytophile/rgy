@@ -1,4 +1,4 @@
-use crate::ic::Irq;
+use crate::ic::{Ints, Irq};
 use log::*;
 
 pub struct Timer {
@@ -59,7 +59,7 @@ impl Timer {
                 if of {
                     self.tim = self.tim_load;
                     info!("Timer interrupt");
-                    irq.timer(true);
+                    irq.request |= Ints::TIMER;
                 }
                 self.tim_clock_reset();
                 if rem <= self.tim_clocks {

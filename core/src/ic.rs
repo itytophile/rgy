@@ -4,35 +4,10 @@ use log::*;
 #[derive(Default)]
 pub struct Irq {
     enable: Ints,
-    request: Ints,
+    pub request: Ints,
 }
 
 impl Irq {
-    /// Request/cacnel vblank interrupt
-    pub fn vblank(&mut self, v: bool) {
-        self.request.set(Ints::VBLANK, v);
-    }
-
-    /// Request/cancel LCD interrupt
-    pub fn lcd(&mut self, v: bool) {
-        self.request.set(Ints::LCD, v);
-    }
-
-    /// Request/cancel timer interrupt
-    pub fn timer(&mut self, v: bool) {
-        self.request.set(Ints::TIMER, v);
-    }
-
-    /// Request/cancel serial interrupt
-    pub fn serial(&mut self, v: bool) {
-        self.request.set(Ints::SERIAL, v);
-    }
-
-    /// Request/cancel joypad interrupt
-    pub fn joypad(&mut self, v: bool) {
-        self.request.set(Ints::JOYPAD, v);
-    }
-
     fn get_first_ready_interrupt(&self) -> Option<(Ints, u8)> {
         let flag = self.enable.intersection(self.request).iter().next()?;
         let pc = match flag {
@@ -59,7 +34,7 @@ impl Irq {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Default, Copy,  PartialEq, Eq)]
-    struct Ints: u8 {
+    pub struct Ints: u8 {
         const VBLANK = 1;
         const LCD = 1 << 1;
         const TIMER = 1 << 2;

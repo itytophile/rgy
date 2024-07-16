@@ -1,4 +1,4 @@
-use crate::ic::Irq;
+use crate::ic::{Ints, Irq};
 use arrayvec::ArrayVec;
 use log::*;
 
@@ -26,7 +26,7 @@ impl Serial {
 
                 // End of transfer
                 self.ctrl &= !0x80;
-                irq.serial(true);
+                irq.request |= Ints::SERIAL;
             } else {
                 self.clock -= time;
             }
@@ -36,7 +36,7 @@ impl Serial {
 
             // End of transfer
             self.ctrl &= !0x80;
-            irq.serial(true);
+            irq.request |= Ints::SERIAL;
         }
     }
 

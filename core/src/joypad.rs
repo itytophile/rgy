@@ -1,7 +1,7 @@
 use log::debug;
 
 use crate::hardware::JoypadInput;
-use crate::ic::Irq;
+use crate::ic::{Ints, Irq};
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy,  PartialEq, Eq)]
@@ -37,9 +37,8 @@ impl Joypad {
 
         // if pressed has different 0 than self.pressed then the intersection will be lower than self.pressed
         // it means that some 1s have been turned to 0 (1 -> 0 = button pressed)
-        if self.pressed & pressed < self.pressed {
-            irq.joypad(true);
-        }
+        irq.request |=
+            Ints::from_bits_retain(u8::from(self.pressed & pressed < self.pressed)) & Ints::JOYPAD;
 
         self.pressed = pressed;
     }
