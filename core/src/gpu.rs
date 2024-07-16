@@ -8,7 +8,7 @@ bitflags::bitflags! {
     struct LcdStatus: u8 {
         const LYC_INT = 1 << 6;
         const OAM_INT = 1 << 5;
-        const VBLAN_INT = 1 << 4;
+        const VBLANK_INT = 1 << 4;
         const HBLANK_INT = 1 << 3;
     }
 }
@@ -912,10 +912,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (Mode::Drawing, 172..) => {
                 draw_line = self.draw();
 
-                // replace LCD bit by one if self.lcd_status contains HBLANK_INT
-                irq.request |= Ints::from_bits_retain(u8::from(
-                    self.lcd_status.contains(LcdStatus::HBLANK_INT),
-                )) & Ints::LCD;
+                if self.lcd_status.contains(LcdStatus::HBLANK_INT) {
+                    irq.request |= Ints::LCD
+                }
 
                 (clocks - 172, Mode::HBlank)
             }
@@ -925,15 +924,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 // ly becomes 144 before vblank interrupt
                 if self.ly > 143 {
                     irq.request |= Ints::VBLANK;
-                    irq.request |= Ints::from_bits_retain(u8::from(
-                        self.lcd_status.contains(LcdStatus::VBLAN_INT),
-                    )) & Ints::LCD;
+                    if self.lcd_status.contains(LcdStatus::VBLANK_INT) {
+                        irq.request |= Ints::LCD
+                    }
 
                     (clocks - 204, Mode::VBlank)
                 } else {
-                    irq.request |= Ints::from_bits_retain(u8::from(
-                        self.lcd_status.contains(LcdStatus::OAM_INT),
-                    )) & Ints::LCD;
+                    if self.lcd_status.contains(LcdStatus::OAM_INT) {
+                        irq.request |= Ints::LCD
+                    }
 
                     (clocks - 204, Mode::OamScan)
                 }
@@ -944,9 +943,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 if self.ly > 153 {
                     self.ly = 0;
 
-                    irq.request |= Ints::from_bits_retain(u8::from(
-                        self.lcd_status.contains(LcdStatus::OAM_INT),
-                    )) & Ints::LCD;
+                    if self.lcd_status.contains(LcdStatus::OAM_INT) {
+                        irq.request |= Ints::LCD;
+                    }
 
                     (clocks - 456, Mode::OamScan)
                 } else {
@@ -957,9 +956,9 @@ impl<Ext: CgbExt> Gpu<Ext> {
             (mode, clock) => (clock, mode),
         };
 
-        irq.request |= Ints::from_bits_retain(u8::from(
-            self.lcd_status.contains(LcdStatus::LYC_INT) && self.lyc == self.ly,
-        )) & Ints::LCD;
+        if self.lcd_status.contains(LcdStatus::LYC_INT) && self.lyc == self.ly {
+            irq.request |= Ints::LCD;
+        }
 
         let enter_hblank = self.mode != Mode::HBlank && mode == Mode::HBlank;
 
@@ -1026,9 +1025,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
         }
 
         if self.lcd_control.contains(LcdControl::SPENABLE) {
-            for oam in 0..40 {
-                let oam = oam * 4;
-                let ypos = self.oam[oam];
+            for oam in self.oam.chunks(4) {
+                let ypos = oam[0];
 
                 if self.ly + 16 < ypos {
                     // This sprite doesn't hit the current ly
@@ -1042,7 +1040,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     continue;
                 }
 
-                let attr = self.cgb_ext.get_sp_attr(self.oam[oam + 3], &self.vram);
+                let attr = self.cgb_ext.get_sp_attr(oam[3], &self.vram);
 
                 let tyoff = if attr.yflip {
                     self.lcd_control.get_spsize() - 1 - tyoff
@@ -1050,7 +1048,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     tyoff
                 };
 
-                let ti = self.oam[oam + 2];
+                let ti = oam[2];
 
                 let ti = if self.lcd_control.get_spsize() == 16 {
                     if tyoff >= 8 {
@@ -1065,7 +1063,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                 let tiles = 0x8000;
 
-                let xpos = self.oam[oam + 1];
+                let xpos = oam[1];
 
                 for x in 0..VRAM_WIDTH {
                     if x + 8 < xpos {
