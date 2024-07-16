@@ -501,20 +501,20 @@ impl CgbExt for Dmg {
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy,  PartialEq, Eq, Default)]
     struct LcdControl: u8 {
-        const ENABLE = 1 << 7;
-        const WINMAP = 1 << 6;
-        const WINENABLE = 1 << 5;
-        const TILES = 1 << 4;
-        const BGMAP = 1 << 3;
-        const SPSIZE = 1 << 2;
-        const SPENABLE = 1 << 1;
+        const LCD_PPU_ENABLE = 1 << 7;
+        const WINDOW_TILE_MAP = 1 << 6;
+        const WINDOW_ENABLE = 1 << 5;
+        const BG_AND_WINDOW_TILES = 1 << 4;
+        const BG_TILE_MAP = 1 << 3;
+        const OBJ_SIZE = 1 << 2;
+        const OBJ_ENABLE = 1 << 1;
         const BGENABLE = 1;
     }
 }
 
 impl LcdControl {
     fn get_bgmap(self) -> u16 {
-        if self.contains(Self::BGMAP) {
+        if self.contains(Self::BG_TILE_MAP) {
             0x9c00
         } else {
             0x9800
@@ -522,7 +522,7 @@ impl LcdControl {
     }
 
     fn get_tiles(self) -> u16 {
-        if self.contains(Self::TILES) {
+        if self.contains(Self::BG_AND_WINDOW_TILES) {
             0x8000
         } else {
             0x8800
@@ -530,7 +530,7 @@ impl LcdControl {
     }
 
     fn get_winmap(self) -> u16 {
-        if self.contains(Self::WINMAP) {
+        if self.contains(Self::WINDOW_TILE_MAP) {
             0x9c00
         } else {
             0x9800
@@ -538,7 +538,7 @@ impl LcdControl {
     }
 
     fn get_spsize(self) -> u8 {
-        if self.contains(Self::SPSIZE) {
+        if self.contains(Self::OBJ_SIZE) {
             16
         } else {
             8
@@ -1000,7 +1000,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
             }
         }
 
-        if self.lcd_control.contains(LcdControl::WINENABLE) {
+        if self.lcd_control.contains(LcdControl::WINDOW_ENABLE) {
             let mapbase = self.lcd_control.get_winmap();
 
             if self.ly >= self.wy {
@@ -1024,93 +1024,99 @@ impl<Ext: CgbExt> Gpu<Ext> {
             }
         }
 
-        if self.lcd_control.contains(LcdControl::SPENABLE) {
-            for oam in self.oam.chunks(4) {
-                let ypos = oam[0];
-
-                if self.ly + 16 < ypos {
-                    // This sprite doesn't hit the current ly
-                    continue;
-                }
-
-                let tyoff = self.ly + 16 - ypos; // ly - (ypos - 16)
-
-                if tyoff >= self.lcd_control.get_spsize() {
-                    // This sprite doesn't hit the current ly
-                    continue;
-                }
-
-                let attr = self.cgb_ext.get_sp_attr(oam[3], &self.vram);
-
-                let tyoff = if attr.yflip {
-                    self.lcd_control.get_spsize() - 1 - tyoff
-                } else {
-                    tyoff
-                };
-
-                let ti = oam[2];
-
-                let ti = if self.lcd_control.get_spsize() == 16 {
-                    if tyoff >= 8 {
-                        ti | 1
-                    } else {
-                        ti & 0xfe
-                    }
-                } else {
-                    ti
-                };
-                let tyoff = tyoff % 8;
-
-                let tiles = 0x8000;
-
-                let xpos = oam[1];
-
-                for x in 0..VRAM_WIDTH {
-                    if x + 8 < xpos {
-                        continue;
-                    }
-                    let txoff = x + 8 - xpos; // x - (xpos - 8)
-                    if txoff >= 8 {
-                        continue;
-                    }
-                    let txoff = if attr.xflip { 7 - txoff } else { txoff };
-
-                    let tbase = tiles + u16::from(ti) * 16;
-
-                    let coli = get_tile_byte(tbase, Point { x: txoff, y: tyoff }, attr.vram_bank);
-
-                    if coli == 0 {
-                        // Color index 0 means transparent
-                        continue;
-                    }
-
-                    let col = attr.palette[usize::from(coli)];
-
-                    let bgcoli = bgbuf[usize::from(x)];
-
-                    if attr.priority && bgcoli != 0 {
-                        // If priority is lower than bg color 1-3, don't draw
-                        continue;
-                    }
-
-                    buf[usize::from(x)] = col;
-                }
-            }
+        if self.lcd_control.contains(LcdControl::OBJ_ENABLE) {
+            self.when_obj_enable(&bgbuf, &mut buf);
         }
 
         Some((self.ly, buf))
+    }
+
+    fn when_obj_enable(&self, bgbuf: &[u8; 160], buf: &mut [<Ext as CgbExt>::Color; 160]) {
+        for oam in self.oam.chunks(4) {
+            let ypos = oam[0];
+
+            if self.ly + 16 < ypos {
+                // This sprite doesn't hit the current ly
+                continue;
+            }
+
+            let tyoff = self.ly + 16 - ypos; // ly - (ypos - 16)
+
+            if tyoff >= self.lcd_control.get_spsize() {
+                // This sprite doesn't hit the current ly
+                continue;
+            }
+
+            let attr = self.cgb_ext.get_sp_attr(oam[3], &self.vram);
+
+            let tyoff = if attr.yflip {
+                self.lcd_control.get_spsize() - 1 - tyoff
+            } else {
+                tyoff
+            };
+
+            let ti = oam[2];
+
+            let ti = if self.lcd_control.get_spsize() == 16 {
+                if tyoff >= 8 {
+                    ti | 1
+                } else {
+                    ti & 0xfe
+                }
+            } else {
+                ti
+            };
+            let tyoff = tyoff % 8;
+
+            let tiles = 0x8000;
+
+            let xpos = oam[1];
+
+            for x in 0..VRAM_WIDTH {
+                if x + 8 < xpos {
+                    continue;
+                }
+                let txoff = x + 8 - xpos; // x - (xpos - 8)
+                if txoff >= 8 {
+                    continue;
+                }
+                let txoff = if attr.xflip { 7 - txoff } else { txoff };
+
+                let tbase = tiles + u16::from(ti) * 16;
+
+                let coli = get_tile_byte(tbase, Point { x: txoff, y: tyoff }, attr.vram_bank);
+
+                if coli == 0 {
+                    // Color index 0 means transparent
+                    continue;
+                }
+
+                let col = attr.palette[usize::from(coli)];
+
+                let bgcoli = bgbuf[usize::from(x)];
+
+                if attr.priority && bgcoli != 0 {
+                    // If priority is lower than bg color 1-3, don't draw
+                    continue;
+                }
+
+                buf[usize::from(x)] = col;
+            }
+        }
     }
 
     /// Write CTRL register (0xff40)
     pub(crate) fn write_ctrl(&mut self, value: u8, irq: &mut Irq) {
         let value = LcdControl::from_bits_retain(value);
 
-        if !self.lcd_control.contains(LcdControl::ENABLE) && value.contains(LcdControl::ENABLE) {
+        if !self.lcd_control.contains(LcdControl::LCD_PPU_ENABLE)
+            && value.contains(LcdControl::LCD_PPU_ENABLE)
+        {
             info!("LCD enabled");
             self.clocks = 0;
             self.mode = Mode::HBlank;
-        } else if self.lcd_control.contains(LcdControl::ENABLE)
-            && !value.contains(LcdControl::ENABLE)
+        } else if self.lcd_control.contains(LcdControl::LCD_PPU_ENABLE)
+            && !value.contains(LcdControl::LCD_PPU_ENABLE)
         {
             info!("LCD disabled");
             self.mode = Mode::None;
