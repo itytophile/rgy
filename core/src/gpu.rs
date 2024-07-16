@@ -1026,28 +1026,32 @@ impl<Ext: CgbExt> Gpu<Ext> {
         }
 
         if self.lcd_control.contains(LcdControl::SPENABLE) {
-            for i in 0..40 {
-                let oam = i * 4;
+            for oam in 0..40 {
+                let oam = oam * 4;
                 let ypos = self.oam[oam];
-                let xpos = self.oam[oam + 1];
-                let ti = self.oam[oam + 2];
-                let attr = self.cgb_ext.get_sp_attr(self.oam[oam + 3], &self.vram);
 
-                let ly = self.ly;
-                if ly + 16 < ypos {
+                if self.ly + 16 < ypos {
                     // This sprite doesn't hit the current ly
                     continue;
                 }
-                let tyoff = ly + 16 - ypos; // ly - (ypos - 16)
+
+                let tyoff = self.ly + 16 - ypos; // ly - (ypos - 16)
+
                 if tyoff >= self.lcd_control.get_spsize() {
                     // This sprite doesn't hit the current ly
                     continue;
                 }
+
+                let attr = self.cgb_ext.get_sp_attr(self.oam[oam + 3], &self.vram);
+
                 let tyoff = if attr.yflip {
                     self.lcd_control.get_spsize() - 1 - tyoff
                 } else {
                     tyoff
                 };
+
+                let ti = self.oam[oam + 2];
+
                 let ti = if self.lcd_control.get_spsize() == 16 {
                     if tyoff >= 8 {
                         ti | 1
@@ -1060,6 +1064,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 let tyoff = tyoff % 8;
 
                 let tiles = 0x8000;
+
+                let xpos = self.oam[oam + 1];
 
                 for x in 0..VRAM_WIDTH {
                     if x + 8 < xpos {
