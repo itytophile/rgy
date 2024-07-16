@@ -3,10 +3,11 @@ use crate::hardware::{VRAM_HEIGHT, VRAM_WIDTH};
 use crate::ic::{Ints, Irq};
 use log::*;
 
+// https://gbdev.io/pandocs/Rendering.html#ppu-modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
-    Oam,
-    Vram,
+    OamScan,
+    Drawing,
     HBlank,
     VBlank,
     None,
@@ -17,8 +18,8 @@ impl From<Mode> for u8 {
         match v {
             Mode::HBlank => 0,
             Mode::VBlank => 1,
-            Mode::Oam => 2,
-            Mode::Vram => 3,
+            Mode::OamScan => 2,
+            Mode::Drawing => 3,
             Mode::None => 0,
         }
     }
@@ -29,8 +30,8 @@ impl From<u8> for Mode {
         match v {
             0 => Mode::HBlank,
             1 => Mode::VBlank,
-            2 => Mode::Oam,
-            3 => Mode::Vram,
+            2 => Mode::OamScan,
+            3 => Mode::Drawing,
             _ => Mode::None,
         }
     }
@@ -904,8 +905,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
         let mut draw_line = None;
 
         let (clocks, mode) = match (self.mode, clocks) {
-            (Mode::Oam, 80..) => (clocks - 80, Mode::Vram),
-            (Mode::Vram, 172..) => {
+            (Mode::OamScan, 80..) => (clocks - 80, Mode::Drawing),
+            (Mode::Drawing, 172..) => {
                 draw_line = self.draw();
 
                 irq.request |= Ints::from_bits_retain(u8::from(self.hblank_interrupt)) & Ints::LCD;
@@ -925,7 +926,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 } else {
                     irq.request |= Ints::from_bits_retain(u8::from(self.oam_interrupt)) & Ints::LCD;
 
-                    (clocks - 204, Mode::Oam)
+                    (clocks - 204, Mode::OamScan)
                 }
             }
             (Mode::VBlank, 456..) => {
@@ -936,7 +937,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                     irq.request |= Ints::from_bits_retain(u8::from(self.oam_interrupt)) & Ints::LCD;
 
-                    (clocks - 456, Mode::Oam)
+                    (clocks - 456, Mode::OamScan)
                 } else {
                     (clocks - 456, Mode::VBlank)
                 }
