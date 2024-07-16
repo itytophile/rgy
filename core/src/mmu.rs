@@ -317,7 +317,7 @@ impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
 
 #[must_use]
 pub struct StepData<C> {
-    pub line_to_draw: Option<(u8, [C; VRAM_WIDTH])>,
+    pub line_to_draw: Option<(u8, [C; VRAM_WIDTH as usize])>,
 }
 
 /// Behaves as a byte array for unit tests

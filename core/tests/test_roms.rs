@@ -22,7 +22,10 @@ impl Expected {
                 _ => None,
             })
             .collect();
-        assert_eq!(VRAM_HEIGHT * VRAM_WIDTH, display.len());
+        assert_eq!(
+            usize::from(VRAM_HEIGHT) * usize::from(VRAM_WIDTH),
+            display.len()
+        );
         Self::Display(display)
     }
 }
@@ -46,7 +49,7 @@ fn test_rom(expected: Expected, path: &str) {
     const TIMEOUT: Duration = Duration::from_secs(60);
     let now = Instant::now();
     let mut mixer_stream = MixerStream::new();
-    let mut display = [DmgColor::White; VRAM_HEIGHT * VRAM_WIDTH];
+    let mut display = [DmgColor::White; VRAM_HEIGHT as usize * VRAM_WIDTH as usize];
     let mut index = 0;
     loop {
         let poll_data = sys.poll(&mut mixer_stream, Default::default(), &mut None);
@@ -81,11 +84,14 @@ fn test_rom(expected: Expected, path: &str) {
                 let Some((ly, buf)) = poll_data.line_to_draw else {
                     continue;
                 };
-                for (a, b) in display[usize::from(ly) * VRAM_WIDTH..].iter_mut().zip(buf) {
+                for (a, b) in display[usize::from(ly) * usize::from(VRAM_WIDTH)..]
+                    .iter_mut()
+                    .zip(buf)
+                {
                     *a = *b;
                 }
 
-                if usize::from(ly) == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
+                if ly == VRAM_HEIGHT - 1 && display.as_slice() == expected.as_slice() {
                     return;
                 }
             }

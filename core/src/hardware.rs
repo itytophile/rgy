@@ -1,8 +1,8 @@
 /// The width of the VRAM.
-pub const VRAM_WIDTH: usize = 160;
+pub const VRAM_WIDTH: u8 = 160;
 
 /// The height of the VRAM.
-pub const VRAM_HEIGHT: usize = 144;
+pub const VRAM_HEIGHT: u8 = 144;
 
 /// Represents a key of the joypad.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

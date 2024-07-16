@@ -49,8 +49,8 @@ impl From<u8> for Mode {
 
 #[derive(Clone, Copy)]
 pub struct Point {
-    x: u16,
-    y: u16,
+    x: u8,
+    y: u8,
 }
 
 pub trait CgbExt: Default {
@@ -158,7 +158,7 @@ impl CgbExt for GpuCgbExtension {
         mapbase: u16,
     ) -> (Self::Color, usize) {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let ti = tile.x + tile.y * 32;
+        let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
         let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
 
         let palette = &self.bg_color_palette.cols[attr & 0x7][..];
@@ -201,7 +201,7 @@ impl CgbExt for GpuCgbExtension {
         mapbase: u16,
     ) -> Self::Color {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let ti = tile.x + tile.y * 32;
+        let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
         let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
 
         let palette = &self.bg_color_palette.cols[attr & 0x7][..];
@@ -875,7 +875,7 @@ impl<Ext: CgbExt> Default for Gpu<Ext> {
     }
 }
 
-pub type LineToDraw<C> = (u8, [C; VRAM_WIDTH]);
+pub type LineToDraw<C> = (u8, [C; VRAM_WIDTH as usize]);
 
 impl<Ext: CgbExt> Gpu<Ext> {
     pub fn new() -> Self {
@@ -970,26 +970,23 @@ impl<Ext: CgbExt> Gpu<Ext> {
         (self.hdma.run(enter_hblank), draw_line)
     }
 
-    fn draw(&self) -> Option<(u8, [Ext::Color; VRAM_WIDTH])> {
-        let height = VRAM_HEIGHT;
-        let width = VRAM_WIDTH;
-
-        if self.ly >= height as u8 {
+    fn draw(&self) -> Option<(u8, [Ext::Color; VRAM_WIDTH as usize])> {
+        if self.ly >= VRAM_HEIGHT {
             return None;
         }
 
-        let mut buf = [Ext::Color::default(); VRAM_WIDTH];
-        let mut bgbuf = [0; VRAM_WIDTH];
+        let mut buf = [Ext::Color::default(); VRAM_WIDTH as usize];
+        let mut bgbuf = [0; VRAM_WIDTH as usize];
 
         if self.lcd_control.contains(LcdControl::BGENABLE) {
             let mapbase = self.lcd_control.get_bgmap();
 
-            let yy = (self.ly as u16 + self.scy as u16) % 256;
+            let yy = self.ly.wrapping_add(self.scy);
             let ty = yy / 8;
             let tyoff = yy % 8;
 
-            for x in 0..width as u16 {
-                let xx = (x + self.scx as u16) % 256;
+            for x in 0..VRAM_WIDTH {
+                let xx = x.wrapping_add(self.scx);
                 let tx = xx / 8;
                 let txoff = xx % 8;
 
@@ -1009,15 +1006,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
             let mapbase = self.lcd_control.get_winmap();
 
             if self.ly >= self.wy {
-                let yy = (self.ly - self.wy) as u16;
+                let yy = self.ly - self.wy;
                 let ty = yy / 8;
                 let tyoff = yy % 8;
 
-                for x in 0..width as u16 {
-                    if x + 7 < self.wx as u16 {
+                for x in 0..VRAM_WIDTH {
+                    if x + 7 < self.wx {
                         continue;
                     }
-                    let xx = x + 7 - self.wx as u16; // x - (wx - 7)
+                    let xx = x + 7 - self.wx; // x - (wx - 7)
                     let tx = xx / 8;
                     let txoff = xx % 8;
 
@@ -1035,23 +1032,23 @@ impl<Ext: CgbExt> Gpu<Ext> {
         if self.lcd_control.contains(LcdControl::SPENABLE) {
             for i in 0..40 {
                 let oam = i * 4;
-                let ypos = self.oam[oam] as u16;
-                let xpos = self.oam[oam + 1] as u16;
+                let ypos = self.oam[oam];
+                let xpos = self.oam[oam + 1];
                 let ti = self.oam[oam + 2];
                 let attr = self.cgb_ext.get_sp_attr(self.oam[oam + 3], &self.vram);
 
-                let ly = self.ly as u16;
+                let ly = self.ly;
                 if ly + 16 < ypos {
                     // This sprite doesn't hit the current ly
                     continue;
                 }
                 let tyoff = ly + 16 - ypos; // ly - (ypos - 16)
-                if tyoff >= u16::from(self.lcd_control.get_spsize()) {
+                if tyoff >= self.lcd_control.get_spsize() {
                     // This sprite doesn't hit the current ly
                     continue;
                 }
                 let tyoff = if attr.yflip {
-                    u16::from(self.lcd_control.get_spsize()) - 1 - tyoff
+                    self.lcd_control.get_spsize() - 1 - tyoff
                 } else {
                     tyoff
                 };
@@ -1068,7 +1065,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
                 let tiles = 0x8000;
 
-                for x in 0..width as u16 {
+                for x in 0..VRAM_WIDTH {
                     if x + 8 < xpos {
                         continue;
                     }
@@ -1339,7 +1336,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
 }
 
 fn get_tile_base(tiles: u16, mapbase: u16, tile: Point, vram_bank0: &[u8; 0x2000]) -> u16 {
-    let ti = tile.x + tile.y * 32;
+    let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
     let num = read_vram_bank(mapbase + ti, vram_bank0);
 
     if tiles == 0x8000 {
@@ -1350,8 +1347,8 @@ fn get_tile_base(tiles: u16, mapbase: u16, tile: Point, vram_bank0: &[u8; 0x2000
 }
 
 fn get_tile_byte(tilebase: u16, tile_offset: Point, bank: &[u8; 0x2000]) -> usize {
-    let l = read_vram_bank(tilebase + tile_offset.y * 2, bank);
-    let h = read_vram_bank(tilebase + tile_offset.y * 2 + 1, bank);
+    let l = read_vram_bank(tilebase + u16::from(tile_offset.y) * 2, bank);
+    let h = read_vram_bank(tilebase + u16::from(tile_offset.y) * 2 + 1, bank);
 
     let l = (l >> (7 - tile_offset.x)) & 1;
     let h = ((h >> (7 - tile_offset.x)) & 1) << 1;

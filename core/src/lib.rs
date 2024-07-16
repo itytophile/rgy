@@ -17,7 +17,7 @@
 //! impl Hardware {
 //!     fn new() -> Self {
 //!         // Create a frame buffer with the size VRAM_WIDTH * VRAM_HEIGHT.
-//!         let dummy_display = vec![vec![0u32; VRAM_HEIGHT]; VRAM_WIDTH];
+//!         let dummy_display = vec![vec![0u32; usize::from(VRAM_HEIGHT)]; usize::from(VRAM_WIDTH)];
 //!
 //!         Self { dummy_display }
 //!     }

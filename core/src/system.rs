@@ -86,7 +86,7 @@ impl<'a, H: Clock + 'static, GB: GameboyMode> System<'a, H, GB> {
 }
 
 pub struct PollData<'a, C> {
-    pub line_to_draw: Option<(u8, &'a [C; VRAM_WIDTH])>,
+    pub line_to_draw: Option<(u8, &'a [C; VRAM_WIDTH as usize])>,
     pub cpu_time: usize,
     pub serial_sent_bytes: &'a [u8],
 }

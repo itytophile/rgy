@@ -60,7 +60,11 @@ fn main() {
 
     let mixer_stream = Arc::new(Mutex::new(MixerStream::new()));
 
-    let vram = Arc::new(Mutex::new(vec![0; VRAM_WIDTH * VRAM_HEIGHT]));
+    let vram = Arc::new(Mutex::new(vec![
+        0;
+        usize::from(VRAM_WIDTH)
+            * usize::from(VRAM_HEIGHT)
+    ]));
     let joypad_input = Arc::new(Mutex::new(JoypadInput::default()));
     let escape = Arc::new(AtomicBool::new(false));
     let color = opt.color;
@@ -106,12 +110,12 @@ fn main() {
 
                 if let Some((ly, buf)) = poll_data.line_to_draw {
                     let mut vram = vram.lock().unwrap();
-                    let base = usize::from(ly) * VRAM_WIDTH;
+                    let base = usize::from(ly) * usize::from(VRAM_WIDTH);
                     for (a, b) in vram[base..].iter_mut().zip(buf) {
                         *a = u32::from(*b);
                     }
                     drop(vram);
-                    if usize::from(ly) == VRAM_HEIGHT - 1 && !native_speed {
+                    if ly == VRAM_HEIGHT - 1 && !native_speed {
                         std::thread::sleep(Duration::from_millis(16))
                     }
                 }

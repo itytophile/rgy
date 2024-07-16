@@ -29,8 +29,8 @@ impl Gui {
         let title = if color { "Gay Boy Color" } else { "Gay Boy" };
         let window = match Window::new(
             title,
-            VRAM_WIDTH,
-            VRAM_HEIGHT,
+            usize::from(VRAM_WIDTH),
+            usize::from(VRAM_HEIGHT),
             WindowOptions {
                 resize: false,
                 scale: Scale::X4,
