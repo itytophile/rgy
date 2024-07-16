@@ -63,7 +63,7 @@ pub trait CgbExt: Default {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> (Self::Color, usize);
+    ) -> (Self::Color, u8);
 
     fn get_window_col(
         &self,
@@ -131,7 +131,7 @@ pub trait CgbExt: Default {
 
 pub struct GpuCgbExtension {
     vram: [u8; 0x2000],
-    vram_select: usize,
+    vram_select: u8,
     bg_color_palette: ColorPalette,
     obj_color_palette: ColorPalette,
 }
@@ -156,12 +156,12 @@ impl CgbExt for GpuCgbExtension {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> (Self::Color, usize) {
+    ) -> (Self::Color, u8) {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
-        let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
+        let attr = read_vram_bank(mapbase + ti, &self.vram);
 
-        let palette = &self.bg_color_palette.cols[attr & 0x7][..];
+        let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
         let vram_bank = (attr >> 3) & 1;
         let xflip = attr & 0x20 != 0;
         let yflip = attr & 0x40 != 0;
@@ -189,7 +189,7 @@ impl CgbExt for GpuCgbExtension {
                 &self.vram
             },
         );
-        (palette[coli], coli)
+        (palette[usize::from(coli)], coli)
     }
 
     fn get_window_col(
@@ -202,9 +202,9 @@ impl CgbExt for GpuCgbExtension {
     ) -> Self::Color {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
-        let attr = read_vram_bank(mapbase + ti, &self.vram) as usize;
+        let attr = read_vram_bank(mapbase + ti, &self.vram);
 
-        let palette = &self.bg_color_palette.cols[attr & 0x7][..];
+        let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
         let vram_bank = (attr >> 3) & 1;
 
         let coli = get_tile_byte(
@@ -216,7 +216,7 @@ impl CgbExt for GpuCgbExtension {
                 &self.vram
             },
         );
-        palette[coli]
+        palette[usize::from(coli)]
     }
 
     fn get_sp_attr<'a>(
@@ -224,10 +224,8 @@ impl CgbExt for GpuCgbExtension {
         attr: u8,
         vram_bank0: &'a [u8; 0x2000],
     ) -> MapAttribute<'a, Self::Color> {
-        let attr = attr as usize;
-
         MapAttribute {
-            palette: self.obj_color_palette.cols[attr & 0x7],
+            palette: self.obj_color_palette.cols[usize::from(attr & 0x7)],
             vram_bank: if (attr >> 3) & 1 == 0 {
                 vram_bank0
             } else {
@@ -294,12 +292,12 @@ impl CgbExt for GpuCgbExtension {
 
     /// Read VBK register (0xff4f)
     fn read_vram_bank_select(&self) -> u8 {
-        self.vram_select as u8 & 0xfe
+        self.vram_select & 0xfe
     }
 
     /// Write VBK register (0xff4f)
     fn select_vram_bank(&mut self, v: u8) {
-        self.vram_select = v as usize & 1;
+        self.vram_select = v & 1;
     }
 
     /// Write BCPS/BGPI register (0xff68)
@@ -374,11 +372,11 @@ impl CgbExt for Dmg {
         tile: Point,
         tile_offset: Point,
         mapbase: u16,
-    ) -> (Self::Color, usize) {
+    ) -> (Self::Color, u8) {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let coli = get_tile_byte(tbase, tile_offset, vram_bank0);
 
-        (self.bg_palette[coli], coli)
+        (self.bg_palette[usize::from(coli)], coli)
     }
 
     fn get_window_col(
@@ -392,7 +390,7 @@ impl CgbExt for Dmg {
         let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
         let coli = get_tile_byte(tbase, tile_offset, vram_bank0);
 
-        self.bg_palette[coli]
+        self.bg_palette[usize::from(coli)]
     }
 
     fn get_sp_attr<'a>(
@@ -613,7 +611,7 @@ impl ColorPalette {
 
     fn select(&mut self, value: u8) {
         self.auto_inc = value & 0x80 != 0;
-        self.index = value as usize & 0x3f;
+        self.index = usize::from(value) & 0x3f;
     }
 
     fn read(&self) -> u8 {
@@ -707,7 +705,7 @@ impl Color {
 }
 
 fn color_adjust(v: u8) -> u32 {
-    let v = v as u32;
+    let v = u32::from(v);
 
     if v >= 0x10 {
         0xff - (0x1f - v)
@@ -817,8 +815,9 @@ impl Hdma {
         } else {
             self.hblank = value & 0x80 != 0;
             self.len = value & 0x7f;
-            self.src_wip = ((self.src_high as u16) << 8 | self.src_low as u16) & !0x000f;
-            self.dst_wip = ((self.dst_high as u16) << 8 | self.dst_low as u16) & !0xe00f | 0x8000;
+            self.src_wip = (u16::from(self.src_high) << 8 | u16::from(self.src_low)) & !0x000f;
+            self.dst_wip =
+                (u16::from(self.dst_high) << 8 | u16::from(self.dst_low)) & !0xe00f | 0x8000;
             self.on = true;
 
             info!(
@@ -848,7 +847,7 @@ impl Hdma {
             0x10
         } else {
             // General mode copies all bytes at once.
-            (self.len as u16 + 1) * 0x10
+            (u16::from(self.len) + 1) * 0x10
         };
 
         info!(
@@ -976,7 +975,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         }
 
         let mut buf = [Ext::Color::default(); VRAM_WIDTH as usize];
-        let mut bgbuf = [0; VRAM_WIDTH as usize];
+        let mut bgbuf = [0u8; VRAM_WIDTH as usize];
 
         if self.lcd_control.contains(LcdControl::BGENABLE) {
             let mapbase = self.lcd_control.get_bgmap();
@@ -997,8 +996,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     Point { x: txoff, y: tyoff },
                     mapbase,
                 );
-                buf[x as usize] = col;
-                bgbuf[x as usize] = coli;
+                buf[usize::from(x)] = col;
+                bgbuf[usize::from(x)] = coli;
             }
         }
 
@@ -1010,15 +1009,12 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 let ty = yy / 8;
                 let tyoff = yy % 8;
 
-                for x in 0..VRAM_WIDTH {
-                    if x + 7 < self.wx {
-                        continue;
-                    }
+                for x in self.wx.saturating_sub(7)..VRAM_WIDTH {
                     let xx = x + 7 - self.wx; // x - (wx - 7)
                     let tx = xx / 8;
                     let txoff = xx % 8;
 
-                    buf[x as usize] = self.cgb_ext.get_window_col(
+                    buf[usize::from(x)] = self.cgb_ext.get_window_col(
                         &self.vram,
                         self.lcd_control.get_tiles(),
                         Point { x: tx, y: ty },
@@ -1075,7 +1071,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     }
                     let txoff = if attr.xflip { 7 - txoff } else { txoff };
 
-                    let tbase = tiles + ti as u16 * 16;
+                    let tbase = tiles + u16::from(ti) * 16;
 
                     let coli = get_tile_byte(tbase, Point { x: txoff, y: tyoff }, attr.vram_bank);
 
@@ -1084,16 +1080,16 @@ impl<Ext: CgbExt> Gpu<Ext> {
                         continue;
                     }
 
-                    let col = attr.palette[coli];
+                    let col = attr.palette[usize::from(coli)];
 
-                    let bgcoli = bgbuf[x as usize];
+                    let bgcoli = bgbuf[usize::from(x)];
 
                     if attr.priority && bgcoli != 0 {
                         // If priority is lower than bg color 1-3, don't draw
                         continue;
                     }
 
-                    buf[x as usize] = col;
+                    buf[usize::from(x)] = col;
                 }
             }
         }
@@ -1138,12 +1134,12 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
     /// Read OAM region (0xfe00 - 0xfe9f)
     pub(crate) fn read_oam(&self, addr: u16) -> u8 {
-        self.oam[addr as usize - 0xfe00]
+        self.oam[usize::from(addr) - 0xfe00]
     }
 
     /// Write OAM region (0xfe00 - 0xfe9f)
     pub(crate) fn write_oam(&mut self, addr: u16, v: u8) {
-        self.oam[addr as usize - 0xfe00] = v;
+        self.oam[usize::from(addr) - 0xfe00] = v;
     }
 
     /// Read SCY register (0xff42)
@@ -1340,26 +1336,26 @@ fn get_tile_base(tiles: u16, mapbase: u16, tile: Point, vram_bank0: &[u8; 0x2000
     let num = read_vram_bank(mapbase + ti, vram_bank0);
 
     if tiles == 0x8000 {
-        tiles + num as u16 * 16
+        tiles + u16::from(num) * 16
     } else {
-        tiles + (0x800 + num as i8 as i16 * 16) as u16
+        tiles + (0x800 + i16::from(num as i8) * 16) as u16
     }
 }
 
-fn get_tile_byte(tilebase: u16, tile_offset: Point, bank: &[u8; 0x2000]) -> usize {
+fn get_tile_byte(tilebase: u16, tile_offset: Point, bank: &[u8; 0x2000]) -> u8 {
     let l = read_vram_bank(tilebase + u16::from(tile_offset.y) * 2, bank);
     let h = read_vram_bank(tilebase + u16::from(tile_offset.y) * 2 + 1, bank);
 
     let l = (l >> (7 - tile_offset.x)) & 1;
     let h = ((h >> (7 - tile_offset.x)) & 1) << 1;
 
-    (h | l) as usize
+    h | l
 }
 fn read_vram_bank(addr: u16, bank: &[u8; 0x2000]) -> u8 {
-    let off = addr as usize - 0x8000;
-    bank[off]
+    let off = addr - 0x8000;
+    bank[usize::from(off)]
 }
 fn write_vram_bank(addr: u16, value: u8, bank: &mut [u8; 0x2000]) {
-    let off = addr as usize - 0x8000;
-    bank[off] = value;
+    let off = addr - 0x8000;
+    bank[usize::from(off)] = value;
 }
