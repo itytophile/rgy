@@ -564,6 +564,7 @@ impl CgbExt for Dmg {
         buf: &mut [Self::Color; VRAM_WIDTH as usize],
         bgbuf: &mut [u8; VRAM_WIDTH as usize],
     ) {
+        // thanks https://github.com/deltabeard/Peanut-GB/blob/4596d56ddb85a1aa45b1197c77f05e236a23bd94/peanut_gb.h#L1465
         let mut tbase = get_tile_base(
             tiles,
             mapbase,
@@ -574,8 +575,10 @@ impl CgbExt for Dmg {
             vram_bank0,
         );
         let mut line = get_tile_line(tbase, y % 8, vram_bank0);
-        let mut offset = scx % 8;
-        for i in 0..VRAM_WIDTH {
+        let mut offset = 7 - (scx % 8);
+        line[0] >>= offset;
+        line[1] >>= offset;
+        for i in (0..VRAM_WIDTH).rev() {
             if offset == 8 {
                 tbase = get_tile_base(
                     tiles,
@@ -589,9 +592,11 @@ impl CgbExt for Dmg {
                 line = get_tile_line(tbase, y % 8, vram_bank0);
                 offset = 0;
             }
-            let coli = get_color_id_from_tile_line(line, offset);
+            let coli = (line[0] & 1) | ((line[1] & 1) << 1);
             buf[usize::from(i)] = self.bg_palette[usize::from(coli)];
             bgbuf[usize::from(i)] = coli;
+            line[0] >>= 1;
+            line[1] >>= 1;
             offset += 1;
         }
     }
