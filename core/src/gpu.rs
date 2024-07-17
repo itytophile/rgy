@@ -130,7 +130,7 @@ pub trait CgbExt: Default {
     /// Write OCPD/OBPD register (0xff6b)
     fn write_obj_color_palette(&mut self, v: u8);
 
-    fn prout(
+    fn get_scanline_after_scx(
         &self,
         scx: u8,
         y: u8,
@@ -344,7 +344,7 @@ impl CgbExt for GpuCgbExtension {
         self.obj_color_palette.write(v);
     }
 
-    fn prout(
+    fn get_scanline_after_scx(
         &self,
         scx: u8,
         y: u8,
@@ -352,7 +352,8 @@ impl CgbExt for GpuCgbExtension {
         tiles: u16,
         mapbase: u16,
     ) -> impl Iterator<Item = (Self::Color, u8)> {
-        (scx / 8..=(scx + VRAM_WIDTH - 1) / 8)
+        (scx / 8..=u8::MAX / 8)
+            .chain(0..) // we don't care about the upper limit because we call take() later anyway
             .flat_map(move |tx| {
                 let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
                 let ti = u16::from(tx * 8) + u16::from(y) * 32;
@@ -375,7 +376,7 @@ impl CgbExt for GpuCgbExtension {
                     (palette[usize::from(coli)], coli)
                 })
             })
-            .skip(usize::from(scx))
+            .skip(usize::from(scx % 8))
             .take(usize::from(VRAM_WIDTH))
     }
 }
@@ -548,7 +549,7 @@ impl CgbExt for Dmg {
         panic!("Write BG Color palette in DMG mode");
     }
 
-    fn prout(
+    fn get_scanline_after_scx(
         &self,
         scx: u8,
         y: u8,
@@ -556,7 +557,8 @@ impl CgbExt for Dmg {
         tiles: u16,
         mapbase: u16,
     ) -> impl Iterator<Item = (Self::Color, u8)> {
-        (scx / 8..=(scx + VRAM_WIDTH - 1) / 8)
+        (scx / 8..=u8::MAX / 8)
+            .chain(0..) // we don't care about the upper limit because we call take() later anyway
             .flat_map(move |tx| {
                 let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
                 let line = get_tile_line(tbase, y % 8, vram_bank0);
@@ -565,7 +567,7 @@ impl CgbExt for Dmg {
                     (self.bg_palette[usize::from(coli)], coli)
                 })
             })
-            .skip(usize::from(scx))
+            .skip(usize::from(scx % 8))
             .take(usize::from(VRAM_WIDTH))
     }
 }
@@ -1071,7 +1073,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
         buf: &mut [<Ext as CgbExt>::Color; 160],
         bgbuf: &mut [u8; 160],
     ) {
-        let colors = self.cgb_ext.prout(
+        let colors = self.cgb_ext.get_scanline_after_scx(
             self.scx,
             self.ly.wrapping_add(self.scy),
             &self.vram,
