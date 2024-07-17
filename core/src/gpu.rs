@@ -129,6 +129,15 @@ pub trait CgbExt: Default {
 
     /// Write OCPD/OBPD register (0xff6b)
     fn write_obj_color_palette(&mut self, v: u8);
+
+    fn prout(
+        &self,
+        scx: u8,
+        y: u8,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        mapbase: u16,
+    ) -> impl Iterator<Item = (Self::Color, u8)>;
 }
 
 pub struct GpuCgbExtension {
@@ -334,6 +343,41 @@ impl CgbExt for GpuCgbExtension {
     fn write_obj_color_palette(&mut self, v: u8) {
         self.obj_color_palette.write(v);
     }
+
+    fn prout(
+        &self,
+        scx: u8,
+        y: u8,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        mapbase: u16,
+    ) -> impl Iterator<Item = (Self::Color, u8)> {
+        (scx / 8..=(scx + VRAM_WIDTH - 1) / 8)
+            .flat_map(move |tx| {
+                let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
+                let ti = u16::from(tx * 8) + u16::from(y) * 32;
+                let attr = read_vram_bank(mapbase + ti, &self.vram);
+
+                let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
+                let vram_bank = (attr >> 3) & 1;
+
+                let line = get_tile_line(
+                    tbase,
+                    y % 8,
+                    if vram_bank == 0 {
+                        vram_bank0
+                    } else {
+                        &self.vram
+                    },
+                );
+                (0u8..8u8).map(move |pixel_in_line| {
+                    let coli = get_color_id_from_tile_line(line, pixel_in_line);
+                    (palette[usize::from(coli)], coli)
+                })
+            })
+            .skip(usize::from(scx))
+            .take(usize::from(VRAM_WIDTH))
+    }
 }
 
 pub struct Dmg {
@@ -502,6 +546,27 @@ impl CgbExt for Dmg {
     /// Write OCPD/OBPD register (0xff6b)
     fn write_obj_color_palette(&mut self, _: u8) {
         panic!("Write BG Color palette in DMG mode");
+    }
+
+    fn prout(
+        &self,
+        scx: u8,
+        y: u8,
+        vram_bank0: &[u8; 0x2000],
+        tiles: u16,
+        mapbase: u16,
+    ) -> impl Iterator<Item = (Self::Color, u8)> {
+        (scx / 8..=(scx + VRAM_WIDTH - 1) / 8)
+            .flat_map(move |tx| {
+                let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
+                let line = get_tile_line(tbase, y % 8, vram_bank0);
+                (0u8..8u8).map(move |pixel_in_line| {
+                    let coli = get_color_id_from_tile_line(line, pixel_in_line);
+                    (self.bg_palette[usize::from(coli)], coli)
+                })
+            })
+            .skip(usize::from(scx))
+            .take(usize::from(VRAM_WIDTH))
     }
 }
 
@@ -1006,26 +1071,17 @@ impl<Ext: CgbExt> Gpu<Ext> {
         buf: &mut [<Ext as CgbExt>::Color; 160],
         bgbuf: &mut [u8; 160],
     ) {
-        let mapbase = self.lcd_control.get_bgmap();
+        let colors = self.cgb_ext.prout(
+            self.scx,
+            self.ly.wrapping_add(self.scy),
+            &self.vram,
+            self.lcd_control.get_bg_and_window_tile_area(),
+            self.lcd_control.get_bgmap(),
+        );
 
-        let yy = self.ly.wrapping_add(self.scy);
-        let ty = yy / 8;
-        let tyoff = yy % 8;
-
-        for x in 0..VRAM_WIDTH {
-            let xx = x.wrapping_add(self.scx);
-            let tx = xx / 8;
-            let txoff = xx % 8;
-
-            let (col, coli) = self.cgb_ext.get_color_and_color_id(
-                &self.vram,
-                self.lcd_control.get_bg_and_window_tile_area(),
-                Point { x: tx, y: ty },
-                Point { x: txoff, y: tyoff },
-                mapbase,
-            );
-            buf[usize::from(x)] = col;
-            bgbuf[usize::from(x)] = coli;
+        for (((color, color_id), buf), bgbuf) in colors.zip(buf.iter_mut()).zip(bgbuf.iter_mut()) {
+            *buf = color;
+            *bgbuf = color_id;
         }
     }
 
