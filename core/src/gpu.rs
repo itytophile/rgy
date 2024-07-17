@@ -569,13 +569,13 @@ impl CgbExt for Dmg {
             tiles,
             mapbase,
             Point {
-                x: scx / 8,
+                x: (VRAM_WIDTH - 1).wrapping_add(scx) / 8,
                 y: y / 8,
             },
             vram_bank0,
         );
         let mut line = get_tile_line(tbase, y % 8, vram_bank0);
-        let mut offset = 7 - (scx % 8);
+        let mut offset = (8 - (scx % 8)) % 8;
         line[0] >>= offset;
         line[1] >>= offset;
         for i in (0..VRAM_WIDTH).rev() {
