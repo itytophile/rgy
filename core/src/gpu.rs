@@ -137,7 +137,9 @@ pub trait CgbExt: Default {
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
         mapbase: u16,
-    ) -> impl Iterator<Item = (Self::Color, u8)>;
+        buf: &mut [Self::Color; VRAM_WIDTH as usize],
+        bgbuf: &mut [u8; VRAM_WIDTH as usize],
+    );
 }
 
 pub struct GpuCgbExtension {
@@ -351,33 +353,36 @@ impl CgbExt for GpuCgbExtension {
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
         mapbase: u16,
-    ) -> impl Iterator<Item = (Self::Color, u8)> {
-        (scx / 8..=u8::MAX / 8)
-            .chain(0..) // we don't care about the upper limit because we call take() later anyway
-            .flat_map(move |tx| {
-                let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
-                let ti = u16::from(tx * 8) + u16::from(y) * 32;
-                let attr = read_vram_bank(mapbase + ti, &self.vram);
+        buf: &mut [Self::Color; VRAM_WIDTH as usize],
+        bgbuf: &mut [u8; VRAM_WIDTH as usize],
+    ) {
+        // (scx / 8..=u8::MAX / 8)
+        //     .chain(0..) // we don't care about the upper limit because we call take() later anyway
+        //     .flat_map(move |tx| {
+        //         let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
+        //         let ti = u16::from(tx * 8) + u16::from(y) * 32;
+        //         let attr = read_vram_bank(mapbase + ti, &self.vram);
 
-                let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
-                let vram_bank = (attr >> 3) & 1;
+        //         let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
+        //         let vram_bank = (attr >> 3) & 1;
 
-                let line = get_tile_line(
-                    tbase,
-                    y % 8,
-                    if vram_bank == 0 {
-                        vram_bank0
-                    } else {
-                        &self.vram
-                    },
-                );
-                (0u8..8u8).map(move |pixel_in_line| {
-                    let coli = get_color_id_from_tile_line(line, pixel_in_line);
-                    (palette[usize::from(coli)], coli)
-                })
-            })
-            .skip(usize::from(scx % 8))
-            .take(usize::from(VRAM_WIDTH))
+        //         let line = get_tile_line(
+        //             tbase,
+        //             y % 8,
+        //             if vram_bank == 0 {
+        //                 vram_bank0
+        //             } else {
+        //                 &self.vram
+        //             },
+        //         );
+        //         (0u8..8u8).map(move |pixel_in_line| {
+        //             let coli = get_color_id_from_tile_line(line, pixel_in_line);
+        //             (palette[usize::from(coli)], coli)
+        //         })
+        //     })
+        //     .skip(usize::from(scx % 8))
+        //     .take(usize::from(VRAM_WIDTH))
+        todo!()
     }
 }
 
@@ -556,19 +561,39 @@ impl CgbExt for Dmg {
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
         mapbase: u16,
-    ) -> impl Iterator<Item = (Self::Color, u8)> {
-        (scx / 8..=u8::MAX / 8)
-            .chain(0..) // we don't care about the upper limit because we call take() later anyway
-            .flat_map(move |tx| {
-                let tbase = get_tile_base(tiles, mapbase, Point { x: tx, y: y / 8 }, vram_bank0);
-                let line = get_tile_line(tbase, y % 8, vram_bank0);
-                (0u8..8u8).map(move |pixel_in_line| {
-                    let coli = get_color_id_from_tile_line(line, pixel_in_line);
-                    (self.bg_palette[usize::from(coli)], coli)
-                })
-            })
-            .skip(usize::from(scx % 8))
-            .take(usize::from(VRAM_WIDTH))
+        buf: &mut [Self::Color; VRAM_WIDTH as usize],
+        bgbuf: &mut [u8; VRAM_WIDTH as usize],
+    ) {
+        let mut tbase = get_tile_base(
+            tiles,
+            mapbase,
+            Point {
+                x: scx / 8,
+                y: y / 8,
+            },
+            vram_bank0,
+        );
+        let mut line = get_tile_line(tbase, y % 8, vram_bank0);
+        let mut offset = scx % 8;
+        for i in 0..VRAM_WIDTH {
+            if offset == 8 {
+                tbase = get_tile_base(
+                    tiles,
+                    mapbase,
+                    Point {
+                        x: i.wrapping_add(scx) / 8,
+                        y: y / 8,
+                    },
+                    vram_bank0,
+                );
+                line = get_tile_line(tbase, y % 8, vram_bank0);
+                offset = 0;
+            }
+            let coli = get_color_id_from_tile_line(line, offset);
+            buf[usize::from(i)] = self.bg_palette[usize::from(coli)];
+            bgbuf[usize::from(i)] = coli;
+            offset += 1;
+        }
     }
 }
 
@@ -1073,18 +1098,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
         buf: &mut [<Ext as CgbExt>::Color; 160],
         bgbuf: &mut [u8; 160],
     ) {
-        let colors = self.cgb_ext.get_scanline_after_scx(
+        self.cgb_ext.get_scanline_after_scx(
             self.scx,
             self.ly.wrapping_add(self.scy),
             &self.vram,
             self.lcd_control.get_bg_and_window_tile_area(),
             self.lcd_control.get_bgmap(),
+            buf,
+            bgbuf,
         );
-
-        for (((color, color_id), buf), bgbuf) in colors.zip(buf.iter_mut()).zip(bgbuf.iter_mut()) {
-            *buf = color;
-            *bgbuf = color_id;
-        }
     }
 
     fn when_window_enable(&self, buf: &mut [<Ext as CgbExt>::Color; 160]) {
