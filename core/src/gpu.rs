@@ -1179,13 +1179,12 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
             let xpos = oam[1];
 
+            let tbase = tiles + u16::from(ti) * 16;
+            let line = get_tile_line(tbase, tyoff, attr.vram_bank);
+
             for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
                 let txoff = x + 8 - xpos; // x - (xpos - 8)
                 let txoff = if attr.xflip { 7 - txoff } else { txoff };
-
-                let tbase = tiles + u16::from(ti) * 16;
-
-                let line = get_tile_line(tbase, tyoff, attr.vram_bank);
 
                 let coli = get_color_id_from_tile_line(line, txoff);
 
