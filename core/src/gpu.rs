@@ -1179,8 +1179,14 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
             let xpos = oam[1];
 
+            if xpos == 0 || xpos >= VRAM_WIDTH + 8 {
+                // the object is off-screen
+                // https://gbdev.io/pandocs/OAM.html#byte-1--x-position
+                continue;
+            }
+
             let tbase = tiles + u16::from(ti) * 16;
-            let line = get_tile_line(tbase, tyoff, attr.vram_bank);
+            let mut line = get_tile_line(tbase, tyoff, attr.vram_bank);
 
             if attr.xflip {
                 for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
@@ -1205,10 +1211,13 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     buf[usize::from(x)] = col;
                 }
             } else {
-                for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
-                    let txoff = x + 8 - xpos; // x - (xpos - 8)
-
-                    let coli = get_color_id_from_tile_line(line, txoff);
+                let txoff = xpos.saturating_sub(VRAM_WIDTH);
+                line[0] >>= txoff;
+                line[1] >>= txoff;
+                for x in (xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos)).rev() {
+                    let coli = (line[0] & 1) | ((line[1] & 1) << 1);
+                    line[0] >>= 1;
+                    line[1] >>= 1;
 
                     if coli == 0 {
                         // Color index 0 means transparent
