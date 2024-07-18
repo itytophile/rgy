@@ -1179,14 +1179,8 @@ impl<Ext: CgbExt> Gpu<Ext> {
 
             let xpos = oam[1];
 
-            for x in 0..VRAM_WIDTH {
-                if x + 8 < xpos {
-                    continue;
-                }
+            for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
                 let txoff = x + 8 - xpos; // x - (xpos - 8)
-                if txoff >= 8 {
-                    continue;
-                }
                 let txoff = if attr.xflip { 7 - txoff } else { txoff };
 
                 let tbase = tiles + u16::from(ti) * 16;
