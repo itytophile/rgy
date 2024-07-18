@@ -1189,10 +1189,15 @@ impl<Ext: CgbExt> Gpu<Ext> {
             let mut line = get_tile_line(tbase, tyoff, attr.vram_bank);
 
             if attr.xflip {
+                // we have to shift only if the sprite is partially off-screen (screen left side)
+                let offset = 8u8.saturating_sub(xpos);
+                line[0] >>= offset;
+                line[1] >>= offset;
+                // we don't need to call .rev() because we want to keep the "natural" flip of the right to left read
                 for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
-                    let txoff = xpos - x - 1;
-
-                    let coli = get_color_id_from_tile_line(line, txoff);
+                    let coli = (line[0] & 1) | ((line[1] & 1) << 1);
+                    line[0] >>= 1;
+                    line[1] >>= 1;
 
                     if coli == 0 {
                         // Color index 0 means transparent
@@ -1211,9 +1216,10 @@ impl<Ext: CgbExt> Gpu<Ext> {
                     buf[usize::from(x)] = col;
                 }
             } else {
-                let txoff = xpos.saturating_sub(VRAM_WIDTH);
-                line[0] >>= txoff;
-                line[1] >>= txoff;
+                // we have to shift only if the sprite is partially off-screen (screen right side)
+                let offset = xpos.saturating_sub(VRAM_WIDTH);
+                line[0] >>= offset;
+                line[1] >>= offset;
                 for x in (xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos)).rev() {
                     let coli = (line[0] & 1) | ((line[1] & 1) << 1);
                     line[0] >>= 1;
