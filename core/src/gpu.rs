@@ -1182,27 +1182,50 @@ impl<Ext: CgbExt> Gpu<Ext> {
             let tbase = tiles + u16::from(ti) * 16;
             let line = get_tile_line(tbase, tyoff, attr.vram_bank);
 
-            for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
-                let txoff = x + 8 - xpos; // x - (xpos - 8)
-                let txoff = if attr.xflip { 7 - txoff } else { txoff };
+            if attr.xflip {
+                for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
+                    let txoff = xpos - x - 1;
 
-                let coli = get_color_id_from_tile_line(line, txoff);
+                    let coli = get_color_id_from_tile_line(line, txoff);
 
-                if coli == 0 {
-                    // Color index 0 means transparent
-                    continue;
+                    if coli == 0 {
+                        // Color index 0 means transparent
+                        continue;
+                    }
+
+                    let col = attr.palette[usize::from(coli)];
+
+                    let bgcoli = bgbuf[usize::from(x)];
+
+                    if attr.priority && bgcoli != 0 {
+                        // If priority is lower than bg color 1-3, don't draw
+                        continue;
+                    }
+
+                    buf[usize::from(x)] = col;
                 }
+            } else {
+                for x in xpos.saturating_sub(8)..VRAM_WIDTH.min(xpos) {
+                    let txoff = x + 8 - xpos; // x - (xpos - 8)
 
-                let col = attr.palette[usize::from(coli)];
+                    let coli = get_color_id_from_tile_line(line, txoff);
 
-                let bgcoli = bgbuf[usize::from(x)];
+                    if coli == 0 {
+                        // Color index 0 means transparent
+                        continue;
+                    }
 
-                if attr.priority && bgcoli != 0 {
-                    // If priority is lower than bg color 1-3, don't draw
-                    continue;
+                    let col = attr.palette[usize::from(coli)];
+
+                    let bgcoli = bgbuf[usize::from(x)];
+
+                    if attr.priority && bgcoli != 0 {
+                        // If priority is lower than bg color 1-3, don't draw
+                        continue;
+                    }
+
+                    buf[usize::from(x)] = col;
                 }
-
-                buf[usize::from(x)] = col;
             }
         }
     }
