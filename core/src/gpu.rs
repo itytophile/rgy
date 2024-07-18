@@ -558,6 +558,7 @@ pub struct Gpu<Ext: CgbExt> {
 
     pub cgb_ext: Ext,
 
+    // useful to keep the data here to avoid the CPU struct to catch some generic bounds
     pub draw_line: [Ext::Color; VRAM_WIDTH as usize],
 }
 
