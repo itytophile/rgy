@@ -1,12 +1,9 @@
 use log::*;
 
-use crate::{
-    gpu,
-    mmu::{GameboyMode, StepData},
-};
+use crate::mmu::StepData;
 
 /// Interface for CPU to interact with memory/devices
-pub trait Sys<GB: GameboyMode> {
+pub trait Sys {
     /// Get the interrupt vector address clearing the interrupt flag state
     fn pop_int_vec(&mut self) -> Option<u8>;
 
@@ -33,10 +30,10 @@ pub trait Sys<GB: GameboyMode> {
     }
 
     /// Proceed the system state by the given CPU cycles.
-    fn step(&mut self, cycles: usize) -> StepData<<GB::Gpu as gpu::CgbExt>::Color>;
+    fn step(&mut self, cycles: usize) -> StepData;
 }
 
-pub struct CpuState<GB: GameboyMode> {
+pub struct CpuState {
     a: u8,
     b: u8,
     c: u8,
@@ -53,16 +50,16 @@ pub struct CpuState<GB: GameboyMode> {
     halt: bool,
     halt_bug: bool,
     cycles: usize,
-    pub steps_data: StepData<<GB::Gpu as gpu::CgbExt>::Color>,
+    pub steps_data: StepData,
 }
 
-impl<GB: GameboyMode> Default for CpuState<GB> {
+impl Default for CpuState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<GB: GameboyMode> CpuState<GB> {
+impl CpuState {
     /// Create a new CPU state.
     pub fn new() -> Self {
         Self {
@@ -82,14 +79,14 @@ impl<GB: GameboyMode> CpuState<GB> {
             halt: false,
             halt_bug: false,
             cycles: 0,
-            steps_data: StepData { line_to_draw: None },
+            steps_data: StepData { drawn_line: None },
         }
     }
 }
 
 /// Represents CPU state.
-pub struct Cpu<'a, T, GB: GameboyMode> {
-    pub state: &'a mut CpuState<GB>,
+pub struct Cpu<'a, T> {
+    pub state: &'a mut CpuState,
     pub sys: &'a mut T,
 }
 
@@ -123,7 +120,7 @@ pub struct Cpu<'a, T, GB: GameboyMode> {
 //     }
 // }
 
-impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
+impl<'a, T: Sys> Cpu<'a, T> {
     /// Switch the CPU state to halting.
     pub fn halt(&mut self) {
         debug!("Halt");
@@ -142,7 +139,7 @@ impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
     /// If the CPU is in the halt state, the function does nothing but returns a fixed clock cycle.
     pub fn execute(&mut self) -> usize {
         self.state.cycles = 0;
-        self.state.steps_data.line_to_draw = None;
+        self.state.steps_data.drawn_line = None;
 
         if self.state.halt {
             self.step(4);
@@ -161,9 +158,9 @@ impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
     /// Step forward
     pub fn step(&mut self, cycles: usize) {
         self.state.cycles = self.state.cycles.wrapping_add(cycles);
-        if let Some(line_to_draw) = self.sys.step(cycles).line_to_draw {
-            assert!(self.state.steps_data.line_to_draw.is_none());
-            self.state.steps_data.line_to_draw = Some(line_to_draw);
+        if let Some(drawn_line) = self.sys.step(cycles).drawn_line {
+            assert!(self.state.steps_data.drawn_line.is_none());
+            self.state.steps_data.drawn_line = Some(drawn_line);
         }
     }
 
@@ -526,9 +523,9 @@ impl<'a, GB: GameboyMode, T: Sys<GB>> Cpu<'a, T, GB> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::mmu::{DmgMode, Ram};
+    use crate::mmu::Ram;
 
-    fn exec(cpu: &mut Cpu<Ram, DmgMode>) {
+    fn exec(cpu: &mut Cpu<Ram>) {
         let code = cpu.fetch_opcode();
         cpu.decode(code);
     }

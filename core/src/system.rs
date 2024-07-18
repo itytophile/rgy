@@ -31,7 +31,7 @@ impl Config {
 
 /// Represents the entire emulator context.
 pub struct System<'a, H: Clock, GB: GameboyMode> {
-    cpu_state: CpuState<GB>,
+    cpu_state: CpuState,
     peripherals: Peripherals<'a, H, GB>,
 }
 
@@ -72,13 +72,14 @@ impl<'a, H: Clock + 'static, GB: GameboyMode> System<'a, H, GB> {
 
         let time = cpu.execute();
 
+        let draw_line = &self.peripherals.gpu.draw_line;
+
         PollData {
             line_to_draw: self
                 .cpu_state
                 .steps_data
-                .line_to_draw
-                .as_ref()
-                .map(|line_to_draw| (line_to_draw.0, &line_to_draw.1)),
+                .drawn_line
+                .map(move |ly| (ly, draw_line)),
             cpu_time: time,
             serial_sent_bytes: self.peripherals.serial.get_sent_bytes(),
         }

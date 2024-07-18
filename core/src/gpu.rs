@@ -557,6 +557,8 @@ pub struct Gpu<Ext: CgbExt> {
     hdma: Hdma,
 
     pub cgb_ext: Ext,
+
+    pub draw_line: [Ext::Color; VRAM_WIDTH as usize],
 }
 
 fn to_palette(p: u8) -> [DmgColor; 4] {
@@ -883,22 +885,19 @@ impl<Ext: CgbExt> Gpu<Ext> {
             oam: [0; 0xa0],
             hdma: Hdma::new(),
             cgb_ext: Ext::default(),
+            draw_line: [Default::default(); VRAM_WIDTH as usize],
         }
     }
 
-    pub fn step(
-        &mut self,
-        time: usize,
-        irq: &mut Irq,
-    ) -> (Option<DmaRequest>, Option<LineToDraw<Ext::Color>>) {
+    pub fn step(&mut self, time: usize, irq: &mut Irq) -> (Option<DmaRequest>, Option<u8>) {
         let clocks = self.clocks + time;
 
-        let mut draw_line = None;
+        let mut drawn_ly = None;
 
         let (clocks, mode) = match (self.mode, clocks) {
             (Mode::OamScan, 80..) => (clocks - 80, Mode::Drawing),
             (Mode::Drawing, 172..) => {
-                draw_line = self.draw();
+                drawn_ly = self.draw();
 
                 if self.lcd_status.contains(LcdStatus::HBLANK_INT) {
                     irq.request |= Ints::LCD
@@ -953,52 +952,49 @@ impl<Ext: CgbExt> Gpu<Ext> {
         self.clocks = clocks;
         self.mode = mode;
 
-        (self.hdma.run(enter_hblank), draw_line)
+        (self.hdma.run(enter_hblank), drawn_ly)
     }
 
-    fn draw(&self) -> Option<(u8, [Ext::Color; VRAM_WIDTH as usize])> {
+    fn draw(&mut self) -> Option<u8> {
         if self.ly >= VRAM_HEIGHT {
             return None;
         }
 
-        let mut buf = [Ext::Color::default(); VRAM_WIDTH as usize];
+        self.draw_line.fill(Default::default());
+
         let mut bgbuf = [0u8; VRAM_WIDTH as usize];
 
         if self.lcd_control.contains(LcdControl::BG_AND_WINDOW_ENABLE) {
-            self.when_bg_and_window_enable(&mut buf, &mut bgbuf);
+            self.when_bg_and_window_enable(&mut bgbuf);
             // https://gbdev.io/pandocs/LCDC.html#non-cgb-mode-dmg-sgb-and-cgb-in-compatibility-mode-bg-and-window-display
             // When Bit 0 [LcdControl::BG_AND_WINDOW_ENABLE] is cleared, both background and window become blank (white),
             // and the Window Display Bit [LcdControl::WINDOW_ENABLE] is ignored in that case.
             // Only objects may still be displayed (if enabled in Bit 1).
             if self.lcd_control.contains(LcdControl::WINDOW_ENABLE) {
-                self.when_window_enable(&mut buf);
+                self.when_window_enable();
             }
         }
 
         if self.lcd_control.contains(LcdControl::OBJ_ENABLE) {
-            self.when_obj_enable(&bgbuf, &mut buf);
+            self.when_obj_enable(&bgbuf);
         }
 
-        Some((self.ly, buf))
+        Some(self.ly)
     }
 
-    fn when_bg_and_window_enable(
-        &self,
-        buf: &mut [<Ext as CgbExt>::Color; 160],
-        bgbuf: &mut [u8; 160],
-    ) {
+    fn when_bg_and_window_enable(&mut self, bgbuf: &mut [u8; 160]) {
         self.cgb_ext.get_scanline_after_offset(
             self.scx,
             self.ly.wrapping_add(self.scy),
             &self.vram,
             self.lcd_control.get_bg_and_window_tile_area(),
             self.lcd_control.get_bgmap(),
-            buf,
+            &mut self.draw_line,
             Some(bgbuf),
         );
     }
 
-    fn when_window_enable(&self, buf: &mut [<Ext as CgbExt>::Color; 160]) {
+    fn when_window_enable(&mut self) {
         if self.ly >= self.wy {
             self.cgb_ext.get_scanline_after_offset(
                 self.wx.saturating_sub(7),
@@ -1006,13 +1002,13 @@ impl<Ext: CgbExt> Gpu<Ext> {
                 &self.vram,
                 self.lcd_control.get_bg_and_window_tile_area(),
                 self.lcd_control.get_winmap(),
-                buf,
+                &mut self.draw_line,
                 None,
             );
         }
     }
 
-    fn when_obj_enable(&self, bgbuf: &[u8; 160], buf: &mut [<Ext as CgbExt>::Color; 160]) {
+    fn when_obj_enable(&mut self, bgbuf: &[u8; 160]) {
         for oam in self.oam.chunks(4) {
             let ypos = oam[0];
 
@@ -1087,7 +1083,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                         continue;
                     }
 
-                    buf[usize::from(x)] = col;
+                    self.draw_line[usize::from(x)] = col;
                 }
             } else {
                 // we have to shift only if the sprite is partially off-screen (screen right side)
@@ -1113,7 +1109,7 @@ impl<Ext: CgbExt> Gpu<Ext> {
                         continue;
                     }
 
-                    buf[usize::from(x)] = col;
+                    self.draw_line[usize::from(x)] = col;
                 }
             }
         }
@@ -1372,12 +1368,6 @@ fn get_tile_base(tiles: u16, mapbase: u16, tile: Point, vram_bank0: &[u8; 0x2000
 fn get_tile_line(tilebase: u16, y_offset: u8, bank: &[u8; 0x2000]) -> [u8; 2] {
     let off = usize::from(tilebase + u16::from(y_offset) * 2 - 0x8000);
     bank[off..=off + 1].try_into().unwrap()
-}
-
-fn get_color_id_from_tile_line(line: [u8; 2], x_offset: u8) -> u8 {
-    let l = (line[0] >> (7 - x_offset)) & 1;
-    let h = ((line[1] >> (7 - x_offset)) & 1) << 1;
-    h | l
 }
 
 fn read_vram_bank(addr: u16, bank: &[u8; 0x2000]) -> u8 {

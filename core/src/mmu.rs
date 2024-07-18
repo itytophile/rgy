@@ -12,7 +12,7 @@ use crate::mbc::Mbc;
 use crate::serial::Serial;
 use crate::timer::Timer;
 use crate::wram::{self, Wram};
-use crate::{Clock, VRAM_WIDTH};
+use crate::Clock;
 use log::*;
 
 pub enum DmgMode {}
@@ -38,7 +38,7 @@ pub trait GameboyMode {
 pub struct Peripherals<'a, H, GB: GameboyMode> {
     wram: Wram<GB::Wram>,
     hram: Hram,
-    gpu: Gpu<GB::Gpu>,
+    pub gpu: Gpu<GB::Gpu>,
     mbc: Mbc<'a>,
     timer: Timer,
     pub serial: Serial,
@@ -241,7 +241,7 @@ impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
     }
 }
 
-impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
+impl<'a, 'b, T: Clock, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
     fn peek_int_vec(&mut self) -> Option<u8> {
         self.peripherals.irq.peek()
@@ -289,12 +289,12 @@ impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
     }
 
     /// Updates the machine state by the given cycles
-    fn step(&mut self, cycles: usize) -> StepData<<GB::Gpu as gpu::CgbExt>::Color> {
+    fn step(&mut self, cycles: usize) -> StepData {
         if let Some(req) = self.peripherals.dma.step(cycles) {
             self.run_dma(req);
         }
 
-        let (dma_request, line_to_draw) =
+        let (dma_request, drawn_line) =
             self.peripherals.gpu.step(cycles, &mut self.peripherals.irq);
 
         if let Some(req) = dma_request {
@@ -311,13 +311,13 @@ impl<'a, 'b, T: Clock, GB: GameboyMode> Sys<GB> for Mmu<'a, 'b, T, GB> {
             .joypad
             .poll(&mut self.peripherals.irq, self.joypad_input);
 
-        StepData { line_to_draw }
+        StepData { drawn_line }
     }
 }
 
 #[must_use]
-pub struct StepData<C> {
-    pub line_to_draw: Option<(u8, [C; VRAM_WIDTH as usize])>,
+pub struct StepData {
+    pub drawn_line: Option<u8>,
 }
 
 /// Behaves as a byte array for unit tests
@@ -345,9 +345,7 @@ impl Ram {
     }
 }
 
-use crate::gpu::DmgColor;
-
-impl Sys<DmgMode> for Ram {
+impl Sys for Ram {
     fn peek_int_vec(&mut self) -> Option<u8> {
         None
     }
@@ -364,7 +362,7 @@ impl Sys<DmgMode> for Ram {
         self.ram[addr as usize] = v;
     }
 
-    fn step(&mut self, _: usize) -> StepData<DmgColor> {
-        StepData { line_to_draw: None }
+    fn step(&mut self, _: usize) -> StepData {
+        StepData { drawn_line: None }
     }
 }
