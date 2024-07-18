@@ -58,24 +58,6 @@ pub struct Point {
 pub trait CgbExt: Default {
     type Color: Default + Copy;
 
-    fn get_color_and_color_id(
-        &self,
-        vram_bank0: &[u8; 0x2000],
-        tiles: u16,
-        tile: Point,
-        tile_offset: Point,
-        mapbase: u16,
-    ) -> (Self::Color, u8);
-
-    fn get_window_col(
-        &self,
-        vram_bank0: &[u8; 0x2000],
-        tiles: u16,
-        tile: Point,
-        tile_offset: Point,
-        mapbase: u16,
-    ) -> Self::Color;
-
     fn get_sp_attr<'a>(
         &'a self,
         attr: u8,
@@ -130,7 +112,7 @@ pub trait CgbExt: Default {
     /// Write OCPD/OBPD register (0xff6b)
     fn write_obj_color_palette(&mut self, v: u8);
 
-    fn get_scanline_after_scx(
+    fn get_scanline_after_offset(
         &self,
         scx: u8,
         y: u8,
@@ -138,7 +120,7 @@ pub trait CgbExt: Default {
         tiles: u16,
         mapbase: u16,
         buf: &mut [Self::Color; VRAM_WIDTH as usize],
-        bgbuf: &mut [u8; VRAM_WIDTH as usize],
+        bgbuf: Option<&mut [u8; VRAM_WIDTH as usize]>,
     );
 }
 
@@ -162,78 +144,6 @@ impl Default for GpuCgbExtension {
 
 impl CgbExt for GpuCgbExtension {
     type Color = Color;
-    fn get_color_and_color_id(
-        &self,
-        vram_bank0: &[u8; 0x2000],
-        tiles: u16,
-        tile: Point,
-        tile_offset: Point,
-        mapbase: u16,
-    ) -> (Self::Color, u8) {
-        let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
-        let attr = read_vram_bank(mapbase + ti, &self.vram);
-
-        let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
-        let vram_bank = (attr >> 3) & 1;
-        let xflip = attr & 0x20 != 0;
-        let yflip = attr & 0x40 != 0;
-        let priority = attr & 0x80 != 0;
-
-        let tyoff = if yflip {
-            7 - tile_offset.y
-        } else {
-            tile_offset.y
-        };
-        let txoff = if xflip {
-            7 - tile_offset.x
-        } else {
-            tile_offset.x
-        };
-
-        assert!(!priority);
-
-        let line = get_tile_line(
-            tbase,
-            tyoff,
-            if vram_bank == 0 {
-                vram_bank0
-            } else {
-                &self.vram
-            },
-        );
-        let coli = get_color_id_from_tile_line(line, txoff);
-        (palette[usize::from(coli)], coli)
-    }
-
-    fn get_window_col(
-        &self,
-        vram_bank0: &[u8; 0x2000],
-        tiles: u16,
-        tile: Point,
-        tile_offset: Point,
-        mapbase: u16,
-    ) -> Self::Color {
-        let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let ti = u16::from(tile.x) + u16::from(tile.y) * 32;
-        let attr = read_vram_bank(mapbase + ti, &self.vram);
-
-        let palette = &self.bg_color_palette.cols[usize::from(attr & 0x7)][..];
-        let vram_bank = (attr >> 3) & 1;
-
-        let line = get_tile_line(
-            tbase,
-            tile_offset.y,
-            if vram_bank == 0 {
-                vram_bank0
-            } else {
-                &self.vram
-            },
-        );
-
-        let coli = get_color_id_from_tile_line(line, tile_offset.x);
-        palette[usize::from(coli)]
-    }
 
     fn get_sp_attr<'a>(
         &'a self,
@@ -346,15 +256,15 @@ impl CgbExt for GpuCgbExtension {
         self.obj_color_palette.write(v);
     }
 
-    fn get_scanline_after_scx(
+    fn get_scanline_after_offset(
         &self,
-        scx: u8,
+        offset: u8,
         y: u8,
         vram_bank0: &[u8; 0x2000],
         tiles: u16,
         mapbase: u16,
         buf: &mut [Self::Color; VRAM_WIDTH as usize],
-        bgbuf: &mut [u8; VRAM_WIDTH as usize],
+        bgbuf: Option<&mut [u8; VRAM_WIDTH as usize]>,
     ) {
         // (scx / 8..=u8::MAX / 8)
         //     .chain(0..) // we don't care about the upper limit because we call take() later anyway
@@ -419,36 +329,6 @@ impl Default for Dmg {
 
 impl CgbExt for Dmg {
     type Color = DmgColor;
-
-    fn get_color_and_color_id(
-        &self,
-        vram_bank0: &[u8; 0x2000],
-        tiles: u16,
-        tile: Point,
-        tile_offset: Point,
-        mapbase: u16,
-    ) -> (Self::Color, u8) {
-        let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let line = get_tile_line(tbase, tile_offset.y, vram_bank0);
-        let coli = get_color_id_from_tile_line(line, tile_offset.x);
-
-        (self.bg_palette[usize::from(coli)], coli)
-    }
-
-    fn get_window_col(
-        &self,
-        vram_bank0: &[u8; 0x2000],
-        tiles: u16,
-        tile: Point,
-        tile_offset: Point,
-        mapbase: u16,
-    ) -> Self::Color {
-        let tbase = get_tile_base(tiles, mapbase, tile, vram_bank0);
-        let line = get_tile_line(tbase, tile_offset.y, vram_bank0);
-        let coli = get_color_id_from_tile_line(line, tile_offset.x);
-
-        self.bg_palette[usize::from(coli)]
-    }
 
     fn get_sp_attr<'a>(
         &'a self,
@@ -554,7 +434,7 @@ impl CgbExt for Dmg {
         panic!("Write BG Color palette in DMG mode");
     }
 
-    fn get_scanline_after_scx(
+    fn get_scanline_after_offset(
         &self,
         scx: u8,
         y: u8,
@@ -562,7 +442,7 @@ impl CgbExt for Dmg {
         tiles: u16,
         mapbase: u16,
         buf: &mut [Self::Color; VRAM_WIDTH as usize],
-        bgbuf: &mut [u8; VRAM_WIDTH as usize],
+        mut bgbuf: Option<&mut [u8; VRAM_WIDTH as usize]>,
     ) {
         // thanks https://github.com/deltabeard/Peanut-GB/blob/4596d56ddb85a1aa45b1197c77f05e236a23bd94/peanut_gb.h#L1465
         let mut tbase = get_tile_base(
@@ -594,7 +474,11 @@ impl CgbExt for Dmg {
             }
             let coli = (line[0] & 1) | ((line[1] & 1) << 1);
             buf[usize::from(i)] = self.bg_palette[usize::from(coli)];
-            bgbuf[usize::from(i)] = coli;
+            if let Some(b) = bgbuf {
+                b[usize::from(i)] = coli;
+                bgbuf = Some(b);
+            }
+
             line[0] >>= 1;
             line[1] >>= 1;
             offset += 1;
@@ -1103,38 +987,28 @@ impl<Ext: CgbExt> Gpu<Ext> {
         buf: &mut [<Ext as CgbExt>::Color; 160],
         bgbuf: &mut [u8; 160],
     ) {
-        self.cgb_ext.get_scanline_after_scx(
+        self.cgb_ext.get_scanline_after_offset(
             self.scx,
             self.ly.wrapping_add(self.scy),
             &self.vram,
             self.lcd_control.get_bg_and_window_tile_area(),
             self.lcd_control.get_bgmap(),
             buf,
-            bgbuf,
+            Some(bgbuf),
         );
     }
 
     fn when_window_enable(&self, buf: &mut [<Ext as CgbExt>::Color; 160]) {
-        let mapbase = self.lcd_control.get_winmap();
-
         if self.ly >= self.wy {
-            let yy = self.ly - self.wy;
-            let ty = yy / 8;
-            let tyoff = yy % 8;
-
-            for x in self.wx.saturating_sub(7)..VRAM_WIDTH {
-                let xx = x + 7 - self.wx; // x - (wx - 7)
-                let tx = xx / 8;
-                let txoff = xx % 8;
-
-                buf[usize::from(x)] = self.cgb_ext.get_window_col(
-                    &self.vram,
-                    self.lcd_control.get_bg_and_window_tile_area(),
-                    Point { x: tx, y: ty },
-                    Point { x: txoff, y: tyoff },
-                    mapbase,
-                );
-            }
+            self.cgb_ext.get_scanline_after_offset(
+                self.wx.saturating_sub(7),
+                self.ly - self.wy,
+                &self.vram,
+                self.lcd_control.get_bg_and_window_tile_area(),
+                self.lcd_control.get_winmap(),
+                buf,
+                None,
+            );
         }
     }
 
