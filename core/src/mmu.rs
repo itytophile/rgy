@@ -83,7 +83,7 @@ pub struct Mmu<'a, 'b, H, GB: GameboyMode> {
 }
 
 impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
-    fn io_read(&mut self, addr: u16) -> u8 {
+    fn io_read(&self, addr: u16) -> u8 {
         match addr {
             0xff00 => self.peripherals.joypad.read(self.joypad_input),
             0xff01 => self.peripherals.serial.get_data(),
@@ -243,7 +243,7 @@ impl<'a, 'b, H: Clock, GB: GameboyMode> Mmu<'a, 'b, H, GB> {
 
 impl<'a, 'b, T: Clock, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
     /// Get the interrupt vector address without clearing the interrupt flag state
-    fn peek_int_vec(&mut self) -> Option<u8> {
+    fn peek_int_vec(&self) -> Option<u8> {
         self.peripherals.irq.peek()
     }
 
@@ -253,7 +253,7 @@ impl<'a, 'b, T: Clock, GB: GameboyMode> Sys for Mmu<'a, 'b, T, GB> {
     }
 
     /// Reads one byte from the given address in the memory.
-    fn get8(&mut self, addr: u16) -> u8 {
+    fn get8(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7fff => self.peripherals.mbc.on_read(addr),
             0x8000..=0x9fff => self.peripherals.gpu.read_vram(addr),
@@ -346,7 +346,7 @@ impl Ram {
 }
 
 impl Sys for Ram {
-    fn peek_int_vec(&mut self) -> Option<u8> {
+    fn peek_int_vec(&self) -> Option<u8> {
         None
     }
 
@@ -354,7 +354,7 @@ impl Sys for Ram {
         None
     }
 
-    fn get8(&mut self, addr: u16) -> u8 {
+    fn get8(&self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }
 

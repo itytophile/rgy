@@ -8,10 +8,10 @@ pub trait Sys {
     fn pop_int_vec(&mut self) -> Option<u8>;
 
     /// Get the interrupt vector address without clearing the interrupt flag state
-    fn peek_int_vec(&mut self) -> Option<u8>;
+    fn peek_int_vec(&self) -> Option<u8>;
 
     /// Read a byte from the address.
-    fn get8(&mut self, addr: u16) -> u8;
+    fn get8(&self, addr: u16) -> u8;
 
     /// Write a byte to the address.
     fn set8(&mut self, addr: u16, v: u8);
